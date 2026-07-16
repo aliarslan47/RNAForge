@@ -1,8 +1,23 @@
 # PLAN.md
 
-**Version:** v1.1\
+**Version:** v1.2\
 **Status:** Active\
 **Purpose:** Single Source of Truth
+
+> **Changelog (v1.1 → v1.2)**
+> - Organizma tipi girişe alındı: prokaryot/ökaryot seçimi akışı dallandırır
+>   (Bölüm 2.1, 4, 5, 11). Bakterilerde intron yok → tx2gene ~1:1; Salmon+tximport
+>   yerine genom hizalama + featureCounts yolu.
+> - Platform tespiti eklendi: Illumina/ONT/PacBio FASTQ'dan tespit edilir.
+>   MVP yalnızca Illumina destekler; ONT/PacBio tespit edilip reddedilir (Bölüm 2.1, 4.1, 11).
+> - Trimming politikası eklendi (literatür temelli): agresif kalite trimming
+>   ekspresyon tahminlerini bozar → nazik varsayılan + zorunlu min-uzunluk filtresi
+>   (Bölüm 4.1, 11).
+> - Doğrulama iki katmanlı tanımlandı: Katman A (count matrisi → birebir yakın),
+>   Katman B (FASTQ → konkordans). Birebir yayın tekrarı hedef değildir (Bölüm 3).
+> - Çıktı yapısının adım-bazlı olduğu gerekçesiyle netleştirildi (Bölüm 14).
+> - Çift dilli (TR/EN) dokümantasyon ve rapor dili config'e bağlandı (Bölüm 11, 15).
+> - Detaylı MVP tasarımı: `docs/superpowers/specs/2026-07-16-rnaforge-mvp-design.md`
 
 > **Changelog (v1.0 → v1.1)**
 > - MVP-First build önceliği eklendi (Bölüm 2.1).
@@ -45,12 +60,30 @@ Bu belge kapsamlıdır; tehlike, ilk müşteriden önce haftalarca cilalama
 tuzağına düşmektir. Bu yüzden geliştirme **çalışan ince bir dilimle** başlar,
 süsler sonra eklenir.
 
--   **MVP (Faz 1 hedefi):** FASTQ → QC → Salmon → DESeq2 → 3-4 temel figür
-    (PCA, Volcano, Heatmap) → basit HTML rapor. Demo veride uçtan uca **koşmalı.**
--   **Faz 2+:** GSEA, KEGG, 11 figür/9 tablo tam seti, otomatik workflow diyagramı,
-    9 modüllü dashboard, PDF rapor.
+-   **MVP (Faz 1 hedefi):** FASTQ → doğrulama + **platform tespiti** → QC →
+    nazik trimming → **kantifikasyon (prokaryot | ökaryot yolu)** → gen-seviyesi
+    count matrisi → DESeq2 → 3 temel figür (PCA, Volcano, Heatmap) → basit HTML
+    rapor. Demo veride uçtan uca **koşmalı.**
+-   **MVP sınırları:** Yalnızca **Illumina**. ONT/PacBio tespit edilir ve net bir
+    hatayla **reddedilir** (tespit etmek ≠ desteklemek). MultiQC, GO/KEGG, GSEA,
+    workflow diyagramı, dashboard ve PDF rapor MVP'de yoktur.
+-   **Faz 2+:** ONT yolu (minimap2), MultiQC, GSEA, KEGG/GO (ORA), 11 figür/9 tablo
+    tam seti, otomatik workflow diyagramı, 9 modüllü dashboard, PDF rapor.
 -   Kural: "Çalışan MVP" > "mükemmel plan". Her modül önce en basit çalışan
     haliyle bitirilir, sonra zenginleştirilir.
+
+### Organizma tipi (girişte seçilir)
+
+Pipeline organizma-agnostiktir; müşteri işi herhangi bir organizma olabilir.
+Organizma tipi **config'ten gelir ve zorunludur** (varsayılanı yoktur — yanlış
+varsayım sessiz hataya yol açar):
+
+-   `prokaryote`: genom hizalama (bowtie2) + featureCounts
+-   `eukaryote`: Salmon + tximport/tx2gene
+
+Bu ayrım yalnızca kantifikasyon ve count modüllerine hapsedilir; her iki yol da
+aynı **gen × örnek count matrisi** sözleşmesinde buluşur. DE, figürler ve rapor
+matrisin hangi yoldan geldiğini bilmez.
 
 ------------------------------------------------------------------------
 
@@ -68,9 +101,40 @@ Doğrulama veri seti;
 
 olmalıdır.
 
-> Not: Yayıncı markası (Nature/Springer vb.) bir kriter değildir. Önemli olan,
-> beklenen sonucun bilinir olması ve pipeline çıktısıyla karşılaştırılabilmesidir.
-> Kriteri gereksiz daraltmak zaman kaybettirir.
+> Not: Önemli olan, beklenen sonucun bilinir olması ve pipeline çıktısıyla
+> karşılaştırılabilmesidir. Buna karşılık veri seti **üst segment bir dergiden**
+> gelmelidir (Nature Communications, Nature Microbiology, Science, Cell, PNAS,
+> EMBO, mBio, NAR vb.); Frontiers, PLOS One ve Scientific Reports dahil değildir.
+> Tarih aralığı 2024–2026 (tercih 2025–2026).
+
+## 3.1 Doğrulama Katmanları
+
+Bir yayının sayılarını **birebir** yeniden üretmek genelde mümkün değildir: yayınlar
+farklı araç, farklı anotasyon sürümü ve farklı filtreler kullanır. Gerçekçi ve
+savunulabilir hedef **konkordanstır**. Bu ayrım yapılmazsa var olmayan bir hata aranır.
+
+-   **Katman A — sayısal doğruluk:** Yayımlanmış count matrisi → DE modülü →
+    yayımlanmış DE sonucuyla karşılaştır. Kantifikasyon değişkenliği devre dışı;
+    yalnızca DE modülü sınanır → **birebir yakın eşleşme beklenir.** Tutmuyorsa
+    DE modülü bozuktur. **pydeseq2 çapraz kontrolü burada çalışır:** R/DESeq2
+    birincil sonuç, pydeseq2 bağımsız ikinci uygulama; anlamlı sapma bir alarmdır.
+-   **Katman B — uçtan uca konkordans:** Ham FASTQ → tüm pipeline → yayının DEG
+    tablosu. Hedef: anlamlı genlerin örtüşmesi ve etki yönü uyumu. Birebir log2FC
+    eşleşmesi **beklenmez.**
+
+pydeseq2 çapraz kontrolü yalnızca doğrulamada çalışır, her müşteri run'ında değil.
+
+## 3.2 Demo Veri Seti Seçim Kriterleri
+
+1.  Bakteriyel (prokaryot yolunu sınar)
+2.  Ham FASTQ public (SRA/GEO/ENA), Illumina
+3.  Üst segment dergi (yukarıdaki liste)
+4.  2024–2026 (tercih 2025–2026)
+5.  **Güçlü ve net sinyal** — knockout/overekspresyon veya güçlü muamele; yüzlerce
+    DEG. Gerekçe: zayıf sinyalli sette doğru kurulmuş bir pipeline bile yayından
+    sapar ve "sapma bizden mi veriden mi" ayırt edilemez.
+6.  Temiz tasarım: az değişken, replikalı
+7.  Yayında karşılaştırılabilir açık sonuç (DEG tablosu / supplementary)
 
 Bu veri seti yalnızca geliştirme ve test amacıyla kullanılacaktır.
 
@@ -85,30 +149,40 @@ Gerçek kullanımda tüm analizler yalnızca müşterinin sağladığı veri
 ``` text
 Input FASTQ
 ↓
-Metadata Validation
+Metadata Validation + Platform Detection (Illumina | ONT | PacBio)
+│   └─ ONT/PacBio → REJECT (MVP: Illumina only)
 ↓
 Quality Control (FastQC)
 ↓
-Read Trimming (fastp)
+Read Trimming (fastp — nazik: adapter + min-length, agresif kalite trimming YOK)
 ↓
-Quantification (Salmon, transcriptome index)
+┌─────────────── organism_type ───────────────┐
+│                                             │
+prokaryote                                eukaryote
+│                                             │
+Alignment (bowtie2, genome index)         Quantification (Salmon, transcriptome index)
+│                                             │
+featureCounts (GFF/GTF)                   tximport + tx2gene (transcript → gene)
+│                                             │
+└─────────────────┬───────────────────────────┘
 ↓
-tximport + tx2gene (transcript → gene level)
+Count Matrix (gen × örnek — ortak sözleşme)
 ↓
-Count Matrix
+Differential Expression (DESeq2, esnek design formülü)
 ↓
-Differential Expression (DESeq2)
+Functional Enrichment (GO/KEGG = ORA, GSEA)        [Faz 2+]
 ↓
-Functional Enrichment (GO/KEGG = ORA, GSEA)
+Visualization (MVP: PCA, Volcano, Heatmap)
 ↓
-Visualization
+MultiQC (tüm adımların QC'sini toplar)             [Faz 2+]
 ↓
-MultiQC (tüm adımların QC'sini toplar)
+Interactive Dashboard                              [Faz 2+]
 ↓
-Interactive Dashboard
-↓
-Scientific Report
+Scientific Report (MVP: HTML; PDF Faz 2+)
 ```
+
+Akış `organism_type`'a göre dallanır ve **count matrisi sözleşmesinde birleşir.**
+Dallanma yalnızca kantifikasyon/count modüllerindedir; sonraki tüm adımlar ortaktır.
 
 Pipeline tamamlandıktan sonra bu akış ayrıca SVG, PNG ve PDF
 formatlarında otomatik bir Workflow Diagram olarak oluşturulmalıdır.
@@ -128,22 +202,59 @@ formatlarında otomatik bir Workflow Diagram olarak oluşturulmalıdır.
     varsa `~batch + condition`. Design, config'ten gelmelidir.
 -   **ORA vs GSEA ayrımı:** GO/KEGG **ORA** anlamlı DEG *alt kümesini* kullanır;
     **GSEA** *tüm genlerin sıralı (ranked) listesini* kullanır. İkisi karıştırılmaz.
+-   **Prokaryot ≠ ökaryot:** Bakterilerde intron yoktur ve gen başına tek transkript
+    vardır → tx2gene ~1:1, tximport bir formaliteye döner. Prokaryotta doğru yol
+    genom hizalama + featureCounts'tur. Ayrıca rRNA deplesyonu polyA seçiminin
+    yerini alır; GO/KEGG anotasyonu farklı kaynaklardan gelir (org.Hs.eg.db yok →
+    eggNOG/KEGG gerekir, Faz 2+).
+-   **Platform tespiti ve sınırı:** FASTQ başlık formatı + read uzunluk dağılımından
+    platform **güvenilir tespit edilir** (Illumina / ONT / PacBio). Buna karşılık
+    kütüphane kimyası (rRNA-deplesyon mu polyA mı, stranded mı) FASTQ'da **yoktur,
+    tespit edilemez** → config'ten gelmelidir. Strandedness hizalama sonrası
+    çıkarsanabilir (Salmon `-l A`) ama tahmin edilmez; config ile çelişirse uyarılır.
+
+## 4.2 Trimming Politikası (literatür temelli)
+
+**Agresif kalite trimming RNA-seq ekspresyon tahminlerini bozar.** Williams et al.
+2016 (BMC Bioinformatics, doi:10.1186/s12859-016-0956-2) agresif trimming ile
+genlerin **%10'undan fazlasının** ekspresyon tahmininin anlamlı şekilde değiştiğini
+gösterir; üç veri setinde ve farklı DE pipeline'larında tekrarlanmış, sonuçlar
+microarray'e karşı doğrulanmıştır. Sebep: kısalan read'lerin yanlış hizalanması
+(spurious mapping). Sapmanın büyük kısmı **minimum uzunluk filtresiyle** ortadan
+kalkar. Yazarların sonucu: *no or modest trimming results in the most biologically
+accurate gene expression estimates.*
+
+Ayrıca Salmon gibi araçlar soft-clipping yaptığı için adapter trimming'in faydası
+yalnızca gerçek adapter kontaminasyonu varsa ortaya çıkar.
+
+**Karar:** fastp kullanılır, ama nazik varsayılanlarla:
+
+-   Adapter tespiti/temizliği: **açık** (fastp otomatik)
+-   Agresif kalite trimming (sliding-window `--cut_right` vb.): **kapalı**
+-   Minimum uzunluk filtresi: **açık ve zorunlu**
+-   Kalite filtresi: fastp varsayılanı (nazik)
+
+Eşikler config'ten ayarlanabilir; güvenli varsayılan daima nazik taraftadır.
+Gerekçe doğrulama hedefini de korur: agresif trimming ile koşulsaydı sonuçlar
+referans yayından sapar ve bu sapma pipeline hatası sanılırdı.
 
 ------------------------------------------------------------------------
 
 # 5. Pipeline Modules
 
--   Input Validation
--   Quality Control
--   Read Trimming
--   Quantification (Salmon)
--   Transcript-to-Gene (tximport + tx2gene)
--   Differential Expression (esnek design formülü, batch desteği)
--   Functional Enrichment (ORA: GO/KEGG — GSEA ayrı)
--   Visualization
--   MultiQC Aggregation
--   Reporting
--   Dashboard
+-   `m01` Input Validation + **Platform Detection**
+-   `m02` Quality Control (FastQC)
+-   `m03` Read Trimming (fastp — nazik, bkz. Bölüm 4.2)
+-   `m04` Quantification **ROUTER** — prokaryote: bowtie2 | eukaryote: Salmon
+-   `m05` Count Matrix — prokaryote: featureCounts | eukaryote: tximport + tx2gene
+-   `m06` Differential Expression (DESeq2, esnek design formülü, batch desteği)
+-   `m07` Visualization (MVP: PCA, Volcano, Heatmap)
+-   `m08` Reporting (MVP: HTML)
+-   Functional Enrichment (ORA: GO/KEGG — GSEA ayrı)   [Faz 2+]
+-   MultiQC Aggregation                                 [Faz 2+]
+-   Dashboard                                           [Faz 2+]
+
+`m04`/`m05` dışındaki hiçbir modül organizma tipini bilmez.
 
 ------------------------------------------------------------------------
 
@@ -247,15 +358,25 @@ Bölümler:
 # 11. Configuration
 
 -   Organism
--   Reference **Transcriptome** (Salmon index)
--   Annotation / **tx2gene** mapping
--   Aligner/Quantifier (default: Salmon; opsiyonel: STAR — bulut)
+-   **Organism Type** — `prokaryote` | `eukaryote` — **ZORUNLU, varsayılanı yok**
+-   **Platform** — `auto` (varsayılan) | `illumina`. `auto` tespit eder; açık değer
+    verilirse tespit yine çalışır ve çelişkide hata verir.
+-   Reference (organism_type'a göre zorunlu olur):
+    -   prokaryote: **Genome FASTA** + **Annotation GFF/GTF**
+    -   eukaryote: **Transcriptome FASTA** (Salmon index) + **tx2gene** mapping
+-   **Library** — `strandedness` (unstranded | stranded | reverse),
+    `selection` (rrna_depletion | polya). FASTQ'dan tespit edilemez (Bölüm 4.1).
+-   **Trimming** — `min_length` (zorunlu filtre), `aggressive_quality: false`
+    (literatür temelli varsayılan, bkz. Bölüm 4.2)
 -   **Design Formula** (ör. `~condition` veya `~batch + condition`)
 -   **Batch / Covariates** (opsiyonel)
 -   FDR Threshold
 -   Log2FC Threshold
+-   **Report Language** — `tr` | `en`
 -   Thread
 -   Memory
+
+Opsiyonel/Faz 2: STAR (bulut), ONT yolu (minimap2).
 
 ------------------------------------------------------------------------
 
@@ -287,19 +408,28 @@ Kontrol edilmesi gereken durumlar:
 # 14. Output Structure
 
 ``` text
-results/
-├── raw_qc/
-├── quantification/
-├── differential_expression/
-├── enrichment/
-├── figures/
+runs/<timestamp>_<run_id>/
+├── raw_qc/                    # örnek-bazlı: her FASTQ'nun FastQC çıktısı
+├── quantification/            # örnek-bazlı quant + counts.tsv (birleşik matris)
+├── differential_expression/   # deney-bazlı: DESeq2 sonuç tablosu
+├── enrichment/                # [Faz 2+]
+├── figures/                   # deney-bazlı: PCA, Volcano, Heatmap (≥300 DPI)
 ├── tables/
-├── statistics/
-├── workflow/
-├── report/
-├── dashboard/
+├── statistics/                # raw + final istatistikler (Bölüm 6)
+├── workflow/                  # [Faz 2+]
+├── report/                    # MVP: HTML
+├── dashboard/                 # [Faz 2+]
 └── logs/
 ```
+
+**Bölme adım-bazlıdır, örnek-bazlı değil.** Gerekçe: DE, PCA ve volcano tek bir
+örneğe değil *deneye* aittir — örnek-bazlı klasörde bu çıktıların konacağı yer
+yoktur. Örnek kırılımı adım klasörlerinin *içinde* korunur (`raw_qc/`,
+`quantification/`). Bu, örnek-bazlı WGS düzeninden bilinçli bir ayrılıştır:
+WGS'de her örnek bağımsız analiz edilir, RNA-seq DE ise doğası gereği
+örnekler-arası bir analizdir.
+
+`runs/` .gitignore'dadır — müşteri verisi asla commit edilmez (Bölüm 16).
 
 ------------------------------------------------------------------------
 
@@ -313,7 +443,12 @@ results/
 -   Otomatik rapor
 -   Otomatik istatistik özeti
 -   Numaralandırılmış tablo ve şekiller
--   GitHub'a uygun proje yapısı
+-   GitHub'a uygun proje yapısı (**private** depo)
+-   **Çift dilli (TR/EN) dokümantasyon:** `README.md` (EN) + `README.tr.md` (TR),
+    içerik eşdeğer. Kod, değişken adları ve log mesajları İngilizce; PLAN/DURUM ve
+    spec'ler Türkçe (çalışma dili). HTML rapor dili config'ten (`tr` | `en`).
+-   **Kapatma dayanıklılığı:** uzun işler kapanmaya dayanıklı — 10 sn heartbeat +
+    her modül bitiminde kalıcı durum kaydı → yeniden başlatmada resume.
 
 ------------------------------------------------------------------------
 
@@ -340,3 +475,8 @@ Müşteri verisi işleneceği için gizlilik ve saklama politikası açıktır
 4.  Proje yapısı, rapor standardı ve çıktı formatı korunacaktır.
 5.  Geliştirme MVP-First ilkesine uyar (bkz. Bölüm 2.1): önce çalışan ince dilim,
     sonra zenginleştirme.
+6.  Organizma tipi ayrımı `m04`/`m05`'e hapsedilir; diğer modüllere sızdırılmaz.
+    Yeni bir yol (ONT, STAR) eklenirse yalnızca bu iki modül değişir.
+7.  Tespit etmek ≠ desteklemek. Desteklenmeyen girdi sessizce işlenmez; net bir
+    hatayla reddedilir.
+8.  Müşteri verisi ve PII asla commit edilmez, teste veya dokümana yazılmaz.
