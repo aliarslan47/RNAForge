@@ -1,0 +1,25 @@
+# Müşteri verisi ve run çıktıları ASLA repoya girmez (PII)
+# Customer data and run outputs are NEVER committed (PII)
+runs/
+raw/
+references/
+databases/
+test_data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# OS / editor
+.DS_Store
+*.swp
