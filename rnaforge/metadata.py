@@ -60,6 +60,8 @@ def load_metadata(path: Path | str, base_dir: Path | None = None) -> list[Sample
         for column in ("fastq_1", "fastq_2"):
             value = (row.get(column) or "").strip()
             if not value:
+                if column == "fastq_1":
+                    raise MetadataError(f"line {line_no}: fastq_1 must not be empty")
                 fastqs.append(None)
                 continue
             resolved = _resolve(value, base_dir)

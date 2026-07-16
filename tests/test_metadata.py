@@ -120,3 +120,12 @@ def test_valid_design_passes(tmp_path):
         "s4\ttreated\td.fastq\n"
     ))
     validate_design(load_metadata(path), "~condition")  # raise etmemeli
+
+
+def test_empty_fastq_1_raises(tmp_path):
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\t\n"
+    ))
+    with pytest.raises(MetadataError, match="fastq_1"):
+        load_metadata(path)
