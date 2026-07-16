@@ -9,9 +9,22 @@
 **Son güncelleme:** 2026-07-16
 
 ## Şu an nerede kaldık
-- **Proje YENİ başladı (2026-07-16).** Brainstorm bitti, tasarım spec'i yazıldı ve
-  PLAN.md v1.2'ye revize edildi. **Kod HENÜZ YAZILMADI.**
-- Sıradaki adım: implementasyon planı (writing-plans) → sonra TDD ile `m01`.
+- **Plan A YARIM — 3/7 görev bitti (2026-07-16).** Branch: `feat/plan-a-temel-m01`.
+- **Bitenler:** Task 1 (paket iskeleti + conda env `rnaforge-core` + CLI),
+  Task 2 (`config.py` — organism_type zorunlu, nazik trimming varsayılanları),
+  Task 3 (`platform.py` — FASTQ'dan platform tespiti, ONT/PacBio reddi).
+  **19/19 test geçiyor.** Her görev subagent + bağımsız review'dan geçti.
+- **Sıradaki:** Task 4 (`metadata.py`) → Task 5 (`state.py` resume/heartbeat) →
+  Task 6 (m01 + `rnaforge validate`) → Task 7 (README TR/EN).
+- Plan: `docs/superpowers/plans/2026-07-16-rnaforge-plan-a-temel-m01.md`
+- **İlerleme ledger'ı: `.superpowers/sdd/progress.md`** (git-ignored; commit SHA'ları
+  ve Minor bulgular orada — devam ederken ÖNCE onu oku).
+
+## Yöntem (devam ederken)
+Subagent-driven development: her görev için `scripts/task-brief` ile brief çıkar →
+implementer subagent (haiku) → `scripts/review-package` → task reviewer (sonnet) →
+ledger'a kaydet. Script'ler:
+`~/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/subagent-driven-development/scripts/`
 
 ## Onaylanan kararlar
 1. **Orkestrasyon:** Python paketi, `ali-wgs-pipeline` deseni (config.yaml, runs/, conda env'ler).
