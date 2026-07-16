@@ -9,13 +9,19 @@
 **Son güncelleme:** 2026-07-16
 
 ## Şu an nerede kaldık
-- **Plan A YARIM — 3/7 görev bitti (2026-07-16).** Branch: `feat/plan-a-temel-m01`.
+- **Plan A YARIM — 4/7 görev bitti (2026-07-16).** Branch: `feat/plan-a-temel-m01`
+  (GitHub'a push edildi). **30/30 test geçiyor.**
 - **Bitenler:** Task 1 (paket iskeleti + conda env `rnaforge-core` + CLI),
   Task 2 (`config.py` — organism_type zorunlu, nazik trimming varsayılanları),
-  Task 3 (`platform.py` — FASTQ'dan platform tespiti, ONT/PacBio reddi).
-  **19/19 test geçiyor.** Her görev subagent + bağımsız review'dan geçti.
-- **Sıradaki:** Task 4 (`metadata.py`) → Task 5 (`state.py` resume/heartbeat) →
-  Task 6 (m01 + `rnaforge validate`) → Task 7 (README TR/EN).
+  Task 3 (`platform.py` — FASTQ'dan platform tespiti, ONT/PacBio reddi),
+  Task 4 (`metadata.py` — örnek metadata + design formülü doğrulama).
+  Her görev subagent + bağımsız review'dan geçti.
+- **Task 4'te bir Important bulundu ve DÜZELTİLDİ:** boş `fastq_1` hücresi sessizce
+  `Sample(fastq_1=None)` üretiyordu (tip sözleşmesi `Path` diyor). Fix `e035b0c` +
+  regresyon testi. Bağımsız doğrulandı. **Ama fix sonrası re-review yapılmadı**
+  (kapatma nedeniyle) → devam edince re-review et veya final review'a bırak.
+- **Sıradaki:** Task 5 (`state.py` resume/heartbeat) → Task 6 (m01 +
+  `rnaforge validate`) → Task 7 (README TR/EN) → final whole-branch review.
 - Plan: `docs/superpowers/plans/2026-07-16-rnaforge-plan-a-temel-m01.md`
 - **İlerleme ledger'ı: `.superpowers/sdd/progress.md`** (git-ignored; commit SHA'ları
   ve Minor bulgular orada — devam ederken ÖNCE onu oku).
