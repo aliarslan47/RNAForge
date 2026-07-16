@@ -1,0 +1,8 @@
+name: rnaforge-core
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pyyaml>=6
+  - pytest>=8
+  - pip
