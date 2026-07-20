@@ -10,8 +10,10 @@ from collections import Counter
 from pathlib import Path
 
 from rnaforge.config import REQUIRED_REFERENCE, Config
+from rnaforge.gates import raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata, validate_design
 from rnaforge.platform import PlatformInfo, detect_platform, require_supported
+from rnaforge.quality import load_profile
 from rnaforge.state import RunState
 
 MODULE_NAME = "m01_validate"
@@ -78,7 +80,16 @@ def run_validation(
         samples = load_metadata(metadata_path)
         log(f"metadata: {len(samples)} sample(s) loaded from {metadata_path}")
 
-        validate_design(samples, config.de.design)
+        profile = load_profile(config.organism_type, config.quality)
+        log(f"quality profile: {profile.name} (permissive={profile.permissive})")
+
+        design_gates = validate_design(samples, config.de.design, paired=config.paired)
+        write_gate_results(run_dir, design_gates)
+        for gate in design_gates:
+            log(f"gate {gate.name}: {gate.status} — {gate.message}")
+        # Kapılar ÖNCE yazılır, SONRA zorlanır: FAIL'de de gates.json diskte kalmalı,
+        # teşhis raporu onu okuyacak (spec §3.5).
+        raise_if_failed(design_gates)
         log(f"design formula {config.de.design!r}: OK")
 
         per_sample: list[dict] = []
@@ -117,6 +128,8 @@ def run_validation(
             "conditions": conditions,
             "design": config.de.design,
             "samples": per_sample,
+            "quality_profile": profile.name,
+            "permissive_profile": profile.permissive,
         }
 
         stats_path.write_text(json.dumps(summary, indent=2))

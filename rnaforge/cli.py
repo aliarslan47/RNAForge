@@ -7,6 +7,7 @@ from pathlib import Path
 
 from rnaforge import __version__
 from rnaforge.config import ConfigError, load_config
+from rnaforge.gates import GateFailure
 from rnaforge.metadata import MetadataError
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.platform import UnsupportedPlatformError
@@ -55,6 +56,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _cmd_validate(args)
+    except GateFailure as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print("no results were produced: the data did not pass the quality gates.",
+              file=sys.stderr)
+        return 1
     except (ConfigError, MetadataError, UnsupportedPlatformError,
             FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
