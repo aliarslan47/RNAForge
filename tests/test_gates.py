@@ -59,3 +59,38 @@ def test_rerunning_a_module_replaces_its_own_results(tmp_path):
     data = json.loads((tmp_path / "quality" / "gates.json").read_text())
     assert len(data["gates"]) == 1
     assert data["gates"][0]["status"] == PASS
+
+
+def test_corrupted_gates_file_is_preserved_not_silently_discarded(tmp_path):
+    """Bozuk gates.json sessizce yok sayilmamali: kenara alinmali, yuksek sesle
+    bildirilmeli ve yeni modulun yazimi yine de basarili olmali (crash-survival)."""
+    write_gate_results(tmp_path, [_result(name="design_rank", module="m01")])
+    gates_path = tmp_path / "quality" / "gates.json"
+    # Yariya kesilmis (truncated) yazimi simule et: cokme sirasinda olabilecek durum.
+    gates_path.write_text('{"gates": [{"name": "design_rank", "module": "m01"')
+
+    with pytest.warns(UserWarning, match="corrupt"):
+        result_path = write_gate_results(tmp_path, [_result(name="alignment_rate", module="m04")])
+
+    assert result_path == gates_path
+    # Bozuk dosya silinmemis, kenara alinmis olmali (adli/forensic iz).
+    corrupt_candidates = list((tmp_path / "quality").glob("gates.json.corrupt*"))
+    assert len(corrupt_candidates) == 1
+    assert "design_rank" in corrupt_candidates[0].read_text()
+
+    # Yeni yazim basarili: m04 sonucu yerinde, dosya yine gecerli JSON.
+    data = json.loads(gates_path.read_text())
+    assert [g["name"] for g in data["gates"]] == ["alignment_rate"]
+
+    # Bozuk dosyadan sonra artik yariya kesik gecici (.tmp) dosya kalmamali.
+    leftovers = list((tmp_path / "quality").glob("gates.json.tmp*"))
+    assert leftovers == []
+
+
+def test_samples_field_cannot_be_mutated_after_construction():
+    """samples frozen dataclass uzerinde list olursa yerinde mutasyona acik kalir;
+    tuple olmali ki .samples uzerinde append/remove calismasin."""
+    result = _result(samples=["S1", "S2"])
+    assert result.samples == ("S1", "S2")
+    with pytest.raises(AttributeError):
+        result.samples.append("S3")
