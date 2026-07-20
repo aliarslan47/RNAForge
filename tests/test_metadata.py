@@ -143,7 +143,10 @@ def test_valid_design_passes(tmp_path):
         "s3\ttreated\tc.fastq\n"
         "s4\ttreated\td.fastq\n"
     ))
-    validate_design(load_metadata(path), "~condition")  # raise etmemeli
+    gates = validate_design(load_metadata(path), "~condition")
+    # Sadece raise etmemesi yetmiyor: yeni sözleşmede all-FAIL de raise etmez,
+    # bu yüzden kapıların gerçekten PASS olduğunu doğrulamalıyız.
+    assert all(g.status == PASS for g in gates)
 
 
 def test_empty_fastq_1_raises(tmp_path):
@@ -198,6 +201,93 @@ def test_balanced_batch_design_passes_every_gate(tmp_path):
     ))
     gates = validate_design(load_metadata(path), "~batch + condition")
     assert all(g.status == PASS for g in gates)
+
+
+def test_single_level_batch_rank_fail_names_the_offending_samples(tmp_path):
+    """Finding 4: tek-seviye batch FAIL'i mesajda batch'i adlandırıyor ama
+    samples alanını boş bırakıyordu; teşhis raporu bu listeyi render eder."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\tcontrol\tb1\tb.fastq\n"
+        "s3\ttreated\tb1\tc.fastq\n"
+        "s4\ttreated\tb1\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~batch + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert set(gate.samples) == {"s1", "s2", "s3", "s4"}
+
+
+def test_saturated_unique_subject_fails_the_rank_gate(tmp_path):
+    """CRITICAL (Finding 1): 4 örnek, 4 BENZERSİZ subject, 2 condition seviyesi.
+    subject örnek sayısı kadar seviyeye sahip -> doygun (saturated) tasarım,
+    residual serbestlik derecesi kalmıyor. DESeq2 bunu kriptik 'model matrix is
+    not full rank' hatasıyla söyler; eskiden bu senaryo tüm kapılardan PASS
+    alıyordu çünkü _rank_gate yalnızca 'batch'e bakıyordu."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp2\tb.fastq\n"
+        "s3\ttreated\tp3\tc.fastq\n"
+        "s4\ttreated\tp4\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~subject + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert "subject" in gate.message
+    assert gate.remedy
+    assert set(gate.samples) == {"s1", "s2", "s3", "s4"}
+
+
+def test_genuinely_paired_subject_design_passes_the_rank_gate(tmp_path):
+    """Doğru bir eşleşmiş (paired) tasarımda her subject BİRDEN FAZLA condition'da
+    görünür, bu yüzden confounded/saturated DEĞİLDİR ve rank gate PASS vermelidir.
+    Burada yanlış-pozitif projenin ana kullanım senaryosunu (paired design) kırar."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tafter\tp1\tb.fastq\n"
+        "s3\tbefore\tp2\tc.fastq\n"
+        "s4\tafter\tp2\td.fastq\n"
+    ))
+    gates = validate_design(load_metadata(path), "~subject + condition")
+    assert all(g.status == PASS for g in gates)
+
+
+def test_single_level_subject_fails_the_rank_gate(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp1\tb.fastq\n"
+        "s3\ttreated\tp1\tc.fastq\n"
+        "s4\ttreated\tp1\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~subject + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert "subject" in gate.message
+    assert set(gate.samples) == {"s1", "s2", "s3", "s4"}
+
+
+def test_subject_confounded_but_not_saturated_fails_the_rank_gate(tmp_path):
+    """6 örnek, 2 subject seviyesi (her biri 3x tekrar), her subject tek bir
+    condition'da -> confounded (doygun değil, çünkü 2 seviye != 6 örnek)."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq", "e.fastq", "f.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp1\tb.fastq\n"
+        "s3\tcontrol\tp1\tc.fastq\n"
+        "s4\ttreated\tp2\td.fastq\n"
+        "s5\ttreated\tp2\te.fastq\n"
+        "s6\ttreated\tp2\tf.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~subject + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert "confounded" in gate.message
+    assert "subject" in gate.message
 
 
 def test_subject_column_is_loaded(tmp_path):
@@ -286,3 +376,72 @@ def test_looks_paired_mixed_with_partial_subject_coverage(tmp_path):
         "s4\tafter\t\td.fastq\n"
     ))
     assert looks_paired(load_metadata(path)) is True
+
+
+def _paired_looking_metadata(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    return _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tafter\tp1\tb.fastq\n"
+        "s3\tbefore\tp2\tc.fastq\n"
+        "s4\tafter\tp2\td.fastq\n"
+    ))
+
+
+def test_paired_declared_gate_fails_when_pairing_undeclared(tmp_path):
+    """Finding 2 + 3: veri PAIRED görünüyor (p1 ve p2 iki condition'da), design
+    'subject' kullanmıyor, paired= de belirtilmemiş -> FAIL. Mesaj hangi
+    subject(ler)in eşleşmiş göründüğünü ADLANDIRMALI ve samples alanı bu
+    subject'lere ait örnek id'leriyle DOLMALI (teşhis raporu bunu render eder)."""
+    path = _paired_looking_metadata(tmp_path)
+    gate = _gate(validate_design(load_metadata(path), "~condition"), "paired_declared")
+    assert gate.status == FAIL
+    assert "p1" in gate.message
+    assert "p2" in gate.message
+    assert gate.remedy
+    assert set(gate.samples) == {"s1", "s2", "s3", "s4"}
+
+
+def test_paired_declared_gate_passes_when_subject_in_design(tmp_path):
+    path = _paired_looking_metadata(tmp_path)
+    gate = _gate(validate_design(load_metadata(path), "~subject + condition"), "paired_declared")
+    assert gate.status == PASS
+
+
+def test_paired_declared_gate_passes_with_explicit_paired_false(tmp_path):
+    """Kullanıcı bilerek unpaired koşmak istiyorsa paired=False deklarasyonu
+    kapının FAIL vermesini engellemeli."""
+    path = _paired_looking_metadata(tmp_path)
+    gate = _gate(
+        validate_design(load_metadata(path), "~condition", paired=False), "paired_declared"
+    )
+    assert gate.status == PASS
+
+
+def test_paired_declared_gate_passes_when_data_is_not_paired(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp2\tb.fastq\n"
+        "s3\ttreated\tp3\tc.fastq\n"
+        "s4\ttreated\tp4\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~condition"), "paired_declared")
+    assert gate.status == PASS
+
+
+def test_subject_in_design_missing_for_some_sample_raises(tmp_path):
+    """Finding 3: design 'subject' kullanıyor ama bazı örneklerin subject
+    değeri yok -> MetadataError (formül hâlâ bozuk girdi, kapı değil)."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tafter\tp1\tb.fastq\n"
+        "s3\tbefore\t\tc.fastq\n"
+    ))
+    samples = load_metadata(path)
+    with pytest.raises(MetadataError, match="subject"):
+        validate_design(samples, "~subject + condition")

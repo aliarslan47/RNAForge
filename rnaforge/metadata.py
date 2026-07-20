@@ -134,39 +134,84 @@ def _ok(name: str, message: str) -> GateResult:
     )
 
 
+RANK_FACTORS = ("batch", "subject")
+
+
 def _rank_gate(samples: list[Sample], variables: list[str]) -> GateResult:
-    if "batch" not in variables:
-        return _ok("design_rank", "the design uses no batch term, so it is full rank")
+    # Tasarımdaki HER kategorik faktör (batch, subject, ...) ayrı ayrı kontrol
+    # edilmeli — yalnızca batch'e bakmak, subject üzerinden doygun/confounded
+    # tasarımları sessizce PASS ettirir (bkz. Finding 1: 4 örnek + 4 benzersiz
+    # subject -> DESeq2 "model matrix is not full rank" ile patlar).
+    factors = [v for v in RANK_FACTORS if v in variables]
+    if not factors:
+        return _ok("design_rank", "the design uses no batch or subject term, so it is full rank")
 
-    batches = {s.batch for s in samples}
-    if len(batches) < 2:
-        return GateResult(
-            name="design_rank", module=MODULE, status=FAIL,
-            message=(
-                f"the design uses 'batch' but every sample is in the same batch "
-                f"({sorted(batches)[0]!r}), which makes the model matrix rank-deficient"
-            ),
-            remedy="use design '~condition', or supply samples from more than one batch",
-        )
+    n_samples = len(samples)
+    for factor in factors:
+        levels = {getattr(s, factor) for s in samples}
 
-    by_batch: dict[str, set[str]] = {}
-    for sample in samples:
-        by_batch.setdefault(sample.batch, set()).add(sample.condition)
-    if all(len(conditions) == 1 for conditions in by_batch.values()):
-        mapping = ", ".join(f"{b}->{next(iter(c))}" for b, c in sorted(by_batch.items()))
-        return GateResult(
-            name="design_rank", module=MODULE, status=FAIL,
-            message=(
-                "batch is completely confounded with condition, so their effects cannot "
-                f"be separated ({mapping})"
-            ),
-            remedy=(
-                "drop 'batch' from the design, or use a layout where at least one batch "
-                "contains more than one condition"
-            ),
-            samples=[s.sample_id for s in samples],
-        )
-    return _ok("design_rank", "batch and condition are not confounded; the design is full rank")
+        # (a) Tek seviye: faktör hiçbir ayrım bilgisi eklemez.
+        if len(levels) < 2:
+            return GateResult(
+                name="design_rank", module=MODULE, status=FAIL,
+                message=(
+                    f"the design uses {factor!r} but every sample is in the same {factor} "
+                    f"({sorted(levels)[0]!r}), which makes the model matrix rank-deficient"
+                ),
+                remedy=f"use design '~condition', or supply samples from more than one {factor}",
+                samples=[s.sample_id for s in samples],
+            )
+
+        # (c) Doygun (saturated): seviye sayısı örnek sayısına eşitse, her
+        # seviye tam olarak BİR örnekte görülür (pigeonhole ilkesi) -> residual
+        # serbestlik derecesi kalmaz. Bu, 'subject' için özellikle sinsi bir
+        # durumdur: her hastadan tek ölçüm varsa (tekrarlanan ölçüm yok),
+        # tasarım "confounded" değil ama yine de rank-deficient'tır — bu yüzden
+        # confounded kontrolünden ÖNCE kontrol ediyoruz ki teşhis mesajı doğru
+        # nedeni (doygunluk) adlandırsın.
+        if len(levels) == n_samples:
+            offending = sorted(str(x) for x in levels)
+            return GateResult(
+                name="design_rank", module=MODULE, status=FAIL,
+                message=(
+                    f"the design uses {factor!r} but it has as many levels as there are "
+                    f"samples ({len(levels)} levels for {n_samples} samples: "
+                    f"{', '.join(offending)}), so the design is saturated and leaves no "
+                    "residual degrees of freedom"
+                ),
+                remedy=(
+                    f"drop {factor!r} from the design, or provide repeated measurements so "
+                    f"that {factor!r} levels repeat across samples"
+                ),
+                samples=[s.sample_id for s in samples],
+            )
+
+        # (b) Tam confounded: her seviye yalnızca tek bir condition'da
+        # görülüyorsa, faktörün etkisi condition'ınkinden ayrıştırılamaz.
+        by_factor: dict[str, set[str]] = {}
+        for sample in samples:
+            by_factor.setdefault(getattr(sample, factor), set()).add(sample.condition)
+        if all(len(conditions) == 1 for conditions in by_factor.values()):
+            mapping = ", ".join(f"{lvl}->{next(iter(c))}" for lvl, c in sorted(by_factor.items()))
+            offending_samples = [
+                s.sample_id for s in samples if len(by_factor[getattr(s, factor)]) == 1
+            ]
+            return GateResult(
+                name="design_rank", module=MODULE, status=FAIL,
+                message=(
+                    f"{factor} is completely confounded with condition, so their effects "
+                    f"cannot be separated ({mapping})"
+                ),
+                remedy=(
+                    f"drop {factor!r} from the design, or use a layout where at least one "
+                    f"{factor} contains more than one condition"
+                ),
+                samples=offending_samples,
+            )
+
+    return _ok(
+        "design_rank", "design factors are not confounded with condition; the design is full rank"
+    )
 
 
 def _replication_gate(samples: list[Sample]) -> GateResult:
@@ -203,17 +248,31 @@ def _paired_gate(
         return _ok("paired_declared", f"pairing was declared explicitly (paired={paired})")
     if not looks_paired(samples):
         return _ok("paired_declared", "the data is not paired")
+
+    # Hangi subject(ler) eşleşmiş görünüyor (>1 condition'da)? Kapı mesajı ve
+    # samples alanı bunları ADLANDIRMALI — teşhis raporu FAIL veren her kapının
+    # sorumlu örneklerini render eder (bkz. Finding 2).
+    by_subject: dict[str, set[str]] = {}
+    for sample in samples:
+        if sample.subject is None:
+            continue
+        by_subject.setdefault(sample.subject, set()).add(sample.condition)
+    paired_subjects = sorted(subj for subj, conditions in by_subject.items() if len(conditions) > 1)
+    offending_samples = [s.sample_id for s in samples if s.subject in paired_subjects]
+
     return GateResult(
         name="paired_declared", module=MODULE, status=FAIL,
         message=(
-            "the metadata looks PAIRED (at least one subject appears in more than one "
-            "condition) but the design does not use 'subject'; an unpaired analysis "
-            "leaves subject-to-subject variation in the noise and hides real differences"
+            "the metadata looks PAIRED (subject(s) appearing in more than one condition: "
+            f"{', '.join(paired_subjects)}) but the design does not use 'subject'; an "
+            "unpaired analysis leaves subject-to-subject variation in the noise and hides "
+            "real differences"
         ),
         remedy=(
             "use design '~subject + condition', or declare 'paired: false' in the config "
             "to run unpaired on purpose"
         ),
+        samples=offending_samples,
     )
 
 
