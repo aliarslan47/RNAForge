@@ -217,3 +217,45 @@ def test_looks_paired_false_when_each_subject_has_one_condition(tmp_path):
         "s4\ttreated\tp4\td.fastq\n"
     ))
     assert looks_paired(load_metadata(path)) is False
+
+
+def test_looks_paired_ignores_empty_subject_values(tmp_path):
+    """Boş veya whitespace-only subject değerleri None'a dönüşür ve yoksayılır.
+    Detector sadece paired measurements görmez ve False döner."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\t\ta.fastq\n"
+        "s2\ttreated\t   \tb.fastq\n"
+        "s3\tbefore\tp1\tc.fastq\n"
+    ))
+    assert looks_paired(load_metadata(path)) is False
+
+
+def test_looks_paired_same_subject_same_condition_is_not_pairing(tmp_path):
+    """Aynı subject aynı condition'da iki kez görülüyorsa bu tekrarlı ölçümdür,
+    pairing değil. Gelecekteki optimizasyon (set -> list/counter) bunu kırabileceğinden,
+    bu davranışı açık ve kasten test ediyoruz."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp1\tb.fastq\n"
+        "s3\ttreated\tp2\tc.fastq\n"
+    ))
+    assert looks_paired(load_metadata(path)) is False
+
+
+def test_looks_paired_mixed_with_partial_subject_coverage(tmp_path):
+    """Bazı satırlar subject'e sahip değildir, bazısı vardır. Yoksayılan satırlar
+    (subject=None) işleme alınmaz; geri kalan satırlar kontrol edilir.
+    Bu durumda p1 hem before hem de after'da görünüyor -> True."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tbefore\t\tb.fastq\n"
+        "s3\tafter\tp1\tc.fastq\n"
+        "s4\tafter\t\td.fastq\n"
+    ))
+    assert looks_paired(load_metadata(path)) is True
