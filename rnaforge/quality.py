@@ -4,6 +4,7 @@ Yeni bir profil eklemek kod değişikliği değil, dosya eklemektir (spec 2026-0
 """
 from __future__ import annotations
 
+import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,11 +19,15 @@ class ProfileError(ValueError):
 
 @dataclass(frozen=True)
 class Profile:
+    # frozen=True yalnizca attribute atamasini engeller; icerideki dict/set
+    # yine de mutasyona acik kalirdi. MappingProxyType + frozenset ile
+    # gercek degismezlik saglaniyor - bu, is_overridden()'in dogrulugunun
+    # (dolayisiyla musteri raporundaki guven kartinin) dayanagi.
     name: str
     permissive: bool
     description: str
-    _thresholds: dict[str, float]
-    _overridden: set[str] = field(default_factory=set)
+    _thresholds: types.MappingProxyType[str, float]
+    _overridden: frozenset[str] = field(default_factory=frozenset)
 
     def threshold(self, gate: str) -> float:
         if gate not in self._thresholds:
@@ -48,7 +53,9 @@ def load_profile(organism_type: str, overrides: dict | None = None) -> Profile:
             f"(available: {available})"
         )
     raw = yaml.safe_load(path.read_text()) or {}
-    thresholds = dict(raw.get("thresholds") or {})
+    # YAML'daki int degerler (ör. read_depth: 1000000) burada float'a
+    # sabitleniyor ki threshold()'un -> float imzasi her yolda dogru olsun.
+    thresholds = {gate: float(value) for gate, value in (raw.get("thresholds") or {}).items()}
 
     applied: set[str] = set()
     for gate, value in (overrides or {}).items():
@@ -68,6 +75,6 @@ def load_profile(organism_type: str, overrides: dict | None = None) -> Profile:
         name=raw.get("name", organism_type),
         permissive=bool(raw.get("permissive", False)),
         description=str(raw.get("description", "")).strip(),
-        _thresholds=thresholds,
-        _overridden=applied,
+        _thresholds=types.MappingProxyType(thresholds),
+        _overridden=frozenset(applied),
     )
