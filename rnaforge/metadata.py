@@ -10,6 +10,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from rnaforge.gates import FAIL, PASS, GateResult
+
 REQUIRED_COLUMNS = ("sample_id", "condition", "fastq_1")
 
 
@@ -88,61 +90,131 @@ def design_variables(design: str) -> list[str]:
     return [v for v in (part.strip() for part in re.split(r"[+*:]", body)) if v]
 
 
-def validate_design(samples: list[Sample], design: str) -> None:
+MODULE = "m01"
+
+
+def validate_design(
+    samples: list[Sample], design: str, paired: bool | None = None
+) -> list[GateResult]:
+    """Tasarım kapılarını döndürür. Bozuk FORMÜL hâlâ MetadataError'dır.
+
+    Kapı döndürmenin sebebi: exception fırlatan kontrol gates.json'a yazılamaz,
+    dolayısıyla FAIL anında teşhis raporunun gösterecek verisi olmaz (spec §3.5).
+    Zorlama çağırana aittir (raise_if_failed).
+    """
     variables = design_variables(design)
     if not variables:
         raise MetadataError(f"design formula has no variables: {design!r}")
 
-    known = {"condition", "batch"}
+    known = {"condition", "batch", "subject"}
     unknown = [v for v in variables if v not in known]
     if unknown:
         raise MetadataError(
             f"design formula references unknown variable(s): {', '.join(unknown)}. "
             f"Metadata columns available for design: {', '.join(sorted(known))}"
         )
+    for variable in ("batch", "subject"):
+        if variable in variables and any(getattr(s, variable) is None for s in samples):
+            raise MetadataError(
+                f"design formula uses {variable!r} but the metadata has no {variable} "
+                f"value for every sample. Add a {variable!r} column, or drop it from "
+                "the design."
+            )
 
-    if "batch" in variables and any(s.batch is None for s in samples):
-        raise MetadataError(
-            "design formula uses 'batch' but the metadata has no batch value for every sample. "
-            "Add a 'batch' column, or use design '~condition'."
+    return [
+        _rank_gate(samples, variables),
+        _replication_gate(samples),
+        _paired_gate(samples, variables, paired),
+    ]
+
+
+def _ok(name: str, message: str) -> GateResult:
+    return GateResult(
+        name=name, module=MODULE, status=PASS, message=message, remedy="no action needed"
+    )
+
+
+def _rank_gate(samples: list[Sample], variables: list[str]) -> GateResult:
+    if "batch" not in variables:
+        return _ok("design_rank", "the design uses no batch term, so it is full rank")
+
+    batches = {s.batch for s in samples}
+    if len(batches) < 2:
+        return GateResult(
+            name="design_rank", module=MODULE, status=FAIL,
+            message=(
+                f"the design uses 'batch' but every sample is in the same batch "
+                f"({sorted(batches)[0]!r}), which makes the model matrix rank-deficient"
+            ),
+            remedy="use design '~condition', or supply samples from more than one batch",
         )
 
-    if "batch" in variables:
-        # Rank-deficient design'lar DESeq2'de kriptik bir matris hatasına dönüşür
-        # ("model matrix is not full rank"). Burada yakalayıp NE yapılacağını söylemek
-        # çok daha ucuz — ve sessizce yanlış bir modele koşmaktan güvenli.
-        batches = {s.batch for s in samples}
-        if len(batches) < 2:
-            raise MetadataError(
-                f"design formula uses 'batch' but every sample is in the same batch "
-                f"({batches.pop()!r}). A single-level batch adds no information and makes "
-                "the model matrix rank-deficient. Use design '~condition'."
-            )
-        by_batch: dict[str, set[str]] = {}
-        for sample in samples:
-            by_batch.setdefault(sample.batch, set()).add(sample.condition)
-        if all(len(conds) == 1 for conds in by_batch.values()):
-            mapping = ", ".join(
-                f"{b}->{next(iter(c))}" for b, c in sorted(by_batch.items())
-            )
-            raise MetadataError(
-                "batch is completely confounded with condition, so their effects cannot be "
-                f"separated ({mapping}). Either drop 'batch' from the design, or use a layout "
-                "where at least one batch contains more than one condition."
-            )
+    by_batch: dict[str, set[str]] = {}
+    for sample in samples:
+        by_batch.setdefault(sample.batch, set()).add(sample.condition)
+    if all(len(conditions) == 1 for conditions in by_batch.values()):
+        mapping = ", ".join(f"{b}->{next(iter(c))}" for b, c in sorted(by_batch.items()))
+        return GateResult(
+            name="design_rank", module=MODULE, status=FAIL,
+            message=(
+                "batch is completely confounded with condition, so their effects cannot "
+                f"be separated ({mapping})"
+            ),
+            remedy=(
+                "drop 'batch' from the design, or use a layout where at least one batch "
+                "contains more than one condition"
+            ),
+            samples=[s.sample_id for s in samples],
+        )
+    return _ok("design_rank", "batch and condition are not confounded; the design is full rank")
 
+
+def _replication_gate(samples: list[Sample]) -> GateResult:
     counts = Counter(s.condition for s in samples)
     if len(counts) < 2:
-        raise MetadataError(
-            f"condition must have at least 2 levels for differential expression, "
-            f"found: {', '.join(sorted(counts))}"
+        return GateResult(
+            name="replication", module=MODULE, status=FAIL,
+            message=(
+                "condition has fewer than 2 levels, so there is nothing to compare "
+                f"(found: {', '.join(sorted(counts))})"
+            ),
+            remedy="provide samples from at least two condition levels",
         )
-    without_replicates = sorted(c for c, n in counts.items() if n < 2)
-    if without_replicates:
-        raise MetadataError(
-            f"condition level(s) without replicate: {', '.join(without_replicates)}. "
-            "DESeq2 cannot estimate dispersion without replicates."
+    without = sorted(c for c, n in counts.items() if n < 2)
+    if without:
+        return GateResult(
+            name="replication", module=MODULE, status=FAIL,
+            message=(
+                f"condition level(s) without replicate: {', '.join(without)}; "
+                "DESeq2 cannot estimate dispersion without replicates"
+            ),
+            remedy="add at least one more sample for each condition level listed above",
+            samples=[s.sample_id for s in samples if s.condition in without],
         )
+    return _ok("replication", "every condition level has at least two replicates")
+
+
+def _paired_gate(
+    samples: list[Sample], variables: list[str], paired: bool | None
+) -> GateResult:
+    if "subject" in variables:
+        return _ok("paired_declared", "the design accounts for the paired structure")
+    if paired is not None:
+        return _ok("paired_declared", f"pairing was declared explicitly (paired={paired})")
+    if not looks_paired(samples):
+        return _ok("paired_declared", "the data is not paired")
+    return GateResult(
+        name="paired_declared", module=MODULE, status=FAIL,
+        message=(
+            "the metadata looks PAIRED (at least one subject appears in more than one "
+            "condition) but the design does not use 'subject'; an unpaired analysis "
+            "leaves subject-to-subject variation in the noise and hides real differences"
+        ),
+        remedy=(
+            "use design '~subject + condition', or declare 'paired: false' in the config "
+            "to run unpaired on purpose"
+        ),
+    )
 
 
 def looks_paired(samples: list[Sample]) -> bool:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from rnaforge.gates import FAIL, PASS
 from rnaforge.metadata import (
     MetadataError,
     design_variables,
@@ -20,6 +21,12 @@ def _write_meta(tmp_path, body: str):
     path = tmp_path / "samples.tsv"
     path.write_text(body)
     return path
+
+
+def _gate(gates, name):
+    matching = [g for g in gates if g.name == name]
+    assert matching, f"gate {name} not reported; got {[g.name for g in gates]}"
+    return matching[0]
 
 
 def test_loads_paired_end_samples(tmp_path):
@@ -88,27 +95,43 @@ def test_design_variable_missing_from_metadata_raises(tmp_path):
         validate_design(samples, "~batch + condition")
 
 
-def test_design_requires_two_condition_levels(tmp_path):
+def test_single_condition_level_fails_the_replication_gate(tmp_path):
     _make_fastqs(tmp_path, "a.fastq", "b.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tfastq_1\n"
         "s1\tcontrol\ta.fastq\n"
         "s2\tcontrol\tb.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="at least 2 levels"):
-        validate_design(load_metadata(path), "~condition")
+    gates = validate_design(load_metadata(path), "~condition")
+    assert _gate(gates, "replication").status == FAIL
 
 
-def test_design_requires_replicates(tmp_path):
-    """DESeq2 replika olmadan dispersiyon tahmin edemez — erken ve net uyar."""
+def test_condition_without_replicate_fails_the_replication_gate(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\ta.fastq\n"
+        "s2\tcontrol\tb.fastq\n"
+        "s3\ttreated\tc.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~condition"), "replication")
+    assert gate.status == FAIL
+    assert "treated" in gate.message
+
+
+def test_malformed_formula_still_raises(tmp_path):
+    """Bozuk FORMUL kapi degil, gecersiz girdidir — MetadataError kalir."""
     _make_fastqs(tmp_path, "a.fastq", "b.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tfastq_1\n"
         "s1\tcontrol\ta.fastq\n"
         "s2\ttreated\tb.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="replicate"):
-        validate_design(load_metadata(path), "~condition")
+    samples = load_metadata(path)
+    with pytest.raises(MetadataError, match="no variables"):
+        validate_design(samples, "~")
+    with pytest.raises(MetadataError, match="unknown variable"):
+        validate_design(samples, "~temperature")
 
 
 def test_valid_design_passes(tmp_path):
@@ -132,9 +155,9 @@ def test_empty_fastq_1_raises(tmp_path):
         load_metadata(path)
 
 
-def test_batch_confounded_with_condition_is_rejected(tmp_path):
-    """Batch condition'la tam confounded ise etkiler ayrıştırılamaz. DESeq2 bunu
-    kriptik 'not full rank' hatasıyla söyler; biz ne yapılacağını söyleyerek durmalıyız."""
+def test_batch_confounded_with_condition_fails_the_rank_gate(tmp_path):
+    """Batch condition'la tam confounded ise etkiler ayristirilamaz. DESeq2 bunu
+    kriptik 'not full rank' hatasiyla soyler; biz kapiyi dusurup ne yapilacagini soyleriz."""
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tbatch\tfastq_1\n"
@@ -143,11 +166,14 @@ def test_batch_confounded_with_condition_is_rejected(tmp_path):
         "s3\ttreated\tb2\tc.fastq\n"
         "s4\ttreated\tb2\td.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="completely confounded"):
-        validate_design(load_metadata(path), "~batch + condition")
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    gate = _gate(gates, "design_rank")
+    assert gate.status == FAIL
+    assert "confounded" in gate.message
+    assert gate.remedy
 
 
-def test_single_level_batch_is_rejected(tmp_path):
+def test_single_level_batch_fails_the_rank_gate(tmp_path):
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tbatch\tfastq_1\n"
@@ -156,12 +182,12 @@ def test_single_level_batch_is_rejected(tmp_path):
         "s3\ttreated\tb1\tc.fastq\n"
         "s4\ttreated\tb1\td.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="same batch"):
-        validate_design(load_metadata(path), "~batch + condition")
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    assert _gate(gates, "design_rank").status == FAIL
 
 
-def test_balanced_batch_design_is_accepted(tmp_path):
-    """Dengeli tasarım GEÇMELİ — kontrol yanlış pozitif vermemeli."""
+def test_balanced_batch_design_passes_every_gate(tmp_path):
+    """Dengeli tasarim GECMELI — kapi sistemi yanlis pozitif uretirse musteri guvenmez."""
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tbatch\tfastq_1\n"
@@ -170,7 +196,8 @@ def test_balanced_batch_design_is_accepted(tmp_path):
         "s3\tcontrol\tb2\tc.fastq\n"
         "s4\ttreated\tb2\td.fastq\n"
     ))
-    validate_design(load_metadata(path), "~batch + condition")
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    assert all(g.status == PASS for g in gates)
 
 
 def test_subject_column_is_loaded(tmp_path):

@@ -122,3 +122,17 @@ def test_non_numeric_min_length_raises_config_error(tmp_path):
     path = _write(tmp_path, PROK_BODY + '\ntrimming:\n  min_length: "otuzalti"\n')
     with pytest.raises(ConfigError, match="trimming.min_length"):
         load_config(path)
+
+
+def test_paired_defaults_to_undeclared(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).paired is None
+
+
+def test_paired_can_be_declared_false(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\npaired: false\n"))
+    assert cfg.paired is False
+
+
+def test_quality_overrides_are_loaded(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\nquality:\n  alignment_rate: 0.4\n"))
+    assert cfg.quality == {"alignment_rate": 0.4}

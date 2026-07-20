@@ -1,7 +1,7 @@
 """Config yükleme ve şema doğrulama. Geçersiz config m01'den ÖNCE yakalanır."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -73,6 +73,8 @@ class Config:
     de: DE
     report: Report
     resources: Resources
+    paired: bool | None = None
+    quality: dict = field(default_factory=dict)
 
 
 def _one_of(value, allowed, field: str):
@@ -188,4 +190,6 @@ def load_config(path: Path | str) -> Config:
             threads=_as_int(resources_raw.get("threads", 8), "resources.threads"),
             memory_gb=_as_int(resources_raw.get("memory_gb", 32), "resources.memory_gb"),
         ),
+        paired=None if raw.get("paired") is None else bool(raw.get("paired")),
+        quality=_section(raw, "quality"),
     )
