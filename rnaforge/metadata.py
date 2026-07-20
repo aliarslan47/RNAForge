@@ -24,6 +24,7 @@ class Sample:
     fastq_1: Path
     fastq_2: Path | None = None
     batch: str | None = None
+    subject: str | None = None
 
 
 def _resolve(value: str, base_dir: Path) -> Path:
@@ -72,7 +73,8 @@ def load_metadata(path: Path | str, base_dir: Path | None = None) -> list[Sample
             fastqs.append(resolved)
 
         batch = (row.get("batch") or "").strip() or None
-        samples.append(Sample(sample_id, condition, fastqs[0], fastqs[1], batch))
+        subject = (row.get("subject") or "").strip() or None
+        samples.append(Sample(sample_id, condition, fastqs[0], fastqs[1], batch, subject))
 
     duplicates = [s for s, n in Counter(x.sample_id for x in samples).items() if n > 1]
     if duplicates:
@@ -141,3 +143,17 @@ def validate_design(samples: list[Sample], design: str) -> None:
             f"condition level(s) without replicate: {', '.join(without_replicates)}. "
             "DESeq2 cannot estimate dispersion without replicates."
         )
+
+
+def looks_paired(samples: list[Sample]) -> bool:
+    """En az bir subject birden fazla condition'da görünüyorsa veri eşleşmiş demektir.
+
+    Bu YALNIZCA bir tespittir; design'a karar VERMEZ (spec 2026-07-20). Tahmin etmek
+    yanlış modeli sessizce koşturabilirdi — burada amaç kullanıcıya sormak.
+    """
+    by_subject: dict[str, set[str]] = {}
+    for sample in samples:
+        if sample.subject is None:
+            continue
+        by_subject.setdefault(sample.subject, set()).add(sample.condition)
+    return any(len(conditions) > 1 for conditions in by_subject.values())

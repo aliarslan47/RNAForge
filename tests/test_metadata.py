@@ -6,6 +6,7 @@ from rnaforge.metadata import (
     MetadataError,
     design_variables,
     load_metadata,
+    looks_paired,
     validate_design,
 )
 
@@ -170,3 +171,49 @@ def test_balanced_batch_design_is_accepted(tmp_path):
         "s4\ttreated\tb2\td.fastq\n"
     ))
     validate_design(load_metadata(path), "~batch + condition")
+
+
+def test_subject_column_is_loaded(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tafter\tp1\tb.fastq\n"
+    ))
+    samples = load_metadata(path)
+    assert [s.subject for s in samples] == ["p1", "p1"]
+
+
+def test_subject_is_none_when_column_absent(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\ta.fastq\n"
+        "s2\ttreated\tb.fastq\n"
+    ))
+    assert all(s.subject is None for s in load_metadata(path))
+
+
+def test_looks_paired_detects_repeated_subject_across_conditions(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tbefore\tp1\ta.fastq\n"
+        "s2\tafter\tp1\tb.fastq\n"
+        "s3\tbefore\tp2\tc.fastq\n"
+        "s4\tafter\tp2\td.fastq\n"
+    ))
+    assert looks_paired(load_metadata(path)) is True
+
+
+def test_looks_paired_false_when_each_subject_has_one_condition(tmp_path):
+    """Her subject tek condition'da -> eslesmis degil, sadece etiketlenmis."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsubject\tfastq_1\n"
+        "s1\tcontrol\tp1\ta.fastq\n"
+        "s2\tcontrol\tp2\tb.fastq\n"
+        "s3\ttreated\tp3\tc.fastq\n"
+        "s4\ttreated\tp4\td.fastq\n"
+    ))
+    assert looks_paired(load_metadata(path)) is False
