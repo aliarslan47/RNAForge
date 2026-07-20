@@ -37,7 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
 def _cmd_validate(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
-    summary = run_validation(config, args.metadata, run_dir, force=args.force)
+    profile = load_profile(config.organism_type, config.quality)
+    try:
+        summary = run_validation(config, args.metadata, run_dir, force=args.force)
+    except GateFailure:
+        # Kart FAIL yolunda da yazilmali: teshis raporu kosu basarisiz oldugunda
+        # tam da bu veriye ihtiyac duyar (m01_validate kapilari enforce etmeden
+        # ONCE gates.json'a yazar, o yuzden burada card icin veri hazirdir).
+        write_confidence_card(run_dir, profile)
+        raise
     if summary.get("resumed"):
         # Atlanan iş görünür olmalı: kullanıcı "koştu" sanıp eski sonuca bakmasın.
         print("m01_validate already completed in this run directory — reusing its result "
@@ -50,7 +58,6 @@ def _cmd_validate(args) -> int:
     )
     print(f"run directory: {run_dir}")
 
-    profile = load_profile(config.organism_type, config.quality)
     card_path = write_confidence_card(run_dir, profile)
     card = json.loads(card_path.read_text())
     print(f"quality verdict: {card['verdict']} "
