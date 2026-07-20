@@ -1,0 +1,8 @@
+name: rnaforge-quant-prok
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bowtie2>=2.5
+  - samtools>=1.19
+  - subread>=2.0

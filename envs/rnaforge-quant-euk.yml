@@ -1,0 +1,6 @@
+name: rnaforge-quant-euk
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - salmon>=1.10

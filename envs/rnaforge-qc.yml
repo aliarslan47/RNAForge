@@ -1,0 +1,7 @@
+name: rnaforge-qc
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - fastqc>=0.12
+  - fastp>=0.23

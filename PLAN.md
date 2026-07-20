@@ -1,9 +1,18 @@
 # PLAN.md
 
-**Version:** v1.2\
+**Version:** v1.3\
 **Status:** Active\
 **Purpose:** Single Source of Truth
 
+> **Changelog (v1.2 → v1.3)**
+> - Trimming varsayılanı testi netleştirildi: `min_length >= 1` iddiası **vacuous**'tu
+>   (config zaten `< 1`'de `ConfigError` atıyor, assertion asla düşemezdi). Williams 2016
+>   gerekçesini gerçekten koruyan iddia **`min_length == 36`**'dır (Bölüm 4.2).
+> - Kapatma dayanıklılığı iddiası koda hizalandı: resume yalnız kayıt değil, **çalışan**
+>   davranıştır — aynı `run_id` var olan run dizinini yeniden kullanır, biten modül
+>   atlanır (`--force` ile ezilebilir), heartbeat 10 sn kadansını gerçekten uygular
+>   (Bölüm 15).
+>
 > **Changelog (v1.1 → v1.2)**
 > - Organizma tipi girişe alındı: prokaryot/ökaryot seçimi akışı dallandırır
 >   (Bölüm 2.1, 4, 5, 11). Bakterilerde intron yok → tx2gene ~1:1; Salmon+tximport
@@ -449,6 +458,11 @@ WGS'de her örnek bağımsız analiz edilir, RNA-seq DE ise doğası gereği
     spec'ler Türkçe (çalışma dili). HTML rapor dili config'ten (`tr` | `en`).
 -   **Kapatma dayanıklılığı:** uzun işler kapanmaya dayanıklı — 10 sn heartbeat +
     her modül bitiminde kalıcı durum kaydı → yeniden başlatmada resume.
+    Somut sözleşme: aynı `--run-id` **var olan** run dizinini yeniden kullanır (yeni
+    zaman damgalı dizin açmaz, aksi halde `state.json` erişilemez kalır ve resume
+    sessizce çöker); tamamlanmış modül atlanır ve bu **ekrana yazılır** (`--force`
+    bilerek yeniden koşturur); modül log'ları satır satır flush edilir, böylece koşu
+    hata verip düştüğünde nedeni diskte kalır.
 
 ------------------------------------------------------------------------
 

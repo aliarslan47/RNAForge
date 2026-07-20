@@ -1,0 +1,40 @@
+# RNAForge — örnek config. Alan açıklamaları: PLAN.md Bölüm 11.
+organism: "Escherichia coli"
+
+# ZORUNLU, varsayılanı yok: prokaryote | eukaryote (PLAN §2.1)
+# Akışı dallandırır: prokaryote -> bowtie2+featureCounts, eukaryote -> Salmon+tximport
+organism_type: "prokaryote"
+
+# auto: FASTQ'dan tespit et. MVP yalnızca Illumina destekler (PLAN §4.1).
+platform: "auto"
+
+reference:
+  # prokaryote için:
+  genome_fasta: "references/ecoli/genome.fa"
+  annotation_gff: "references/ecoli/genes.gff"
+  # eukaryote için (organism_type: eukaryote ise bunlar zorunlu olur):
+  # transcriptome_fasta: "references/human/tx.fa"
+  # tx2gene: "references/human/tx2gene.tsv"
+
+library:
+  # FASTQ'dan TESPİT EDİLEMEZ, buradan gelmeli (PLAN §4.1)
+  strandedness: "unstranded"   # unstranded | stranded | reverse
+  selection: "rrna_depletion"  # rrna_depletion | polya
+
+trimming:
+  # PLAN §4.2: agresif kalite trimming ekspresyon tahminlerini bozar
+  # (Williams et al. 2016). Değiştirmeden önce gerekçeyi oku.
+  min_length: 36
+  aggressive_quality: false
+
+de:
+  design: "~condition"         # batch varsa: "~batch + condition"
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"               # tr | en
+
+resources:
+  threads: 8
+  memory_gb: 32
