@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from rnaforge.gates import GateFailure
 from rnaforge.metadata import MetadataError
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.platform import UnsupportedPlatformError
+from rnaforge.quality import load_profile
+from rnaforge.report.confidence import write_confidence_card
 from rnaforge.state import resolve_run_dir
 
 
@@ -46,6 +49,18 @@ def _cmd_validate(args) -> int:
         f"conditions={summary['conditions']}"
     )
     print(f"run directory: {run_dir}")
+
+    profile = load_profile(config.organism_type, config.quality)
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    if profile.permissive:
+        print("note: this profile is permissive — thresholds are deliberately loose "
+              "and results should be read with that in mind.")
+    for gate, value in profile.overrides().items():
+        print(f"note: threshold {gate} was overridden to {value} in the config.")
     return 0
 
 
