@@ -3,14 +3,43 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from rnaforge.state import RunState, new_run_dir
+from rnaforge.state import RunState, resolve_run_dir
 
 
-def test_new_run_dir_has_timestamp_and_id(tmp_path):
+def test_resolve_run_dir_has_timestamp_and_id(tmp_path):
     now = datetime(2026, 7, 16, 14, 30, 22)
-    run_dir = new_run_dir(tmp_path, "demo", now=now)
+    run_dir = resolve_run_dir(tmp_path, "demo", now=now)
     assert run_dir.name == "20260716_143022_demo"
     assert run_dir.exists()
+
+
+def test_resolve_run_dir_reuses_existing_run_id(tmp_path):
+    """Resume'un dayanağı: aynı run_id ikinci kez yeni dizin AÇMAMALI.
+    Açarsa state.json erişilemez kalır ve 'kaldığı yerden devam' sessizce çöker."""
+    first = resolve_run_dir(tmp_path, "demo", now=datetime(2026, 7, 16, 14, 30, 22))
+    second = resolve_run_dir(tmp_path, "demo", now=datetime(2026, 7, 16, 15, 0, 0))
+    assert second == first
+    assert len(list(tmp_path.iterdir())) == 1
+
+
+def test_resolve_run_dir_does_not_confuse_similar_ids(tmp_path):
+    resolve_run_dir(tmp_path, "a_run", now=datetime(2026, 7, 16, 14, 30, 22))
+    other = resolve_run_dir(tmp_path, "run", now=datetime(2026, 7, 16, 15, 0, 0))
+    assert other.name == "20260716_150000_run"
+
+
+def test_heartbeat_is_throttled_to_interval(tmp_path):
+    """HEARTBEAT_INTERVAL_SECONDS gerçekten uygulanmalı; aksi halde sabit
+    tanımlı ama karşılıksız kalır (PLAN §15 iddiası boşa çıkar)."""
+    state = RunState(tmp_path)
+    state.heartbeat()
+    first = (tmp_path / "heartbeat.txt").read_text()
+    (tmp_path / "heartbeat.txt").write_text("MARKER\n")
+    state.heartbeat()  # interval dolmadı -> yazmamalı
+    assert (tmp_path / "heartbeat.txt").read_text() == "MARKER\n"
+    state.heartbeat(force=True)  # force -> yazmalı
+    assert (tmp_path / "heartbeat.txt").read_text() != "MARKER\n"
+    assert first  # ilk çağrı her zaman yazar
 
 
 def test_module_not_done_initially(tmp_path):

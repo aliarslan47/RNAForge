@@ -105,6 +105,30 @@ def validate_design(samples: list[Sample], design: str) -> None:
             "Add a 'batch' column, or use design '~condition'."
         )
 
+    if "batch" in variables:
+        # Rank-deficient design'lar DESeq2'de kriptik bir matris hatasına dönüşür
+        # ("model matrix is not full rank"). Burada yakalayıp NE yapılacağını söylemek
+        # çok daha ucuz — ve sessizce yanlış bir modele koşmaktan güvenli.
+        batches = {s.batch for s in samples}
+        if len(batches) < 2:
+            raise MetadataError(
+                f"design formula uses 'batch' but every sample is in the same batch "
+                f"({batches.pop()!r}). A single-level batch adds no information and makes "
+                "the model matrix rank-deficient. Use design '~condition'."
+            )
+        by_batch: dict[str, set[str]] = {}
+        for sample in samples:
+            by_batch.setdefault(sample.batch, set()).add(sample.condition)
+        if all(len(conds) == 1 for conds in by_batch.values()):
+            mapping = ", ".join(
+                f"{b}->{next(iter(c))}" for b, c in sorted(by_batch.items())
+            )
+            raise MetadataError(
+                "batch is completely confounded with condition, so their effects cannot be "
+                f"separated ({mapping}). Either drop 'batch' from the design, or use a layout "
+                "where at least one batch contains more than one condition."
+            )
+
     counts = Counter(s.condition for s in samples)
     if len(counts) < 2:
         raise MetadataError(

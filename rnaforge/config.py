@@ -81,6 +81,33 @@ def _one_of(value, allowed, field: str):
     return value
 
 
+def _section(raw: dict, field: str) -> dict:
+    """Bir config bölümünü mapping olarak al. `library: "foo"` ham AttributeError
+    yerine ConfigError vermeli: hata mesajı kullanıcıya ne yapacağını söylemeli."""
+    value = raw.get(field)
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ConfigError(
+            f"{field} must be a mapping of settings, got {type(value).__name__} ({value!r})"
+        )
+    return value
+
+
+def _as_int(value, field: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ConfigError(f"{field}: expected an integer, got {value!r}") from None
+
+
+def _as_float(value, field: str) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ConfigError(f"{field}: expected a number, got {value!r}") from None
+
+
 def _require_organism_type(raw: dict) -> str:
     value = raw.get("organism_type")
     if value is None:
@@ -120,14 +147,14 @@ def load_config(path: Path | str) -> Config:
         raise ConfigError("organism is required")
 
     organism_type = _require_organism_type(raw)
-    library_raw = raw.get("library") or {}
-    trimming_raw = raw.get("trimming") or {}
-    de_raw = raw.get("de") or {}
-    report_raw = raw.get("report") or {}
-    resources_raw = raw.get("resources") or {}
+    library_raw = _section(raw, "library")
+    trimming_raw = _section(raw, "trimming")
+    de_raw = _section(raw, "de")
+    report_raw = _section(raw, "report")
+    resources_raw = _section(raw, "resources")
 
     trimming = Trimming(
-        min_length=int(trimming_raw.get("min_length", 36)),
+        min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
         aggressive_quality=bool(trimming_raw.get("aggressive_quality", False)),
     )
     if trimming.min_length < 1:
@@ -137,7 +164,7 @@ def load_config(path: Path | str) -> Config:
         organism=str(organism),
         organism_type=organism_type,
         platform=_one_of(raw.get("platform", "auto"), PLATFORMS, "platform"),
-        reference=_build_reference(raw.get("reference") or {}, organism_type),
+        reference=_build_reference(_section(raw, "reference"), organism_type),
         library=Library(
             strandedness=_one_of(
                 library_raw.get("strandedness", "unstranded"), STRANDEDNESS, "library.strandedness"
@@ -149,14 +176,16 @@ def load_config(path: Path | str) -> Config:
         trimming=trimming,
         de=DE(
             design=str(de_raw.get("design", "~condition")),
-            fdr_threshold=float(de_raw.get("fdr_threshold", 0.05)),
-            log2fc_threshold=float(de_raw.get("log2fc_threshold", 1.0)),
+            fdr_threshold=_as_float(de_raw.get("fdr_threshold", 0.05), "de.fdr_threshold"),
+            log2fc_threshold=_as_float(
+                de_raw.get("log2fc_threshold", 1.0), "de.log2fc_threshold"
+            ),
         ),
         report=Report(
             language=_one_of(report_raw.get("language", "tr"), REPORT_LANGUAGES, "report.language")
         ),
         resources=Resources(
-            threads=int(resources_raw.get("threads", 8)),
-            memory_gb=int(resources_raw.get("memory_gb", 32)),
+            threads=_as_int(resources_raw.get("threads", 8), "resources.threads"),
+            memory_gb=_as_int(resources_raw.get("memory_gb", 32), "resources.memory_gb"),
         ),
     )

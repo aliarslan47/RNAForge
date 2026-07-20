@@ -129,3 +129,44 @@ def test_empty_fastq_1_raises(tmp_path):
     ))
     with pytest.raises(MetadataError, match="fastq_1"):
         load_metadata(path)
+
+
+def test_batch_confounded_with_condition_is_rejected(tmp_path):
+    """Batch condition'la tam confounded ise etkiler ayrıştırılamaz. DESeq2 bunu
+    kriptik 'not full rank' hatasıyla söyler; biz ne yapılacağını söyleyerek durmalıyız."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\tcontrol\tb1\tb.fastq\n"
+        "s3\ttreated\tb2\tc.fastq\n"
+        "s4\ttreated\tb2\td.fastq\n"
+    ))
+    with pytest.raises(MetadataError, match="completely confounded"):
+        validate_design(load_metadata(path), "~batch + condition")
+
+
+def test_single_level_batch_is_rejected(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\tcontrol\tb1\tb.fastq\n"
+        "s3\ttreated\tb1\tc.fastq\n"
+        "s4\ttreated\tb1\td.fastq\n"
+    ))
+    with pytest.raises(MetadataError, match="same batch"):
+        validate_design(load_metadata(path), "~batch + condition")
+
+
+def test_balanced_batch_design_is_accepted(tmp_path):
+    """Dengeli tasarım GEÇMELİ — kontrol yanlış pozitif vermemeli."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\ttreated\tb1\tb.fastq\n"
+        "s3\tcontrol\tb2\tc.fastq\n"
+        "s4\ttreated\tb2\td.fastq\n"
+    ))
+    validate_design(load_metadata(path), "~batch + condition")

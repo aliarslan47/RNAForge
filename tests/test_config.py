@@ -82,7 +82,10 @@ def test_trimming_defaults_are_gentle(tmp_path):
     Varsayılan NAZİK olmalı; bu test o kararı sabitler."""
     cfg = load_config(_write(tmp_path, PROK_BODY))
     assert cfg.trimming.aggressive_quality is False
-    assert cfg.trimming.min_length >= 1
+    # `>= 1` vacuous olurdu: config.py zaten min_length < 1'de ConfigError atıyor,
+    # yani assertion asla düşemezdi. Varsayılanı sabitlemek literatür gerekçesini
+    # (Williams 2016) gerçekten korur — biri 36'yı 2 yaparsa test yakalar.
+    assert cfg.trimming.min_length == 36
 
 
 def test_platform_defaults_to_auto(tmp_path):
@@ -98,4 +101,24 @@ def test_invalid_platform_raises(tmp_path):
 def test_invalid_strandedness_raises(tmp_path):
     path = _write(tmp_path, PROK_BODY + '\nlibrary:\n  strandedness: "sideways"\n')
     with pytest.raises(ConfigError, match="strandedness"):
+        load_config(path)
+
+
+def test_non_mapping_section_raises_config_error(tmp_path):
+    """`library: "foo"` ham AttributeError sızdırmamalı — ConfigError sözleşmesi
+    kapıda tutar; ticari üründe traceback kullanıcıya ne yapacağını söylemez."""
+    path = _write(tmp_path, PROK_BODY + '\nlibrary: "foo"\n')
+    with pytest.raises(ConfigError, match="library must be a mapping"):
+        load_config(path)
+
+
+def test_non_numeric_threads_raises_config_error(tmp_path):
+    path = _write(tmp_path, PROK_BODY + '\nresources:\n  threads: "sekiz"\n')
+    with pytest.raises(ConfigError, match="resources.threads"):
+        load_config(path)
+
+
+def test_non_numeric_min_length_raises_config_error(tmp_path):
+    path = _write(tmp_path, PROK_BODY + '\ntrimming:\n  min_length: "otuzalti"\n')
+    with pytest.raises(ConfigError, match="trimming.min_length"):
         load_config(path)
