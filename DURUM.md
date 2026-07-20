@@ -4,21 +4,45 @@
 > (`rnaforge-project` memory). Claude bunu anlamlı her durakta ve `/clear` öncesi günceller.
 
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
-**GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH), yalnız `main`
+**GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
 **Son güncelleme:** 2026-07-20
 
 ## Şu an nerede kaldık
-- **Plan A BİTTİ ve `main`'e MERGE EDİLDİ** (`e3e68ec`). 52/52 test geçiyor.
-  Final review'un 6 Important'ının **6'sı da düzeltildi** ve canlı doğrulandı (`654add4`).
-- **HENÜZ PUSH EDİLMEDİ** — `main` yerelde origin'in önünde. Ali onayı bekliyor.
-- `rnaforge validate --config X --metadata Y` çalışıyor. Resume artık GERÇEKTEN çalışıyor:
-  aynı `--run-id` var olan dizini yeniden kullanır, biten modülü atlar ve **atladığını yazar**,
-  `--force` ezer. Log satır satır flush edilir → koşu patlasa da neden diskte kalır.
-- **Sıradaki iş: kalite kapıları çerçevesi.** Plan hazır ve onaylı:
-  `docs/superpowers/plans/2026-07-20-kalite-kapilari-cerceve.md` (7 task, TDD adımlı).
-  Tasarım: `docs/superpowers/specs/2026-07-20-kalite-kapilari-design.md`.
-- **İlerleme ledger'ı: `.superpowers/sdd/progress.md`** (git-ignored — devam ederken ÖNCE oku).
+- **Branch `feat/kalite-kapilari` — Task 1-6 BİTTİ, 105/105 test geçiyor, push edildi.**
+  Son commit `7ae728d`. `main` de güncel (Plan A merge edilmiş durumda).
+- **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
+  (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
+- Kalite kapıları çerçevesi çalışıyor ve **canlı doğrulandı**: replikasız koşu →
+  `GateFailure`, `gates.json` + `confidence_card.json` (verdict `INVALID`) yazılıyor,
+  `raw_statistics.json` ÜRETİLMİYOR, stderr'de düzeltme önerisi, exit 1.
+
+## Tamamlanan (kalite kapıları planı)
+| Task | İş | Durum |
+|---|---|---|
+| 1 | `gates.py` sözleşmesi (PASS/WARN/FAIL, gates.json) | ✅ re-review temiz |
+| 2 | Profiller veri olarak (`profiles/*.yml`) + eşik ezme | ✅ re-review temiz |
+| 3 | `subject` sütunu + `looks_paired()` detektörü | ✅ review temiz |
+| 4 | `validate_design` → `GateResult` döndürüyor (B kararı) | ✅ re-review temiz |
+| 5 | m01 kapıları yazıp zorluyor | ✅ review temiz (mutasyon testli) |
+| 6 | Güvence kartı + CLI verdict | ✅ controller doğruladı |
+| 7 | Dokümantasyon (README/PLAN v1.4) | ⏸ **ERTELENDİ** (m02-m03 sonrası) |
+
+Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
+1. `gates.json` bozulunca önceki modüllerin kaydı **sessizce siliniyordu** (atomik yazma yok).
+2. `~subject + condition` doygun tasarımda **üç kapı da yeşil yanıyordu** → DESeq2 kriptik
+   çökme + "TRUSTWORTHY" damgası. (Spec'in deliğiydi, implementer hatası değil.)
+3. Güvence kartı **FAIL'de hiç yazılmıyordu** — en çok gerektiği anda yok.
+
+## SIRADAKİ İŞ (bu sırayla)
+1. **config.py sessiz hata fix'i:** üst seviye `design:` anahtarı SESSİZCE yok sayılıyor
+   (doğru şema `de.design`). Kullanıcı tasarımını değiştirdiğini sanıp eski tasarımla koşar.
+   Çözüm: bilinmeyen üst seviye anahtarlar `ConfigError` ile reddedilsin.
+2. Final whole-branch review (Task 6 bağımsız re-review almadı; Minor: `test_m01_validate.py`
+   içinde ikinci `_illumina` helper'ı ilkini gölgeliyor).
+3. `feat/kalite-kapilari` → `main` merge.
+4. **m02 = FastQC — ilk gerçek biyoinformatik aracı.** Sonra m03 fastp → m04 quant → m05
+   count matrisi → m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
