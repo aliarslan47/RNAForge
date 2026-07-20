@@ -229,7 +229,8 @@ git commit -m "feat: kalite kapisi sozlesmesi (GateResult/GateFailure/gates.json
 
 **Files:**
 - Create: `rnaforge/profiles/prokaryote.yml`, `rnaforge/profiles/eukaryote.yml`, `rnaforge/quality.py`
-- Modify: `rnaforge/config.py` (`quality:` bölümü), `pyproject.toml` (paket verisi)
+- Modify: `pyproject.toml` (paket verisi)
+- NOT: `config.py`'deki `quality:` bölümü **Task 4'ün işidir** (`Config.quality`), burada değil.
 - Test: `tests/test_quality.py`
 
 **Interfaces:**
