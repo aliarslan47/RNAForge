@@ -9,16 +9,19 @@
 **Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **m03 = fastp (nazik trimming) BİTTİ (2026-07-30), branch `feat/m03-fastp`, 134/134 test.**
-  6 task TDD; **canlı doğrulandı** (gerçek fastp 1.3.6) hem PASS hem FAIL yolu. MERGE bekliyor.
-- Önceki: m01 (validate), m02 (FastQC) `main`'de. Kalite kapıları çerçevesi + config sertleştirme.
+- **m04 = prokaryot hizalama (bowtie2) BİTTİ (2026-07-30), branch `feat/m04-prok-alignment`,
+  150/150 test.** 7 task TDD; **canlı doğrulandı** (gerçek bowtie2 2.5.5+samtools) PASS+FAIL.
+  MERGE bekliyor.
+- Önceki: m01 (validate), m02 (FastQC), m03 (fastp) `main`'de.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
-- **m03 canlı doğrulama:** validate→trim. Nazik: survival 1.0 → TRUSTWORTHY. FAIL testi
-  (`min_length:200` → tüm okumalar elenir): survival 0.00<0.50 → `GateFailure` exit 1,
-  `gates.json` FAIL + güvence kartı INVALID, trimlenmiş FASTQ adli iz olarak diskte.
-- **m03 = İLK gerçek veri-FAIL kapısı** (survival_rate). m02'nin aksine m03 DURABİLİR.
-  Akış: `validate` → (`qc`) → `trim`, hepsi aynı `--run-id`. Ön koşul m01 (m02 değil).
+- **m04 canlı doğrulama:** validate→trim→quant (gerçek fastp+bowtie2). Genomdan türetilmiş
+  okumalar: alignment 1.0 → TRUSTWORTHY, `quantification/<id>/aligned.sorted.bam`+`.bai`+log.
+  Rastgele okumalar: alignment 0.00<0.70 → `GateFailure` exit **1**, INVALID.
+- **m04 = ROUTER (organism_type):** prokaryot yolu (bowtie2) BAĞLI; **eukaryote →
+  `NotImplementedError`** (salmon yolu sonraki spec). alignment_rate = İKİNCİ veri-FAIL kapısı.
+  Ön koşul **m03** (trimlenmiş okuma kullanır); zincir m01→m03→m04, aynı `--run-id`.
+- **Trimlenmiş yol TEK kaynak:** `m03_trim.trimmed_reads(run_dir, sample)` (m03 yazar, m04 okur).
 - **Çalıştırma NOTU:** `python -m rnaforge.cli` ÇALIŞMAZ (main-guard yok); entry point
   `rnaforge` kullan. Referans yolları config'te göreliyse CWD'ye bağlı — smoke'ta cd gerekti.
 
@@ -51,13 +54,14 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 2. ~~Final whole-branch review + `_illumina` gölgeleme~~ ✅ BİTTİ (2026-07-30)
 3. ~~`feat/kalite-kapilari` → `main` merge~~ ✅ BİTTİ (2026-07-30)
 4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — `main`'de (merge `db4b501`).
-5. ~~m03 = fastp (nazik trimming)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m03-fastp*`.
-6. **`feat/m03-fastp` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
-7. **m04 = Quantification ROUTER** (prok=bowtie2 | euk=salmon). Sonra m05 count matrisi →
-   m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
-   - **m04 ÖNCESİ ZORUNLU:** salmon **2.3.4** CLI/index davranışını doğrula (PLAN 1.x eski
-     sürüm varsayar); bowtie2+featureCounts prok yolu. Kod öncesi brainstorm/spec.
-   - m04 veri kapısı: `alignment_rate` (profil eşiği 0.70 prok) — ilk hizalama FAIL kapısı.
+5. ~~m03 = fastp (nazik trimming)~~ ✅ BİTTİ — `main`'de (`25b3ca2`).
+6. ~~m04 = prokaryot hizalama (bowtie2)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m04-prok-alignment*`.
+7. **`feat/m04-prok-alignment` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
+8. **m05 = Count Matrix** (prok=featureCounts: BAM+GFF → gen×örnek count matrisi = ortak sözleşme)
+   VE/VEYA **m04 ökaryot yolu** (salmon+tximport; salmon 2.3.4 CLI doğrulandı, uyumlu).
+   Sonra m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
+   - m05 count matrisi m06 DESeq2'nin girdisi; PLAN §14 `quantification/counts.tsv`.
+   - annotation_gff zaten config'te zorunlu (prok); featureCounts `-a genes.gff -o counts`.
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
