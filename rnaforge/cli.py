@@ -12,6 +12,7 @@ from rnaforge.gates import GateFailure
 from rnaforge.metadata import MetadataError
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.modules.m02_qc import run_qc
+from rnaforge.modules.m03_trim import run_trim
 from rnaforge.platform import UnsupportedPlatformError
 from rnaforge.quality import load_profile
 from rnaforge.report.confidence import write_confidence_card
@@ -41,6 +42,16 @@ def build_parser() -> argparse.ArgumentParser:
     qc.add_argument(
         "--force", action="store_true",
         help="re-run even if m02 already completed in this run directory",
+    )
+
+    trim = sub.add_parser("trim", help="gently trim reads with fastp (m03)")
+    trim.add_argument("--config", required=True, type=Path)
+    trim.add_argument("--metadata", required=True, type=Path)
+    trim.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    trim.add_argument("--run-id", default="run")
+    trim.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m03 already completed in this run directory",
     )
     return parser
 
@@ -100,6 +111,29 @@ def _cmd_qc(args) -> int:
     return 0
 
 
+def _cmd_trim(args) -> int:
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    try:
+        summary = run_trim(config, args.metadata, run_dir, force=args.force)
+    except GateFailure:
+        # FAIL'de de güvence kartı yaz (gates.json diskte; verdict INVALID olur).
+        write_confidence_card(run_dir, profile)
+        raise
+    if summary.get("resumed"):
+        print("m03_trim already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"trimming OK: {summary['n_samples']} sample(s)")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command is None:
@@ -108,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "qc":
             return _cmd_qc(args)
+        if args.command == "trim":
+            return _cmd_trim(args)
         return _cmd_validate(args)
     except GateFailure as exc:
         print(f"error: {exc}", file=sys.stderr)
