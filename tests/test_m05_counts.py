@@ -156,3 +156,35 @@ def test_run_counts_resumes(tmp_path, monkeypatch):
     summary = run_counts(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def test_cli_counts_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    from rnaforge.modules import m03_trim, m04_quant
+    from rnaforge.modules.m03_trim import trimmed_name
+    from rnaforge.fastp import FastpResult
+    from rnaforge.bowtie2 import AlignmentResult
+    config_path, metadata_path = _setup(tmp_path)
+    common = ["--config", str(config_path), "--metadata", str(metadata_path),
+              "--runs-dir", str(tmp_path / "runs"), "--run-id", "demo"]
+
+    def fake_fastp(fastq_1, out_dir, min_length, fastq_2=None, aggressive_quality=False, env="rnaforge-qc"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        out1 = out_dir / trimmed_name(Path(fastq_1)); out1.write_text("@r\nACGT\n+\nIIII\n")
+        (out_dir / "fastp.json").write_text("{}")
+        return FastpResult(200, 196, 0.98, out1=out1)
+    monkeypatch.setattr(m03_trim, "run_fastp", fake_fastp)
+    monkeypatch.setattr(m04_quant, "build_index", lambda g, i, env="rnaforge-quant-prok": Path(i) / "genome")
+    def fake_align(index_prefix, out_dir, fastq_1, fastq_2=None, threads=4, env="rnaforge-quant-prok"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        bam = out_dir / "aligned.sorted.bam"; bam.write_bytes(b"BAM")
+        return AlignmentResult(bam=bam, alignment_rate=0.95)
+    monkeypatch.setattr(m04_quant, "run_bowtie2", fake_align)
+    _fake_featurecounts(monkeypatch, rate=0.9, n_genes=3)
+
+    assert main(["validate", *common]) == 0
+    assert main(["trim", *common]) == 0
+    assert main(["quant", *common]) == 0
+    capsys.readouterr()
+    assert main(["counts", *common]) == 0
+    assert "quality verdict" in capsys.readouterr().out
