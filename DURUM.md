@@ -6,11 +6,12 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-07-20
+**Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **Branch `feat/kalite-kapilari` — Task 1-6 BİTTİ, 105/105 test geçiyor, push edildi.**
-  Son commit `7ae728d`. `main` de güncel (Plan A merge edilmiş durumda).
+- **Kalite kapıları çerçevesi `main`'e MERGE edildi (2026-07-30), 107/107 test geçiyor.**
+  Merge commit `bcaf47b`. `feat/kalite-kapilari` push edildi (`4373e7c`). main+branch push'lu.
+- SIRADAKİ İŞ 1-3 (config fix, test temizliği, merge) **BİTTİ**. Sırada **m02 = FastQC**.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
 - Kalite kapıları çerçevesi çalışıyor ve **canlı doğrulandı**: replikasız koşu →
@@ -25,8 +26,15 @@
 | 3 | `subject` sütunu + `looks_paired()` detektörü | ✅ review temiz |
 | 4 | `validate_design` → `GateResult` döndürüyor (B kararı) | ✅ re-review temiz |
 | 5 | m01 kapıları yazıp zorluyor | ✅ review temiz (mutasyon testli) |
-| 6 | Güvence kartı + CLI verdict | ✅ controller doğruladı |
+| 6 | Güvence kartı + CLI verdict | ✅ controller + final review (m01 gates.json'ı enforce'tan ÖNCE yazıyor → FAIL'de kart INVALID, doğrulandı) |
 | 7 | Dokümantasyon (README/PLAN v1.4) | ⏸ **ERTELENDİ** (m02-m03 sonrası) |
+
+**2026-07-30 tamamlanan (bu oturum):**
+- **config sertleştirme:** bilinmeyen üst-seviye anahtar (`design:` → `de.design`, yazım
+  hataları) artık `ConfigError` ile reddediliyor (`KNOWN_TOP_LEVEL_KEYS`). Sessiz yutma bitti.
+- **test temizliği:** `test_m01_validate.py`'de ikinci `_illumina` gölgeleme kaldırıldı,
+  tek kanonik helper (200-read), gates importu tepeye taşındı.
+- **Task 6 final review:** temiz. m02'ye geçiş serbest.
 
 Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 1. `gates.json` bozulunca önceki modüllerin kaydı **sessizce siliniyordu** (atomik yazma yok).
@@ -34,15 +42,14 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
    çökme + "TRUSTWORTHY" damgası. (Spec'in deliğiydi, implementer hatası değil.)
 3. Güvence kartı **FAIL'de hiç yazılmıyordu** — en çok gerektiği anda yok.
 
-## SIRADAKİ İŞ (bu sırayla)
-1. **config.py sessiz hata fix'i:** üst seviye `design:` anahtarı SESSİZCE yok sayılıyor
-   (doğru şema `de.design`). Kullanıcı tasarımını değiştirdiğini sanıp eski tasarımla koşar.
-   Çözüm: bilinmeyen üst seviye anahtarlar `ConfigError` ile reddedilsin.
-2. Final whole-branch review (Task 6 bağımsız re-review almadı; Minor: `test_m01_validate.py`
-   içinde ikinci `_illumina` helper'ı ilkini gölgeliyor).
-3. `feat/kalite-kapilari` → `main` merge.
-4. **m02 = FastQC — ilk gerçek biyoinformatik aracı.** Sonra m03 fastp → m04 quant → m05
-   count matrisi → m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
+## SIRADAKİ İŞ
+1. ~~config.py sessiz hata fix'i~~ ✅ BİTTİ (2026-07-30)
+2. ~~Final whole-branch review + `_illumina` gölgeleme~~ ✅ BİTTİ (2026-07-30)
+3. ~~`feat/kalite-kapilari` → `main` merge~~ ✅ BİTTİ (2026-07-30)
+4. **m02 = FastQC — ilk gerçek biyoinformatik aracı. ← ŞİMDİ BURADAYIZ.**
+   Sonra m03 fastp → m04 quant → m05 count matrisi → m06 DESeq2 → m07 figürler → m08 rapor.
+   Her modül kendi veri kapısıyla. m02 kod öncesi brainstorm/spec gerek (çıktı sözleşmesi,
+   veri kapısı yok mu, FastQC 0.12.1 `rnaforge-qc` env'de kurulu).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
