@@ -153,3 +153,22 @@ def test_run_qc_gate_counts_reported(tmp_path, monkeypatch):
     summary = run_qc(load_config(config_path), metadata_path, run_dir)
     assert summary["gate_counts"]["PASS"] >= 1
     assert summary["gate_counts"].get("FAIL", 0) == 0
+
+
+def test_cli_qc_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    _fake_fastqc(monkeypatch)
+    config_path, metadata_path = _setup(tmp_path)
+    common = [
+        "--config", str(config_path),
+        "--metadata", str(metadata_path),
+        "--runs-dir", str(tmp_path / "runs"),
+        "--run-id", "demo",
+    ]
+    # Önce m01: resolve_run_dir aynı --run-id'yi aynı run dizinine çözer,
+    # böylece qc, validate'in bıraktığı state'i (m01 done) görür.
+    assert main(["validate", *common]) == 0
+    capsys.readouterr()  # validate çıktısını temizle
+    assert main(["qc", *common]) == 0
+    out = capsys.readouterr().out
+    assert "quality verdict" in out
