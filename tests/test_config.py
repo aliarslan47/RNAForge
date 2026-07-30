@@ -136,3 +136,22 @@ def test_paired_can_be_declared_false(tmp_path):
 def test_quality_overrides_are_loaded(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY + "\nquality:\n  alignment_rate: 0.4\n"))
     assert cfg.quality == {"alignment_rate": 0.4}
+
+
+def test_unknown_top_level_key_raises(tmp_path):
+    """`design:` üst seviyede SESSİZCE yok sayılıyordu (doğru şema `de.design`).
+    Kullanıcı tasarımını değiştirdiğini sanıp eski `~condition` ile koşardı —
+    makul görünen SAHTE sonuç. Bilinmeyen üst anahtar reddedilmeli; mesaj
+    doğru yeri (`de.design`) göstermeli değil ama en azından anahtarı adlandırmalı."""
+    path = _write(tmp_path, PROK_BODY + '\ndesign: "~subject + condition"\n')
+    with pytest.raises(ConfigError, match="design"):
+        load_config(path)
+
+
+def test_typo_in_top_level_key_raises(tmp_path):
+    """`organismtype` gibi yazım hatası sessizce yutulup `organism_type` zorunlu
+    hatası vermek yerine — burada organism_type zaten var, yani yanlış anahtar
+    tamamen görünmez olurdu. Reddedilsin ki kullanıcı hatasını görsün."""
+    path = _write(tmp_path, PROK_BODY + '\nrefernce:\n  genome_fasta: "x"\n')
+    with pytest.raises(ConfigError, match="refernce"):
+        load_config(path)
