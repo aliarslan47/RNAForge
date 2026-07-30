@@ -160,3 +160,28 @@ def test_run_quant_resumes(tmp_path, monkeypatch):
     summary = run_quant(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def test_cli_quant_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    from rnaforge.modules import m03_trim
+    from rnaforge.modules.m03_trim import trimmed_name
+    from rnaforge.fastp import FastpResult
+    config_path, metadata_path = _setup(tmp_path)
+    common = ["--config", str(config_path), "--metadata", str(metadata_path),
+              "--runs-dir", str(tmp_path / "runs"), "--run-id", "demo"]
+
+    def fake_fastp(fastq_1, out_dir, min_length, fastq_2=None,
+                   aggressive_quality=False, env="rnaforge-qc"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        out1 = out_dir / trimmed_name(Path(fastq_1)); out1.write_text("@r\nACGT\n+\nIIII\n")
+        (out_dir / "fastp.json").write_text("{}")
+        return FastpResult(200, int(200 * 0.98), 0.98, out1=out1)
+    monkeypatch.setattr(m03_trim, "run_fastp", fake_fastp)
+    _fake_bowtie2(monkeypatch, rate=0.95)
+
+    assert main(["validate", *common]) == 0
+    assert main(["trim", *common]) == 0
+    capsys.readouterr()
+    assert main(["quant", *common]) == 0
+    assert "quality verdict" in capsys.readouterr().out
