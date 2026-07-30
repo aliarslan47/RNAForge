@@ -10,14 +10,23 @@ from collections import Counter
 from pathlib import Path
 
 from rnaforge.config import Config
-from rnaforge.fastp import FastpResult, run_fastp
+from rnaforge.fastp import FastpResult, run_fastp, trimmed_name
 from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
-from rnaforge.metadata import load_metadata
+from rnaforge.metadata import Sample, load_metadata
 from rnaforge.quality import Profile, load_profile
 from rnaforge.state import RunState
 
 MODULE_NAME = "m03_trim"
 _GATE = "survival_rate"
+
+
+def trimmed_reads(run_dir, sample: Sample) -> tuple[Path, Path | None]:
+    """m03'ün bir örnek için ürettiği trimlenmiş FASTQ yol(lar)ı. Adlandırma
+    kuralının TEK kaynağı: m03 buraya yazar, m04 buradan okur (drift önlenir)."""
+    d = Path(run_dir) / "trimmed" / sample.sample_id
+    out1 = d / trimmed_name(sample.fastq_1)
+    out2 = d / trimmed_name(sample.fastq_2) if sample.fastq_2 else None
+    return out1, out2
 
 
 def build_trim_gates(results: dict[str, FastpResult], profile: Profile) -> list[GateResult]:

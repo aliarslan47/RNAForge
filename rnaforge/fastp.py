@@ -46,7 +46,7 @@ def parse_fastp_json(json_text: str, out1: Path | None = None,
                        survival_rate=survival, out1=out1, out2=out2)
 
 
-def _trimmed_name(fastq: Path) -> str:
+def trimmed_name(fastq: Path) -> str:
     stem = fastq.name
     for ext in (".gz", ".fastq", ".fq"):
         if stem.endswith(ext):
@@ -60,7 +60,7 @@ def run_fastp(fastq_1: Path, out_dir: Path, min_length: int,
     fastq_1 = Path(fastq_1)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out1 = out_dir / _trimmed_name(fastq_1)
+    out1 = out_dir / trimmed_name(fastq_1)
     json_path = out_dir / "fastp.json"
     html_path = out_dir / "fastp.html"
     cmd = ["conda", "run", "-n", env, "fastp",
@@ -70,7 +70,7 @@ def run_fastp(fastq_1: Path, out_dir: Path, min_length: int,
     out2 = None
     if fastq_2 is not None:
         fastq_2 = Path(fastq_2)
-        out2 = out_dir / _trimmed_name(fastq_2)
+        out2 = out_dir / trimmed_name(fastq_2)
         cmd += ["-I", str(fastq_2), "-O", str(out2)]
     if aggressive_quality:
         cmd += ["-r"]  # BİLİNÇLİ agresif (sliding-window); nazik varsayılandan sapma
