@@ -15,5 +15,8 @@ rnaforge = "rnaforge.cli:main"
 [tool.setuptools.packages.find]
 include = ["rnaforge*"]
 
+[tool.setuptools.package-data]
+rnaforge = ["profiles/*.yml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

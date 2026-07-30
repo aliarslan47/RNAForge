@@ -1,7 +1,7 @@
 """Config yükleme ve şema doğrulama. Geçersiz config m01'den ÖNCE yakalanır."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -11,6 +11,15 @@ PLATFORMS = ("auto", "illumina")
 STRANDEDNESS = ("unstranded", "stranded", "reverse")
 SELECTIONS = ("rrna_depletion", "polya")
 REPORT_LANGUAGES = ("tr", "en")
+
+# İzin verilen üst seviye anahtarlar. Bunun DIŞINDA bir anahtar (ör. `design:`
+# doğrusu `de.design`, ya da `refernce` yazım hatası) SESSİZCE yutulmamalı:
+# kullanıcı config'ini değiştirdiğini sanıp eski varsayılanla koşar → makul
+# görünen sahte sonuç. Yeni üst anahtar eklerken buraya da ekle.
+KNOWN_TOP_LEVEL_KEYS = frozenset({
+    "organism", "organism_type", "platform", "reference", "library",
+    "trimming", "de", "report", "resources", "paired", "quality",
+})
 
 # organism_type -> zorunlu reference alanları
 REQUIRED_REFERENCE = {
@@ -73,6 +82,8 @@ class Config:
     de: DE
     report: Report
     resources: Resources
+    paired: bool | None = None
+    quality: dict = field(default_factory=dict)
 
 
 def _one_of(value, allowed, field: str):
@@ -142,6 +153,15 @@ def load_config(path: Path | str) -> Config:
     if not isinstance(raw, dict):
         raise ConfigError(f"config must be a YAML mapping: {path}")
 
+    unknown = [k for k in raw if k not in KNOWN_TOP_LEVEL_KEYS]
+    if unknown:
+        raise ConfigError(
+            f"unknown top-level config key(s): {', '.join(map(repr, sorted(map(str, unknown))))}. "
+            f"Allowed: {', '.join(sorted(KNOWN_TOP_LEVEL_KEYS))}. "
+            "A misplaced key (e.g. top-level 'design' instead of 'de.design') is "
+            "silently ignored otherwise, so the run would use stale defaults."
+        )
+
     organism = raw.get("organism")
     if not organism:
         raise ConfigError("organism is required")
@@ -188,4 +208,6 @@ def load_config(path: Path | str) -> Config:
             threads=_as_int(resources_raw.get("threads", 8), "resources.threads"),
             memory_gb=_as_int(resources_raw.get("memory_gb", 32), "resources.memory_gb"),
         ),
+        paired=None if raw.get("paired") is None else bool(raw.get("paired")),
+        quality=_section(raw, "quality"),
     )

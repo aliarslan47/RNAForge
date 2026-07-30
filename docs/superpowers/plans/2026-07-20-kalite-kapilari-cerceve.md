@@ -229,7 +229,8 @@ git commit -m "feat: kalite kapisi sozlesmesi (GateResult/GateFailure/gates.json
 
 **Files:**
 - Create: `rnaforge/profiles/prokaryote.yml`, `rnaforge/profiles/eukaryote.yml`, `rnaforge/quality.py`
-- Modify: `rnaforge/config.py` (`quality:` bölümü), `pyproject.toml` (paket verisi)
+- Modify: `pyproject.toml` (paket verisi)
+- NOT: `config.py`'deki `quality:` bölümü **Task 4'ün işidir** (`Config.quality`), burada değil.
 - Test: `tests/test_quality.py`
 
 **Interfaces:**
@@ -559,70 +560,136 @@ git commit -m "feat: metadata subject sutunu + eslesmis tasarim tespiti"
 
 ---
 
-### Task 4: `paired_declared` kapısı ve `subject` design değişkeni
+### Task 4: Tasarım kontrollerini kapıya çevir (`validate_design` → `GateResult`)
+
+Bu, planın **B kararıdır** (Ali, 2026-07-20): tasarım kontrolleri exception fırlatmak
+yerine kapı döndürür. Gerekçe: exception fırlatan kontrol `gates.json`'a hiç yazılamaz,
+dolayısıyla FAIL anında teşhis raporunun gösterecek verisi olmaz (spec §3.5) ve
+"design_rank kapısı" asla düşemeyen, vacuous bir kayda dönüşür.
+
+**Sınır:** *bozuk formül* hâlâ `MetadataError`'dır (girdi geçersiz — formülde değişken yok,
+bilinmeyen değişken, `subject` kullanılmış ama sütun yok). *Tasarım kalitesi* kapıdır
+(rank, replikasyon). Biri "bu dosya hatalı", diğeri "bu deney sonuç vermez" der.
 
 **Files:**
-- Modify: `rnaforge/metadata.py` (`validate_design`), `rnaforge/config.py` (`paired`)
+- Modify: `rnaforge/metadata.py`, `rnaforge/config.py`
 - Test: `tests/test_metadata.py`, `tests/test_config.py`
 
 **Interfaces:**
-- Consumes: Task 3 (`looks_paired`, `Sample.subject`)
-- Produces: `Config.paired: bool | None` (None = beyan edilmedi); `validate_design(samples, design, paired: bool | None = None)`
+- Consumes: Task 1 (`GateResult`, `FAIL`, `PASS`), Task 3 (`looks_paired`)
+- Produces: `validate_design(samples, design, paired=None) -> list[GateResult]`;
+  `Config.paired: bool | None`; `Config.quality: dict`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Update the existing tests to the new contract**
+
+`tests/test_metadata.py` içinde `validate_design`'ın **exception** beklediği üç test
+kapı bekleyecek şekilde güncellenir. Aşağıdaki üç testi bul ve **yerine** bunları yaz:
 
 ```python
-# tests/test_metadata.py — sona ekle
-def test_paired_data_without_subject_in_design_is_rejected(tmp_path):
-    """Tespit VAR, karar YOK: dur ve sor (spec 2026-07-20)."""
+def _gate(gates, name):
+    matching = [g for g in gates if g.name == name]
+    assert matching, f"gate {name} not reported; got {[g.name for g in gates]}"
+    return matching[0]
+
+
+def test_batch_confounded_with_condition_fails_the_rank_gate(tmp_path):
+    """Batch condition'la tam confounded ise etkiler ayristirilamaz. DESeq2 bunu
+    kriptik 'not full rank' hatasiyla soyler; biz kapiyi dusurup ne yapilacagini soyleriz."""
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
-        "sample_id\tcondition\tsubject\tfastq_1\n"
-        "s1\tbefore\tp1\ta.fastq\n"
-        "s2\tafter\tp1\tb.fastq\n"
-        "s3\tbefore\tp2\tc.fastq\n"
-        "s4\tafter\tp2\td.fastq\n"
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\tcontrol\tb1\tb.fastq\n"
+        "s3\ttreated\tb2\tc.fastq\n"
+        "s4\ttreated\tb2\td.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="paired"):
-        validate_design(load_metadata(path), "~condition")
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    gate = _gate(gates, "design_rank")
+    assert gate.status == FAIL
+    assert "confounded" in gate.message
+    assert gate.remedy
 
 
-def test_paired_false_declaration_allows_unpaired_design(tmp_path):
-    """Bilerek eslesmemis kosmak MUMKUN olmali — ama beyan edilerek."""
+def test_single_level_batch_fails_the_rank_gate(tmp_path):
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
-        "sample_id\tcondition\tsubject\tfastq_1\n"
-        "s1\tbefore\tp1\ta.fastq\n"
-        "s2\tafter\tp1\tb.fastq\n"
-        "s3\tbefore\tp2\tc.fastq\n"
-        "s4\tafter\tp2\td.fastq\n"
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\tcontrol\tb1\tb.fastq\n"
+        "s3\ttreated\tb1\tc.fastq\n"
+        "s4\ttreated\tb1\td.fastq\n"
     ))
-    validate_design(load_metadata(path), "~condition", paired=False)
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    assert _gate(gates, "design_rank").status == FAIL
 
 
-def test_subject_in_design_satisfies_the_gate(tmp_path):
+def test_balanced_batch_design_passes_every_gate(tmp_path):
+    """Dengeli tasarim GECMELI — kapi sistemi yanlis pozitif uretirse musteri guvenmez."""
     _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
     path = _write_meta(tmp_path, (
-        "sample_id\tcondition\tsubject\tfastq_1\n"
-        "s1\tbefore\tp1\ta.fastq\n"
-        "s2\tafter\tp1\tb.fastq\n"
-        "s3\tbefore\tp2\tc.fastq\n"
-        "s4\tafter\tp2\td.fastq\n"
+        "sample_id\tcondition\tbatch\tfastq_1\n"
+        "s1\tcontrol\tb1\ta.fastq\n"
+        "s2\ttreated\tb1\tb.fastq\n"
+        "s3\tcontrol\tb2\tc.fastq\n"
+        "s4\ttreated\tb2\td.fastq\n"
     ))
-    validate_design(load_metadata(path), "~subject + condition")
+    gates = validate_design(load_metadata(path), "~batch + condition")
+    assert all(g.status == PASS for g in gates)
+```
+
+Aynı dosyada replikasyon/seviye testleri de kapı sözleşmesine taşınır:
+
+```python
+def test_single_condition_level_fails_the_replication_gate(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\ta.fastq\n"
+        "s2\tcontrol\tb.fastq\n"
+    ))
+    gates = validate_design(load_metadata(path), "~condition")
+    assert _gate(gates, "replication").status == FAIL
 
 
-def test_subject_in_design_requires_subject_column(tmp_path):
-    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+def test_condition_without_replicate_fails_the_replication_gate(tmp_path):
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq")
     path = _write_meta(tmp_path, (
         "sample_id\tcondition\tfastq_1\n"
         "s1\tcontrol\ta.fastq\n"
         "s2\tcontrol\tb.fastq\n"
         "s3\ttreated\tc.fastq\n"
-        "s4\ttreated\td.fastq\n"
     ))
-    with pytest.raises(MetadataError, match="subject"):
-        validate_design(load_metadata(path), "~subject + condition")
+    gate = _gate(validate_design(load_metadata(path), "~condition"), "replication")
+    assert gate.status == FAIL
+    assert "treated" in gate.message
+
+
+def test_malformed_formula_still_raises(tmp_path):
+    """Bozuk FORMUL kapi degil, gecersiz girdidir — MetadataError kalir."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\ta.fastq\n"
+        "s2\ttreated\tb.fastq\n"
+    ))
+    samples = load_metadata(path)
+    with pytest.raises(MetadataError, match="no variables"):
+        validate_design(samples, "~")
+    with pytest.raises(MetadataError, match="unknown variable"):
+        validate_design(samples, "~temperature")
+```
+
+Import bloğunu güncelle:
+
+```python
+from rnaforge.gates import FAIL, PASS
+from rnaforge.metadata import (
+    MetadataError,
+    design_variables,
+    load_metadata,
+    looks_paired,
+    validate_design,
+)
 ```
 
 ```python
@@ -634,17 +701,24 @@ def test_paired_defaults_to_undeclared(tmp_path):
 def test_paired_can_be_declared_false(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY + "\npaired: false\n"))
     assert cfg.paired is False
+
+
+def test_quality_overrides_are_loaded(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\nquality:\n  alignment_rate: 0.4\n"))
+    assert cfg.quality == {"alignment_rate": 0.4}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run: `conda run -n rnaforge-core python -m pytest tests/test_metadata.py tests/test_config.py -v`
-Expected: FAIL — `TypeError: validate_design() got an unexpected keyword argument 'paired'` ve `AttributeError: 'Config' object has no attribute 'paired'`
+Expected: FAIL — `validate_design` `None` döndürüyor (`assert matching` düşer) ve
+`Config` nesnesinde `paired`/`quality` alanları yok.
 
-- [ ] **Step 3: Implement config field**
+- [ ] **Step 3: Implement config fields**
 
-`rnaforge/config.py` — `Config` dataclass'ına alan ekle (varsayılan `None`, çünkü
-"beyan edilmedi" ile "hayır" farklı şeylerdir):
+`rnaforge/config.py` — importu güncelle: `from dataclasses import dataclass, field`.
+`Config` dataclass'ına iki alan ekle (varsayılan `None`, çünkü "beyan edilmedi" ile
+"hayır" farklı şeylerdir):
 
 ```python
 @dataclass(frozen=True)
@@ -662,50 +736,152 @@ class Config:
     quality: dict = field(default_factory=dict)
 ```
 
-`from dataclasses import dataclass, field` importunu güncelle. `load_config` içinde
-`Config(...)` çağrısına ekle:
+`load_config` içindeki `Config(...)` çağrısına ekle:
 
 ```python
         paired=None if raw.get("paired") is None else bool(raw.get("paired")),
         quality=_section(raw, "quality"),
 ```
 
-- [ ] **Step 4: Implement design validation**
+- [ ] **Step 4: Implement validate_design as a gate producer**
 
-`rnaforge/metadata.py` — `validate_design` imzasını ve bilinen değişkenleri güncelle:
+`rnaforge/metadata.py` — import ekle:
 
 ```python
+from rnaforge.gates import FAIL, PASS, GateResult
+```
+
+`validate_design`'ı tamamen değiştir:
+
+```python
+MODULE = "m01"
+
+
 def validate_design(
     samples: list[Sample], design: str, paired: bool | None = None
-) -> None:
+) -> list[GateResult]:
+    """Tasarım kapılarını döndürür. Bozuk FORMÜL hâlâ MetadataError'dır.
+
+    Kapı döndürmenin sebebi: exception fırlatan kontrol gates.json'a yazılamaz,
+    dolayısıyla FAIL anında teşhis raporunun gösterecek verisi olmaz (spec §3.5).
+    Zorlama çağırana aittir (raise_if_failed).
+    """
     variables = design_variables(design)
     if not variables:
         raise MetadataError(f"design formula has no variables: {design!r}")
 
     known = {"condition", "batch", "subject"}
-```
-
-`batch` kontrolünün hemen ardına ekle:
-
-```python
-    if "subject" in variables and any(s.subject is None for s in samples):
+    unknown = [v for v in variables if v not in known]
+    if unknown:
         raise MetadataError(
-            "design formula uses 'subject' but the metadata has no subject value for "
-            "every sample. Add a 'subject' column, or drop 'subject' from the design."
+            f"design formula references unknown variable(s): {', '.join(unknown)}. "
+            f"Metadata columns available for design: {', '.join(sorted(known))}"
+        )
+    for variable in ("batch", "subject"):
+        if variable in variables and any(getattr(s, variable) is None for s in samples):
+            raise MetadataError(
+                f"design formula uses {variable!r} but the metadata has no {variable} "
+                f"value for every sample. Add a {variable!r} column, or drop it from "
+                "the design."
+            )
+
+    return [
+        _rank_gate(samples, variables),
+        _replication_gate(samples),
+        _paired_gate(samples, variables, paired),
+    ]
+
+
+def _ok(name: str, message: str) -> GateResult:
+    return GateResult(
+        name=name, module=MODULE, status=PASS, message=message, remedy="no action needed"
+    )
+
+
+def _rank_gate(samples: list[Sample], variables: list[str]) -> GateResult:
+    if "batch" not in variables:
+        return _ok("design_rank", "the design uses no batch term, so it is full rank")
+
+    batches = {s.batch for s in samples}
+    if len(batches) < 2:
+        return GateResult(
+            name="design_rank", module=MODULE, status=FAIL,
+            message=(
+                f"the design uses 'batch' but every sample is in the same batch "
+                f"({sorted(batches)[0]!r}), which makes the model matrix rank-deficient"
+            ),
+            remedy="use design '~condition', or supply samples from more than one batch",
         )
 
-    if "subject" not in variables and paired is not True and looks_paired(samples):
-        if paired is None:
-            raise MetadataError(
-                "the metadata looks PAIRED: at least one subject appears in more than one "
-                "condition, but the design formula does not use 'subject'. A paired design "
-                f"({'~subject + condition'!r}) compares each subject with itself and finds "
-                "considerably more true differences. Either use 'subject' in the design, or "
-                "declare 'paired: false' in the config to run unpaired on purpose."
-            )
+    by_batch: dict[str, set[str]] = {}
+    for sample in samples:
+        by_batch.setdefault(sample.batch, set()).add(sample.condition)
+    if all(len(conditions) == 1 for conditions in by_batch.values()):
+        mapping = ", ".join(f"{b}->{next(iter(c))}" for b, c in sorted(by_batch.items()))
+        return GateResult(
+            name="design_rank", module=MODULE, status=FAIL,
+            message=(
+                "batch is completely confounded with condition, so their effects cannot "
+                f"be separated ({mapping})"
+            ),
+            remedy=(
+                "drop 'batch' from the design, or use a layout where at least one batch "
+                "contains more than one condition"
+            ),
+            samples=[s.sample_id for s in samples],
+        )
+    return _ok("design_rank", "batch and condition are not confounded; the design is full rank")
+
+
+def _replication_gate(samples: list[Sample]) -> GateResult:
+    counts = Counter(s.condition for s in samples)
+    if len(counts) < 2:
+        return GateResult(
+            name="replication", module=MODULE, status=FAIL,
+            message=(
+                "condition has fewer than 2 levels, so there is nothing to compare "
+                f"(found: {', '.join(sorted(counts))})"
+            ),
+            remedy="provide samples from at least two condition levels",
+        )
+    without = sorted(c for c, n in counts.items() if n < 2)
+    if without:
+        return GateResult(
+            name="replication", module=MODULE, status=FAIL,
+            message=(
+                f"condition level(s) without replicate: {', '.join(without)}; "
+                "DESeq2 cannot estimate dispersion without replicates"
+            ),
+            remedy="add at least one more sample for each condition level listed above",
+            samples=[s.sample_id for s in samples if s.condition in without],
+        )
+    return _ok("replication", "every condition level has at least two replicates")
+
+
+def _paired_gate(
+    samples: list[Sample], variables: list[str], paired: bool | None
+) -> GateResult:
+    if "subject" in variables:
+        return _ok("paired_declared", "the design accounts for the paired structure")
+    if paired is not None:
+        return _ok("paired_declared", f"pairing was declared explicitly (paired={paired})")
+    if not looks_paired(samples):
+        return _ok("paired_declared", "the data is not paired")
+    return GateResult(
+        name="paired_declared", module=MODULE, status=FAIL,
+        message=(
+            "the metadata looks PAIRED (at least one subject appears in more than one "
+            "condition) but the design does not use 'subject'; an unpaired analysis "
+            "leaves subject-to-subject variation in the noise and hides real differences"
+        ),
+        remedy=(
+            "use design '~subject + condition', or declare 'paired: false' in the config "
+            "to run unpaired on purpose"
+        ),
+    )
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run: `conda run -n rnaforge-core python -m pytest tests/test_metadata.py tests/test_config.py -v`
 Expected: PASS
@@ -713,36 +889,41 @@ Expected: PASS
 - [ ] **Step 6: Run full suite**
 
 Run: `conda run -n rnaforge-core python -m pytest -q`
-Expected: tüm testler yeşil
+Expected: `test_m01_validate.py` içinde **kırmızı** testler olabilir — m01 hâlâ
+`validate_design`'ın exception fırlatmasını bekliyor. Bunlar Task 5'te düzeltilecek.
+Kırmızıysa dur ve raporunda hangi testlerin düştüğünü **aynen** bildir; kendi başına
+m01'i değiştirme (bu Task 5'in işi).
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add rnaforge/metadata.py rnaforge/config.py tests/test_metadata.py tests/test_config.py
-git commit -m "feat: paired_declared kapisi — eslesmis veri beyan edilmeden gecemez"
+git commit -m "refactor: tasarim kontrolleri exception yerine GateResult donduruyor"
 ```
 
 ---
 
-### Task 5: m01 kontrollerini kapı sözleşmesine taşı
+### Task 5: m01'i kapı sözleşmesine bağla
 
 **Files:**
 - Modify: `rnaforge/modules/m01_validate.py`, `rnaforge/cli.py`
 - Test: `tests/test_m01_validate.py`
 
 **Interfaces:**
-- Consumes: Task 1 (`GateResult`, `write_gate_results`, `raise_if_failed`), Task 2 (`load_profile`), Task 4 (`validate_design(..., paired=)`)
-- Produces: `run_validation(...)` artık `quality/gates.json` yazar; `summary["quality_profile"]`, `summary["permissive_profile"]`
+- Consumes: Task 1 (`write_gate_results`, `raise_if_failed`, `GateFailure`), Task 2
+  (`load_profile`), Task 4 (`validate_design` → `list[GateResult]`)
+- Produces: `run_validation` artık `quality/gates.json` yazar ve FAIL'de `GateFailure`
+  fırlatır; `summary["quality_profile"]`, `summary["permissive_profile"]`
 
 - [ ] **Step 1: Write the failing test**
 
 `tests/test_m01_validate.py` içinde `_setup(tmp_path, fastq_maker)` yardımcısı zaten
-var; `(config_path, metadata_path)` döndürür ve `illumina_fastq` deseninde FASTQ üretir.
-Yeni testler onu kullanır — yeni fixture YAZMA.
+var; `(config_path, metadata_path)` döndürür. Yeni testler onu kullanır — yeni fixture
+YAZMA.
 
 ```python
 # tests/test_m01_validate.py — sona ekle
-from rnaforge.gates import PASS
+from rnaforge.gates import FAIL, PASS, GateFailure
 
 
 def _illumina(path):
@@ -767,54 +948,70 @@ def test_m01_summary_records_quality_profile(tmp_path):
     summary = run_validation(load_config(config_path), metadata_path, run_dir)
     assert summary["quality_profile"] == "prokaryote"
     assert summary["permissive_profile"] is False
+
+
+def test_m01_failing_gate_stops_the_run_and_is_recorded(tmp_path):
+    """FAIL: kosu DURUR, ama dusen kapi gates.json'a YAZILMIS olmali —
+    teshis raporunun gosterecek verisi buradan gelir (spec 3.5)."""
+    config_path, metadata_path = _setup(tmp_path, _illumina)
+    # replikasiz tasarim: her condition tek ornek
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\tc1.fastq\n"
+        "s2\ttreated\tt1.fastq\n"
+    )
+    run_dir = tmp_path / "run"
+    with pytest.raises(GateFailure):
+        run_validation(load_config(config_path), metadata_path, run_dir)
+
+    data = json.loads((run_dir / "quality" / "gates.json").read_text())
+    failed = [g for g in data["gates"] if g["status"] == FAIL]
+    assert [g["name"] for g in failed] == ["replication"]
+    assert failed[0]["remedy"]
+
+
+def test_m01_does_not_write_statistics_when_a_gate_fails(tmp_path):
+    """FAIL = sonuc GECERSIZ: biyolojik cikti URETILMEZ (spec karar 4)."""
+    config_path, metadata_path = _setup(tmp_path, _illumina)
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\tc1.fastq\n"
+        "s2\ttreated\tt1.fastq\n"
+    )
+    run_dir = tmp_path / "run"
+    with pytest.raises(GateFailure):
+        run_validation(load_config(config_path), metadata_path, run_dir)
+    assert not (run_dir / "statistics" / "raw_statistics.json").exists()
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `conda run -n rnaforge-core python -m pytest tests/test_m01_validate.py -v`
-Expected: FAIL — `FileNotFoundError` (gates.json yok)
+Expected: FAIL — `gates.json` yok / `GateFailure` fırlatılmıyor.
 
 - [ ] **Step 3: Write minimal implementation**
 
-`rnaforge/modules/m01_validate.py` — import bloğuna ekle:
+`rnaforge/modules/m01_validate.py` — import ekle:
 
 ```python
-from rnaforge.gates import PASS, GateResult, raise_if_failed, write_gate_results
+from rnaforge.gates import raise_if_failed, write_gate_results
 from rnaforge.quality import load_profile
 ```
 
-`validate_design` çağrısını `config.paired` geçecek şekilde güncelle ve kapıları kaydet.
-`log(f"design formula ...: OK")` satırının yerine:
+`validate_design(samples, config.de.design)` satırının **yerine**:
 
 ```python
         profile = load_profile(config.organism_type, config.quality)
         log(f"quality profile: {profile.name} (permissive={profile.permissive})")
 
-        validate_design(samples, config.de.design, paired=config.paired)
+        design_gates = validate_design(samples, config.de.design, paired=config.paired)
+        write_gate_results(run_dir, design_gates)
+        for gate in design_gates:
+            log(f"gate {gate.name}: {gate.status} — {gate.message}")
+        # Kapılar ÖNCE yazılır, SONRA zorlanır: FAIL'de de gates.json diskte kalmalı,
+        # teşhis raporu onu okuyacak (spec §3.5).
+        raise_if_failed(design_gates)
         log(f"design formula {config.de.design!r}: OK")
-
-        # Buraya ulaşıldıysa tasarım kontrolleri geçmiştir: validate_design ihlalde
-        # MetadataError fırlatır. Kapıları PASS olarak kaydetmek, müşterinin NEYİN
-        # kontrol edildiğini görmesini sağlar (spec §3.4 — görünmeyen güvence, güvence değildir).
-        gates = [
-            GateResult(
-                name="design_rank", module="m01", status=PASS,
-                message="the design matrix is full rank (batch is not confounded with condition)",
-                remedy="no action needed",
-            ),
-            GateResult(
-                name="replication", module="m01", status=PASS,
-                message="every condition level has at least two replicates",
-                remedy="no action needed",
-            ),
-            GateResult(
-                name="paired_declared", module="m01", status=PASS,
-                message="the pairing structure of the data matches the design formula",
-                remedy="no action needed",
-            ),
-        ]
-        write_gate_results(run_dir, gates)
-        raise_if_failed(gates)
 ```
 
 `summary` sözlüğüne ekle:
@@ -824,21 +1021,34 @@ from rnaforge.quality import load_profile
             "permissive_profile": profile.permissive,
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Handle GateFailure in the CLI**
+
+`rnaforge/cli.py` — `from rnaforge.gates import GateFailure` ekle ve mevcut
+`except (ConfigError, ...)` bloğundan **ÖNCE** şunu koy:
+
+```python
+    except GateFailure as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print("no results were produced: the data did not pass the quality gates.",
+              file=sys.stderr)
+        return 1
+```
+
+- [ ] **Step 5: Run test to verify it passes**
 
 Run: `conda run -n rnaforge-core python -m pytest tests/test_m01_validate.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite**
+- [ ] **Step 6: Run full suite**
 
 Run: `conda run -n rnaforge-core python -m pytest -q`
-Expected: tüm testler yeşil
+Expected: tüm testler yeşil (Task 4'te bırakılan kırmızılar dahil)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add rnaforge/modules/m01_validate.py tests/test_m01_validate.py
-git commit -m "feat: m01 kapilarini gates.json'a yaziyor + kalite profili secimi"
+git add rnaforge/modules/m01_validate.py rnaforge/cli.py tests/test_m01_validate.py
+git commit -m "feat: m01 kapilari gates.json'a yaziyor, FAIL kosuyu durduruyor"
 ```
 
 ---
@@ -851,7 +1061,7 @@ git commit -m "feat: m01 kapilarini gates.json'a yaziyor + kalite profili secimi
 - Test: `tests/test_confidence.py`
 
 **Interfaces:**
-- Consumes: Task 1 (`gates.json`), Task 2 (`Profile`)
+- Consumes: Task 1 (`gates.json`), Task 2 (`Profile`), Task 5 (m01 kapıları yazıyor)
 - Produces: `build_confidence_card(run_dir: Path, profile: Profile) -> dict`; `write_confidence_card(run_dir: Path, profile: Profile) -> Path`
 
 - [ ] **Step 1: Write the failing test**

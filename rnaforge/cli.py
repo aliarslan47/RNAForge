@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from rnaforge import __version__
 from rnaforge.config import ConfigError, load_config
+from rnaforge.gates import GateFailure
 from rnaforge.metadata import MetadataError
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.platform import UnsupportedPlatformError
+from rnaforge.quality import load_profile
+from rnaforge.report.confidence import write_confidence_card
 from rnaforge.state import resolve_run_dir
 
 
@@ -33,7 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
 def _cmd_validate(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
-    summary = run_validation(config, args.metadata, run_dir, force=args.force)
+    profile = load_profile(config.organism_type, config.quality)
+    try:
+        summary = run_validation(config, args.metadata, run_dir, force=args.force)
+    except GateFailure:
+        # Kart FAIL yolunda da yazilmali: teshis raporu kosu basarisiz oldugunda
+        # tam da bu veriye ihtiyac duyar (m01_validate kapilari enforce etmeden
+        # ONCE gates.json'a yazar, o yuzden burada card icin veri hazirdir).
+        write_confidence_card(run_dir, profile)
+        raise
     if summary.get("resumed"):
         # Atlanan iş görünür olmalı: kullanıcı "koştu" sanıp eski sonuca bakmasın.
         print("m01_validate already completed in this run directory — reusing its result "
@@ -45,6 +57,17 @@ def _cmd_validate(args) -> int:
         f"conditions={summary['conditions']}"
     )
     print(f"run directory: {run_dir}")
+
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    if profile.permissive:
+        print("note: this profile is permissive — thresholds are deliberately loose "
+              "and results should be read with that in mind.")
+    for gate, value in profile.overrides().items():
+        print(f"note: threshold {gate} was overridden to {value} in the config.")
     return 0
 
 
@@ -55,6 +78,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _cmd_validate(args)
+    except GateFailure as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print("no results were produced: the data did not pass the quality gates.",
+              file=sys.stderr)
+        return 1
     except (ConfigError, MetadataError, UnsupportedPlatformError,
             FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

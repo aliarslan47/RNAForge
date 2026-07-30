@@ -1,0 +1,12 @@
+name: prokaryote
+permissive: false
+description: >
+  Bakteriyel RNA-seq. Sıkı eşikler: temiz bir bakteri koşusu tipik olarak
+  %90+ hizalama verir. Bu profil doğrulanmış alandır.
+thresholds:
+  read_depth: 1000000
+  base_quality: 30
+  survival_rate: 0.50
+  alignment_rate: 0.70
+  rrna_fraction: 0.20
+  replicate_correlation: 0.85

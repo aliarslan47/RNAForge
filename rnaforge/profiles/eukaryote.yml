@@ -1,0 +1,14 @@
+name: eukaryote
+permissive: true
+description: >
+  Ökaryotik RNA-seq. Eşikler BİLİNÇLİ olarak gevşektir: elde doğrulanmış ökaryot
+  veri seti yoktur ve uydurma bir eşik kapı sisteminin anlamını bozar. Bu profille
+  üretilen rapor "geniş toleranslı" damgası taşır. Ökaryot doğrulaması geldiğinde
+  eşikler sıkılacaktır.
+thresholds:
+  read_depth: 10000000
+  base_quality: 30
+  survival_rate: 0.50
+  alignment_rate: 0.50
+  rrna_fraction: 0.30
+  replicate_correlation: 0.80
