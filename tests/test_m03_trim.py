@@ -153,6 +153,24 @@ def test_cli_trim_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys)
     assert "quality verdict" in capsys.readouterr().out
 
 
+def test_trimmed_reads_single_end(tmp_path):
+    from rnaforge.metadata import Sample
+    from rnaforge.modules.m03_trim import trimmed_reads
+    sample = Sample("s1", "control", tmp_path / "c1.fastq")
+    out1, out2 = trimmed_reads(tmp_path / "run", sample)
+    assert out1 == tmp_path / "run" / "trimmed" / "s1" / "c1.trimmed.fastq"
+    assert out2 is None
+
+
+def test_trimmed_reads_paired_end(tmp_path):
+    from rnaforge.metadata import Sample
+    from rnaforge.modules.m03_trim import trimmed_reads
+    sample = Sample("s1", "control", tmp_path / "c1_R1.fastq", tmp_path / "c1_R2.fastq")
+    out1, out2 = trimmed_reads(tmp_path / "run", sample)
+    assert out1.name == "c1_R1.trimmed.fastq"
+    assert out2.name == "c1_R2.trimmed.fastq"
+
+
 def test_cli_trim_returns_one_on_low_survival(tmp_path, monkeypatch, capsys):
     from rnaforge.cli import main
     _fake_fastp(monkeypatch, survival=0.10)
