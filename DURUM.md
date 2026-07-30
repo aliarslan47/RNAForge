@@ -9,17 +9,18 @@
 **Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **m02 = FastQC BİTTİ (2026-07-30), branch `feat/m02-fastqc`, 121/121 test geçiyor.**
-  6 task TDD ile tamamlandı; **canlı doğrulandı** (gerçek FastQC 0.12.1, uçtan uca
-  validate→qc). MERGE bekliyor (aşağı bak).
-- Önceki iş: kalite kapıları çerçevesi `main`'de (merge `bcaf47b`), config sertleştirme dahil.
+- **m03 = fastp (nazik trimming) BİTTİ (2026-07-30), branch `feat/m03-fastp`, 134/134 test.**
+  6 task TDD; **canlı doğrulandı** (gerçek fastp 1.3.6) hem PASS hem FAIL yolu. MERGE bekliyor.
+- Önceki: m01 (validate), m02 (FastQC) `main`'de. Kalite kapıları çerçevesi + config sertleştirme.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
-- **m02 canlı doğrulama:** validate→qc; verdict TRUSTWORTHY→**SUSPECT** (m02 kapıları WARN,
-  koşu DURMADI — tasarım gereği FastQC FAIL→bizim WARN). `raw_qc/<sample>/` ham HTML+zip,
-  `statistics/qc_statistics.json`, `gates.json`'a m01 kapıları KORUNARAK m02 eklendi.
-- **Çalıştırma NOTU:** `python -m rnaforge.cli` ÇALIŞMAZ (main-guard/`__main__.py` yok);
-  kurulu entry point `rnaforge` kullan (`conda run -n rnaforge-core rnaforge validate|qc ...`).
+- **m03 canlı doğrulama:** validate→trim. Nazik: survival 1.0 → TRUSTWORTHY. FAIL testi
+  (`min_length:200` → tüm okumalar elenir): survival 0.00<0.50 → `GateFailure` exit 1,
+  `gates.json` FAIL + güvence kartı INVALID, trimlenmiş FASTQ adli iz olarak diskte.
+- **m03 = İLK gerçek veri-FAIL kapısı** (survival_rate). m02'nin aksine m03 DURABİLİR.
+  Akış: `validate` → (`qc`) → `trim`, hepsi aynı `--run-id`. Ön koşul m01 (m02 değil).
+- **Çalıştırma NOTU:** `python -m rnaforge.cli` ÇALIŞMAZ (main-guard yok); entry point
+  `rnaforge` kullan. Referans yolları config'te göreliyse CWD'ye bağlı — smoke'ta cd gerekti.
 
 ## Tamamlanan (kalite kapıları planı)
 | Task | İş | Durum |
@@ -49,12 +50,14 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 1. ~~config.py sessiz hata fix'i~~ ✅ BİTTİ (2026-07-30)
 2. ~~Final whole-branch review + `_illumina` gölgeleme~~ ✅ BİTTİ (2026-07-30)
 3. ~~`feat/kalite-kapilari` → `main` merge~~ ✅ BİTTİ (2026-07-30)
-4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — spec+plan `docs/superpowers/{specs,plans}/2026-07-30-m02-fastqc*`.
-5. **`feat/m02-fastqc` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
-6. **m03 = fastp (nazik trimming).** Sonra m04 quant (ROUTER) → m05 count matrisi →
+4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — `main`'de (merge `db4b501`).
+5. ~~m03 = fastp (nazik trimming)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m03-fastp*`.
+6. **`feat/m03-fastp` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
+7. **m04 = Quantification ROUTER** (prok=bowtie2 | euk=salmon). Sonra m05 count matrisi →
    m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
-   - m04 ÖNCESİ: salmon **2.3.4** CLI/index davranışı doğrula (PLAN 1.x eski sürüm varsayar).
-   - m03 kod öncesi brainstorm/spec gerek (fastp NAZİK: adapter+min-length, agresif kalite YOK).
+   - **m04 ÖNCESİ ZORUNLU:** salmon **2.3.4** CLI/index davranışını doğrula (PLAN 1.x eski
+     sürüm varsayar); bowtie2+featureCounts prok yolu. Kod öncesi brainstorm/spec.
+   - m04 veri kapısı: `alignment_rate` (profil eşiği 0.70 prok) — ilk hizalama FAIL kapısı.
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
