@@ -1,8 +1,18 @@
 from __future__ import annotations
 
-from rnaforge.gates import FAIL, PASS
-from rnaforge.modules.m05_counts import build_count_gates
+import json
+import textwrap
+from pathlib import Path
+
+import pytest
+
+from rnaforge.config import load_config
+from rnaforge.featurecounts import FeatureCountsResult
+from rnaforge.gates import FAIL, PASS, GateFailure
+from rnaforge.modules import m05_counts
+from rnaforge.modules.m05_counts import build_count_gates, run_counts
 from rnaforge.quality import load_profile
+from tests.conftest import write_fastq
 
 
 def test_all_above_threshold_passes():
@@ -29,3 +39,120 @@ def test_override_marks_overridden():
     gates = build_count_gates({"s1": 0.10}, profile)
     assert gates[0].status == PASS
     assert gates[0].overridden is True
+
+
+def _setup(tmp_path):
+    (tmp_path / "ref").mkdir()
+    (tmp_path / "ref" / "genome.fa").write_text(">c1\n" + "ACGT" * 25 + "\n")
+    (tmp_path / "ref" / "genes.gtf").write_text('c1\ts\texon\t1\t80\t.\t+\t.\tgene_id "g1";\n')
+    for n in ("c1.fastq", "c2.fastq", "t1.fastq", "t2.fastq"):
+        write_fastq(tmp_path / n, 200, 150, "I")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(textwrap.dedent(f"""
+        organism: "E. coli"
+        organism_type: "prokaryote"
+        reference:
+          genome_fasta: "{tmp_path / 'ref' / 'genome.fa'}"
+          annotation_gff: "{tmp_path / 'ref' / 'genes.gtf'}"
+    """))
+    metadata_path = tmp_path / "samples.tsv"
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\tc1.fastq\n" "s2\tcontrol\tc2.fastq\n"
+        "s3\ttreated\tt1.fastq\n" "s4\ttreated\tt2.fastq\n"
+    )
+    return config_path, metadata_path
+
+
+def _prep_through_m04(config_path, metadata_path, run_dir, monkeypatch):
+    """m01(gerçek)+m03(fake fastp)+m04(fake bowtie2) done state + BAM üretir."""
+    from rnaforge.modules.m01_validate import run_validation
+    from rnaforge.modules import m03_trim, m04_quant
+    from rnaforge.modules.m03_trim import run_trim, trimmed_name
+    from rnaforge.modules.m04_quant import run_quant
+    from rnaforge.fastp import FastpResult
+    from rnaforge.bowtie2 import AlignmentResult
+    run_validation(load_config(config_path), metadata_path, run_dir)
+
+    def fake_fastp(fastq_1, out_dir, min_length, fastq_2=None, aggressive_quality=False, env="rnaforge-qc"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        out1 = out_dir / trimmed_name(Path(fastq_1)); out1.write_text("@r\nACGT\n+\nIIII\n")
+        (out_dir / "fastp.json").write_text("{}")
+        return FastpResult(200, 196, 0.98, out1=out1)
+    monkeypatch.setattr(m03_trim, "run_fastp", fake_fastp)
+    run_trim(load_config(config_path), metadata_path, run_dir)
+
+    monkeypatch.setattr(m04_quant, "build_index", lambda g, i, env="rnaforge-quant-prok": Path(i) / "genome")
+    def fake_align(index_prefix, out_dir, fastq_1, fastq_2=None, threads=4, env="rnaforge-quant-prok"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        bam = out_dir / "aligned.sorted.bam"; bam.write_bytes(b"BAM")
+        return AlignmentResult(bam=bam, alignment_rate=0.95)
+    monkeypatch.setattr(m04_quant, "run_bowtie2", fake_align)
+    run_quant(load_config(config_path), metadata_path, run_dir)
+
+
+def _fake_featurecounts(monkeypatch, rate=0.9, n_genes=3):
+    def fake_run(bams, gff, out_dir, feature_type, attribute, paired=False, threads=4, env="rnaforge-quant-prok"):
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        genes = [f"g{i}" for i in range(n_genes)]
+        counts = {str(b): [10 + i for i in range(n_genes)] for b in bams}
+        rates = {str(b): rate for b in bams}
+        return FeatureCountsResult(gene_ids=genes, counts=counts, assignment_rates=rates)
+    monkeypatch.setattr(m05_counts, "run_featurecounts", fake_run)
+
+
+def test_run_counts_requires_m04_done(tmp_path, monkeypatch):
+    _fake_featurecounts(monkeypatch)
+    config_path, metadata_path = _setup(tmp_path)
+    with pytest.raises(ValueError, match="m04"):
+        run_counts(load_config(config_path), metadata_path, tmp_path / "run")
+
+
+def test_run_counts_writes_matrix_and_passes(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_through_m04(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_featurecounts(monkeypatch, rate=0.9, n_genes=3)
+    summary = run_counts(load_config(config_path), metadata_path, run_dir)
+
+    assert summary["n_samples"] == 4
+    assert summary["n_genes"] == 3
+    matrix = (run_dir / "quantification" / "counts.tsv").read_text().splitlines()
+    assert matrix[0] == "gene\ts1\ts2\ts3\ts4"        # sample_id basliklari (BAM yollari degil)
+    assert matrix[1].split("\t")[0] == "g0"
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m05_counts" and g["status"] == "PASS" for g in gates)
+    assert any(g["module"] == "m04_quant" for g in gates)   # onceki kapilar korundu
+
+
+def test_run_counts_empty_matrix_raises(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_through_m04(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_featurecounts(monkeypatch, n_genes=0)   # yanlis feature_type senaryosu
+    with pytest.raises(ValueError, match="no genes"):
+        run_counts(load_config(config_path), metadata_path, run_dir)
+
+
+def test_run_counts_low_assignment_fails(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_through_m04(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_featurecounts(monkeypatch, rate=0.10)
+    with pytest.raises(GateFailure):
+        run_counts(load_config(config_path), metadata_path, run_dir)
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m05_counts" and g["status"] == "FAIL" for g in gates)
+
+
+def test_run_counts_resumes(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_through_m04(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_featurecounts(monkeypatch, rate=0.9)
+    run_counts(load_config(config_path), metadata_path, run_dir)
+    calls = []
+    monkeypatch.setattr(m05_counts, "run_featurecounts", lambda *a, **k: calls.append(1))
+    summary = run_counts(load_config(config_path), metadata_path, run_dir)
+    assert summary.get("resumed") is True
+    assert calls == []
