@@ -15,7 +15,23 @@ if ("batch" %in% colnames(coldata)) coldata$batch <- factor(coldata$batch)
 
 dds <- DESeqDataSetFromMatrix(countData = as.matrix(counts),
                               colData = coldata, design = as.formula(design_str))
-dds <- DESeq(dds, quiet = TRUE)
+# Dispersiyon uyumu: parametrik başarısız olursa (ör. az gen / zor veri) sessizce
+# çökme yerine local'e, o da olmazsa mean'e düş. Hangi uyumun kullanıldığı stderr'e yazılır.
+dds <- tryCatch(
+  DESeq(dds, quiet = TRUE),
+  error = function(e1) {
+    message("parametric dispersion fit failed (", conditionMessage(e1),
+            "); retrying with fitType='local'")
+    tryCatch(
+      DESeq(dds, quiet = TRUE, fitType = "local"),
+      error = function(e2) {
+        message("local dispersion fit failed (", conditionMessage(e2),
+                "); retrying with fitType='mean'")
+        DESeq(dds, quiet = TRUE, fitType = "mean")
+      }
+    )
+  }
+)
 res <- as.data.frame(results(dds))
 res <- cbind(gene = rownames(res), res)
 write.table(res, file.path(out_dir, "deseq2_results.tsv"),
