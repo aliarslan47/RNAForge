@@ -9,13 +9,17 @@
 **Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **m05 = prokaryot count matrisi (featureCounts) BİTTİ (2026-07-30), branch
-  `feat/m05-prok-counts`, 167/167 test.** 7 task TDD; **canlı doğrulandı** (gerçek featureCounts
-  2.1.1) uçtan uca. MERGE bekliyor.
-- **PROKARYOT UÇTAN UCA ÇALIŞIYOR:** `validate→trim→quant→counts` → `quantification/counts.tsv`
-  (gen×örnek matrisi = ortak sözleşme, m06 DESeq2 girdisi). Canlı: 3 gen×4 örnek gerçek sayım,
-  tüm kapılar PASS (m01+m03+m04+m05), TRUSTWORTHY.
-- Önceki: m01, m02, m03, m04(prok) `main`'de.
+- **m06 = DESeq2 diferansiyel ekspresyon BİTTİ (2026-07-30), branch `feat/m06-deseq2`,
+  181/181 test.** 7 task TDD; **canlı doğrulandı** (gerçek DESeq2 1.50.2). MERGE bekliyor.
+- **PROKARYOT MVP DE'YE ULAŞTI:** `validate→trim→quant→counts→de` uçtan uca çalışıyor.
+  Canlı: 150 gen, ilk 15'i treated'da 4× → DESeq2 **15/15 doğru buldu** (log2FC≈2, padj≈1e-15),
+  null genler anlamsız, kontrast "treated vs control", min replika korelasyon 0.862. Tüm kapılar
+  PASS (m01×3+m03+m04+m05+m06), verdict TRUSTWORTHY.
+- **AÇIK KONU (kullanıcı vurguladı):** GERÇEK yayımlanmış veri seti ile doğrulama henüz YOK.
+  Testler + canlı smoke SENTETİK (Kural 8: gerçek/müşteri verisi repo'da yok — doğru). Ama
+  Katman A/B doğruluğu için gerçek bakteri veri seti seçilmeli (bkz. "Açık konu" bölümü,
+  demo veri kriterleri). SIRADAKİ GERÇEK İŞ olabilir.
+- Önceki: m01, m02, m03, m04(prok), m05(prok) `main`'de.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
 - **m05 detay:** featureCounts TÜM BAM'lere tek çağrı → native matris; sütun→sample_id KONUMLA
@@ -57,15 +61,17 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — `main`'de (merge `db4b501`).
 5. ~~m03 = fastp (nazik trimming)~~ ✅ BİTTİ — `main`'de (`25b3ca2`).
 6. ~~m04 = prokaryot hizalama (bowtie2)~~ ✅ BİTTİ — `main`'de (`7595d66`).
-7. ~~m05 = prokaryot count matrisi (featureCounts)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m05-prok-counts*`.
-8. **`feat/m05-prok-counts` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
-9. **m06 = DESeq2** (`counts.tsv` + metadata → design formülü ile diferansiyel ekspresyon).
-   R/Bioconductor DESeq2 birincil + pydeseq2 çapraz kontrol (yalnız doğrulamada). Katman A
-   doğrulaması (yayımlanmış count matrisi → DE → birebir yakın) burada mümkün olur.
-   Sonra m07 figürler (PCA/Volcano/Heatmap) → m08 HTML rapor.
-   - ALTERNATİF: m04-euk (salmon) + m05-euk (tximport) — ökaryot yolunu tamamlar.
-   - m06 = ilk R/Rscript entegrasyonu (R sistemde kurulu `/usr/bin/Rscript`); veri kapısı
-     replicate_correlation (profil 0.85 prok) olabilir. Kod öncesi brainstorm/spec.
+7. ~~m05 = prokaryot count matrisi (featureCounts)~~ ✅ BİTTİ — `main`'de (`caba117`).
+8. ~~m06 = DESeq2~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m06-deseq2*`; env `rnaforge-de`
+   (bioconductor-deseq2 1.50.2), betik `rnaforge/scripts/deseq2.R` (dispersiyon fallback'li).
+9. **`feat/m06-deseq2` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
+10. **SIRADAKİ — iki yön:**
+    a) **GERÇEK VERİ doğrulaması (Katman A/B):** yayımlanmış bakteri RNA-seq (count matrisi + ham
+       FASTQ) ile pipeline'ı doğrula — demo veri seti seçimi (kriterler "Açık konu"da). Kullanıcı
+       gerçek veri istedi; muhtemelen öncelik.
+    b) **m07 figürler** (PCA/Volcano/Heatmap; `deseq2_results.tsv`+`normalized_counts.tsv` tüketir)
+       → **m08 HTML rapor** → MVP tamam. VE/VEYA ökaryot yolu (m04-euk salmon + m05-euk tximport).
+    - m06 = ilk ORTAK (organizma-agnostik) adım; asla FAIL üretmez (replicate_correlation WARN).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var

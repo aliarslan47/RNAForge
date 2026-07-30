@@ -59,6 +59,7 @@ class DE:
     design: str = "~condition"
     fdr_threshold: float = 0.05
     log2fc_threshold: float = 1.0
+    reference: str | None = None
 
 
 @dataclass(frozen=True)
@@ -211,6 +212,7 @@ def load_config(path: Path | str) -> Config:
             log2fc_threshold=_as_float(
                 de_raw.get("log2fc_threshold", 1.0), "de.log2fc_threshold"
             ),
+            reference=(str(de_raw["reference"]) if de_raw.get("reference") else None),
         ),
         report=Report(
             language=_one_of(report_raw.get("language", "tr"), REPORT_LANGUAGES, "report.language")
