@@ -139,3 +139,27 @@ def test_run_trim_resumes_without_rerunning(tmp_path, monkeypatch):
     summary = run_trim(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def test_cli_trim_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    _fake_fastp(monkeypatch, survival=0.98)
+    config_path, metadata_path = _setup(tmp_path)
+    common = ["--config", str(config_path), "--metadata", str(metadata_path),
+              "--runs-dir", str(tmp_path / "runs"), "--run-id", "demo"]
+    assert main(["validate", *common]) == 0
+    capsys.readouterr()
+    assert main(["trim", *common]) == 0
+    assert "quality verdict" in capsys.readouterr().out
+
+
+def test_cli_trim_returns_one_on_low_survival(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    _fake_fastp(monkeypatch, survival=0.10)
+    config_path, metadata_path = _setup(tmp_path)
+    common = ["--config", str(config_path), "--metadata", str(metadata_path),
+              "--runs-dir", str(tmp_path / "runs"), "--run-id", "demo"]
+    assert main(["validate", *common]) == 0
+    capsys.readouterr()
+    assert main(["trim", *common]) == 1
+    assert "quality gate" in capsys.readouterr().err.lower()
