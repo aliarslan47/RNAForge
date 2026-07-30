@@ -141,3 +141,19 @@ def test_run_de_resumes(tmp_path, monkeypatch):
     summary = run_de(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def test_cli_de_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
+    from rnaforge.cli import main
+    from rnaforge.state import resolve_run_dir
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir_base = tmp_path / "runs"
+    _fake_deseq2(monkeypatch, min_corr=0.95)
+    common = ["--config", str(config_path), "--metadata", str(metadata_path),
+              "--runs-dir", str(run_dir_base), "--run-id", "demo"]
+    assert main(["validate", *common]) == 0
+    run_dir = resolve_run_dir(run_dir_base, "demo")
+    _mark_m05_done(run_dir)
+    capsys.readouterr()
+    assert main(["de", *common]) == 0
+    assert "quality verdict" in capsys.readouterr().out

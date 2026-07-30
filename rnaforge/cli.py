@@ -15,6 +15,7 @@ from rnaforge.modules.m02_qc import run_qc
 from rnaforge.modules.m03_trim import run_trim
 from rnaforge.modules.m04_quant import run_quant
 from rnaforge.modules.m05_counts import run_counts
+from rnaforge.modules.m06_de import run_de
 from rnaforge.platform import UnsupportedPlatformError
 from rnaforge.quality import load_profile
 from rnaforge.report.confidence import write_confidence_card
@@ -74,6 +75,16 @@ def build_parser() -> argparse.ArgumentParser:
     counts.add_argument(
         "--force", action="store_true",
         help="re-run even if m05 already completed in this run directory",
+    )
+
+    de = sub.add_parser("de", help="differential expression with DESeq2 (m06)")
+    de.add_argument("--config", required=True, type=Path)
+    de.add_argument("--metadata", required=True, type=Path)
+    de.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    de.add_argument("--run-id", default="run")
+    de.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m06 already completed in this run directory",
     )
     return parser
 
@@ -200,6 +211,25 @@ def _cmd_counts(args) -> int:
     return 0
 
 
+def _cmd_de(args) -> int:
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_de(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m06_de already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"DE OK: {summary['n_significant']} significant / {summary['n_genes']} genes "
+          f"({summary['contrast']})")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command is None:
@@ -214,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_quant(args)
         if args.command == "counts":
             return _cmd_counts(args)
+        if args.command == "de":
+            return _cmd_de(args)
         return _cmd_validate(args)
     except GateFailure as exc:
         print(f"error: {exc}", file=sys.stderr)
