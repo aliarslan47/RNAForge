@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import json
+import textwrap
 from pathlib import Path
 
+import pytest
+
 from rnaforge.bowtie2 import AlignmentResult
-from rnaforge.gates import FAIL, PASS
-from rnaforge.modules.m04_quant import build_alignment_gates
+from rnaforge.config import load_config
+from rnaforge.gates import FAIL, PASS, GateFailure
+from rnaforge.modules import m04_quant
+from rnaforge.modules.m04_quant import build_alignment_gates, run_quant
 from rnaforge.quality import load_profile
+from tests.conftest import write_fastq
 
 
 def _res(rate: float) -> AlignmentResult:
@@ -37,3 +44,119 @@ def test_override_marks_gate_overridden():
     assert gates[0].status == PASS
     assert gates[0].overridden is True
     assert gates[0].threshold == 0.20
+
+
+def _setup(tmp_path, organism_type="prokaryote"):
+    (tmp_path / "ref").mkdir()
+    (tmp_path / "ref" / "genome.fa").write_text(">c1\n" + "ACGT" * 25 + "\n")
+    (tmp_path / "ref" / "genes.gff").write_text("##gff-version 3\n")
+    ref = ("genome_fasta" if organism_type == "prokaryote" else "transcriptome_fasta")
+    extra = ("annotation_gff" if organism_type == "prokaryote" else "tx2gene")
+    for n in ("c1.fastq", "c2.fastq", "t1.fastq", "t2.fastq"):
+        write_fastq(tmp_path / n, 200, 150, "I")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(textwrap.dedent(f"""
+        organism: "E. coli"
+        organism_type: "{organism_type}"
+        reference:
+          {ref}: "{tmp_path / 'ref' / 'genome.fa'}"
+          {extra}: "{tmp_path / 'ref' / 'genes.gff'}"
+    """))
+    metadata_path = tmp_path / "samples.tsv"
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\tc1.fastq\n" "s2\tcontrol\tc2.fastq\n"
+        "s3\ttreated\tt1.fastq\n" "s4\ttreated\tt2.fastq\n"
+    )
+    return config_path, metadata_path
+
+
+def _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch, survival=0.98):
+    """m01 (gerçek) + m03 (fastp monkeypatch) hazırlar — m04 için trimlenmiş okuma
+    ve done state gerekir."""
+    from rnaforge.modules.m01_validate import run_validation
+    from rnaforge.modules import m03_trim
+    from rnaforge.modules.m03_trim import run_trim, trimmed_name
+    from rnaforge.fastp import FastpResult
+    run_validation(load_config(config_path), metadata_path, run_dir)
+
+    def fake_fastp(fastq_1, out_dir, min_length, fastq_2=None,
+                   aggressive_quality=False, env="rnaforge-qc"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        out1 = out_dir / trimmed_name(Path(fastq_1))
+        out1.write_text("@r\nACGT\n+\nIIII\n")
+        (out_dir / "fastp.json").write_text("{}")
+        return FastpResult(reads_before=200, reads_after=int(200 * survival),
+                           survival_rate=survival, out1=out1)
+    monkeypatch.setattr(m03_trim, "run_fastp", fake_fastp)
+    run_trim(load_config(config_path), metadata_path, run_dir)
+
+
+def _fake_bowtie2(monkeypatch, rate=0.95):
+    monkeypatch.setattr(m04_quant, "build_index",
+                        lambda genome, index_dir, env="rnaforge-quant-prok": Path(index_dir) / "genome")
+    def fake_align(index_prefix, out_dir, fastq_1, fastq_2=None, threads=4,
+                   env="rnaforge-quant-prok"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        bam = out_dir / "aligned.sorted.bam"; bam.write_bytes(b"BAM")
+        return AlignmentResult(bam=bam, alignment_rate=rate)
+    monkeypatch.setattr(m04_quant, "run_bowtie2", fake_align)
+
+
+def test_run_quant_requires_m03_done(tmp_path, monkeypatch):
+    _fake_bowtie2(monkeypatch)
+    config_path, metadata_path = _setup(tmp_path)
+    from rnaforge.modules.m01_validate import run_validation
+    run_dir = tmp_path / "run"
+    run_validation(load_config(config_path), metadata_path, run_dir)  # yalniz m01
+    with pytest.raises(ValueError, match="m03"):
+        run_quant(load_config(config_path), metadata_path, run_dir)
+
+
+def test_run_quant_eukaryote_not_implemented(tmp_path, monkeypatch):
+    _fake_bowtie2(monkeypatch)
+    config_path, metadata_path = _setup(tmp_path, organism_type="eukaryote")
+    run_dir = tmp_path / "run"
+    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
+    with pytest.raises(NotImplementedError, match="eukaryote"):
+        run_quant(load_config(config_path), metadata_path, run_dir)
+
+
+def test_run_quant_writes_bam_and_passes(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_bowtie2(monkeypatch, rate=0.95)
+    summary = run_quant(load_config(config_path), metadata_path, run_dir)
+
+    assert summary["n_samples"] == 4
+    assert (run_dir / "quantification" / "s1" / "aligned.sorted.bam").exists()
+    stats = json.loads((run_dir / "statistics" / "alignment_statistics.json").read_text())
+    assert set(stats["samples"]) == {"s1", "s2", "s3", "s4"}
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m04_quant" and g["status"] == "PASS" for g in gates)
+    assert any(g["module"] == "m03_trim" for g in gates)   # onceki kapilar korundu
+
+
+def test_run_quant_low_alignment_fails(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_bowtie2(monkeypatch, rate=0.10)
+    with pytest.raises(GateFailure):
+        run_quant(load_config(config_path), metadata_path, run_dir)
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m04_quant" and g["status"] == "FAIL" for g in gates)
+
+
+def test_run_quant_resumes(tmp_path, monkeypatch):
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
+    _fake_bowtie2(monkeypatch, rate=0.95)
+    run_quant(load_config(config_path), metadata_path, run_dir)
+    calls = []
+    monkeypatch.setattr(m04_quant, "run_bowtie2", lambda *a, **k: calls.append(1))
+    summary = run_quant(load_config(config_path), metadata_path, run_dir)
+    assert summary.get("resumed") is True
+    assert calls == []
