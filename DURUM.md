@@ -9,19 +9,20 @@
 **Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **m04 = prokaryot hizalama (bowtie2) BİTTİ (2026-07-30), branch `feat/m04-prok-alignment`,
-  150/150 test.** 7 task TDD; **canlı doğrulandı** (gerçek bowtie2 2.5.5+samtools) PASS+FAIL.
-  MERGE bekliyor.
-- Önceki: m01 (validate), m02 (FastQC), m03 (fastp) `main`'de.
+- **m05 = prokaryot count matrisi (featureCounts) BİTTİ (2026-07-30), branch
+  `feat/m05-prok-counts`, 167/167 test.** 7 task TDD; **canlı doğrulandı** (gerçek featureCounts
+  2.1.1) uçtan uca. MERGE bekliyor.
+- **PROKARYOT UÇTAN UCA ÇALIŞIYOR:** `validate→trim→quant→counts` → `quantification/counts.tsv`
+  (gen×örnek matrisi = ortak sözleşme, m06 DESeq2 girdisi). Canlı: 3 gen×4 örnek gerçek sayım,
+  tüm kapılar PASS (m01+m03+m04+m05), TRUSTWORTHY.
+- Önceki: m01, m02, m03, m04(prok) `main`'de.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
-- **m04 canlı doğrulama:** validate→trim→quant (gerçek fastp+bowtie2). Genomdan türetilmiş
-  okumalar: alignment 1.0 → TRUSTWORTHY, `quantification/<id>/aligned.sorted.bam`+`.bai`+log.
-  Rastgele okumalar: alignment 0.00<0.70 → `GateFailure` exit **1**, INVALID.
-- **m04 = ROUTER (organism_type):** prokaryot yolu (bowtie2) BAĞLI; **eukaryote →
-  `NotImplementedError`** (salmon yolu sonraki spec). alignment_rate = İKİNCİ veri-FAIL kapısı.
-  Ön koşul **m03** (trimlenmiş okuma kullanır); zincir m01→m03→m04, aynı `--run-id`.
-- **Trimlenmiş yol TEK kaynak:** `m03_trim.trimmed_reads(run_dir, sample)` (m03 yazar, m04 okur).
+- **m05 detay:** featureCounts TÜM BAM'lere tek çağrı → native matris; sütun→sample_id KONUMLA
+  (BAM adıyla değil). Veri kapısı `assignment_rate` (ÜÇÜNCÜ FAIL kapısı). featureCounts params
+  config-driven: `quantification.feature_type`(exon)/`attribute`(gene_id) — prok GFF3 için ez
+  (CDS/locus_tag). `quantification` KNOWN_TOP_LEVEL_KEYS'e eklendi. Yanlış feature_type → yüksek
+  sesle hata, exit 1 (sessiz boş matris YOK). Ön koşul m04; zincir m01→m03→m04→m05.
 - **Çalıştırma NOTU:** `python -m rnaforge.cli` ÇALIŞMAZ (main-guard yok); entry point
   `rnaforge` kullan. Referans yolları config'te göreliyse CWD'ye bağlı — smoke'ta cd gerekti.
 
@@ -55,13 +56,16 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 3. ~~`feat/kalite-kapilari` → `main` merge~~ ✅ BİTTİ (2026-07-30)
 4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — `main`'de (merge `db4b501`).
 5. ~~m03 = fastp (nazik trimming)~~ ✅ BİTTİ — `main`'de (`25b3ca2`).
-6. ~~m04 = prokaryot hizalama (bowtie2)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m04-prok-alignment*`.
-7. **`feat/m04-prok-alignment` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
-8. **m05 = Count Matrix** (prok=featureCounts: BAM+GFF → gen×örnek count matrisi = ortak sözleşme)
-   VE/VEYA **m04 ökaryot yolu** (salmon+tximport; salmon 2.3.4 CLI doğrulandı, uyumlu).
-   Sonra m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
-   - m05 count matrisi m06 DESeq2'nin girdisi; PLAN §14 `quantification/counts.tsv`.
-   - annotation_gff zaten config'te zorunlu (prok); featureCounts `-a genes.gff -o counts`.
+6. ~~m04 = prokaryot hizalama (bowtie2)~~ ✅ BİTTİ — `main`'de (`7595d66`).
+7. ~~m05 = prokaryot count matrisi (featureCounts)~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m05-prok-counts*`.
+8. **`feat/m05-prok-counts` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
+9. **m06 = DESeq2** (`counts.tsv` + metadata → design formülü ile diferansiyel ekspresyon).
+   R/Bioconductor DESeq2 birincil + pydeseq2 çapraz kontrol (yalnız doğrulamada). Katman A
+   doğrulaması (yayımlanmış count matrisi → DE → birebir yakın) burada mümkün olur.
+   Sonra m07 figürler (PCA/Volcano/Heatmap) → m08 HTML rapor.
+   - ALTERNATİF: m04-euk (salmon) + m05-euk (tximport) — ökaryot yolunu tamamlar.
+   - m06 = ilk R/Rscript entegrasyonu (R sistemde kurulu `/usr/bin/Rscript`); veri kapısı
+     replicate_correlation (profil 0.85 prok) olabilir. Kod öncesi brainstorm/spec.
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var

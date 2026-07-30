@@ -14,6 +14,7 @@ from rnaforge.modules.m01_validate import run_validation
 from rnaforge.modules.m02_qc import run_qc
 from rnaforge.modules.m03_trim import run_trim
 from rnaforge.modules.m04_quant import run_quant
+from rnaforge.modules.m05_counts import run_counts
 from rnaforge.platform import UnsupportedPlatformError
 from rnaforge.quality import load_profile
 from rnaforge.report.confidence import write_confidence_card
@@ -63,6 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
     quant.add_argument(
         "--force", action="store_true",
         help="re-run even if m04 already completed in this run directory",
+    )
+
+    counts = sub.add_parser("counts", help="build gene x sample count matrix (m05)")
+    counts.add_argument("--config", required=True, type=Path)
+    counts.add_argument("--metadata", required=True, type=Path)
+    counts.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    counts.add_argument("--run-id", default="run")
+    counts.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m05 already completed in this run directory",
     )
     return parser
 
@@ -167,6 +178,28 @@ def _cmd_quant(args) -> int:
     return 0
 
 
+def _cmd_counts(args) -> int:
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    try:
+        summary = run_counts(config, args.metadata, run_dir, force=args.force)
+    except GateFailure:
+        write_confidence_card(run_dir, profile)
+        raise
+    if summary.get("resumed"):
+        print("m05_counts already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"count matrix OK: {summary['n_genes']} genes x {summary['n_samples']} sample(s)")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command is None:
@@ -179,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_trim(args)
         if args.command == "quant":
             return _cmd_quant(args)
+        if args.command == "counts":
+            return _cmd_counts(args)
         return _cmd_validate(args)
     except GateFailure as exc:
         print(f"error: {exc}", file=sys.stderr)

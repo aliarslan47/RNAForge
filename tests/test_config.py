@@ -138,6 +138,24 @@ def test_quality_overrides_are_loaded(tmp_path):
     assert cfg.quality == {"alignment_rate": 0.4}
 
 
+def test_quantification_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.quantification.feature_type == "exon"
+    assert cfg.quantification.attribute == "gene_id"
+
+
+def test_quantification_overrides(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY +
+                             "\nquantification:\n  feature_type: CDS\n  attribute: locus_tag\n"))
+    assert cfg.quantification.feature_type == "CDS"
+    assert cfg.quantification.attribute == "locus_tag"
+
+
+def test_quantification_is_known_top_level_key(tmp_path):
+    # 'quantification' reddedilmemeli (KNOWN_TOP_LEVEL_KEYS'te)
+    load_config(_write(tmp_path, PROK_BODY + "\nquantification:\n  feature_type: gene\n"))
+
+
 def test_unknown_top_level_key_raises(tmp_path):
     """`design:` üst seviyede SESSİZCE yok sayılıyordu (doğru şema `de.design`).
     Kullanıcı tasarımını değiştirdiğini sanıp eski `~condition` ile koşardı —

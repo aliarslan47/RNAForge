@@ -19,6 +19,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
+    "quantification",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -61,6 +62,14 @@ class DE:
 
 
 @dataclass(frozen=True)
+class Quantification:
+    # featureCounts (prokaryot) parametreleri. Anotasyon kaynağı değişir → config-driven.
+    # Prokaryot GFF3 kullanıcısı tipik CDS/locus_tag ile ezer.
+    feature_type: str = "exon"
+    attribute: str = "gene_id"
+
+
+@dataclass(frozen=True)
 class Report:
     language: str = "tr"
 
@@ -84,6 +93,7 @@ class Config:
     resources: Resources
     paired: bool | None = None
     quality: dict = field(default_factory=dict)
+    quantification: Quantification = field(default_factory=Quantification)
 
 
 def _one_of(value, allowed, field: str):
@@ -172,6 +182,7 @@ def load_config(path: Path | str) -> Config:
     de_raw = _section(raw, "de")
     report_raw = _section(raw, "report")
     resources_raw = _section(raw, "resources")
+    quantification_raw = _section(raw, "quantification")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -210,4 +221,8 @@ def load_config(path: Path | str) -> Config:
         ),
         paired=None if raw.get("paired") is None else bool(raw.get("paired")),
         quality=_section(raw, "quality"),
+        quantification=Quantification(
+            feature_type=str(quantification_raw.get("feature_type", "exon")),
+            attribute=str(quantification_raw.get("attribute", "gene_id")),
+        ),
     )
