@@ -27,7 +27,19 @@ dds <- tryCatch(
       error = function(e2) {
         message("local dispersion fit failed (", conditionMessage(e2),
                 "); retrying with fitType='mean'")
-        DESeq(dds, quiet = TRUE, fitType = "mean")
+        tryCatch(
+          DESeq(dds, quiet = TRUE, fitType = "mean"),
+          error = function(e3) {
+            # Dejenere durum (ör. neredeyse tekdüze sayımlar): dispersiyon trendi
+            # uydurulamaz. DESeq2'nin önerdiği yol — gen-bazlı tahminleri doğrudan kullan.
+            message("all dispersion trend fits failed (", conditionMessage(e3),
+                    "); using gene-wise dispersion estimates directly")
+            d <- estimateSizeFactors(dds)
+            d <- estimateDispersionsGeneEst(d)
+            dispersions(d) <- mcols(d)$dispGeneEst
+            nbinomWaldTest(d)
+          }
+        )
       }
     )
   }
