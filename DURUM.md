@@ -9,14 +9,17 @@
 **Son güncelleme:** 2026-07-30
 
 ## Şu an nerede kaldık
-- **Kalite kapıları çerçevesi `main`'e MERGE edildi (2026-07-30), 107/107 test geçiyor.**
-  Merge commit `bcaf47b`. `feat/kalite-kapilari` push edildi (`4373e7c`). main+branch push'lu.
-- SIRADAKİ İŞ 1-3 (config fix, test temizliği, merge) **BİTTİ**. Sırada **m02 = FastQC**.
+- **m02 = FastQC BİTTİ (2026-07-30), branch `feat/m02-fastqc`, 121/121 test geçiyor.**
+  6 task TDD ile tamamlandı; **canlı doğrulandı** (gerçek FastQC 0.12.1, uçtan uca
+  validate→qc). MERGE bekliyor (aşağı bak).
+- Önceki iş: kalite kapıları çerçevesi `main`'de (merge `bcaf47b`), config sertleştirme dahil.
 - **Test komutu:** `conda run -n rnaforge-core --cwd /home/ali/rnaforge-pipeline python -m pytest -q`
   (repo dışından çağırırsan `tests.conftest` importu kırılır — yanlış alarm verir.)
-- Kalite kapıları çerçevesi çalışıyor ve **canlı doğrulandı**: replikasız koşu →
-  `GateFailure`, `gates.json` + `confidence_card.json` (verdict `INVALID`) yazılıyor,
-  `raw_statistics.json` ÜRETİLMİYOR, stderr'de düzeltme önerisi, exit 1.
+- **m02 canlı doğrulama:** validate→qc; verdict TRUSTWORTHY→**SUSPECT** (m02 kapıları WARN,
+  koşu DURMADI — tasarım gereği FastQC FAIL→bizim WARN). `raw_qc/<sample>/` ham HTML+zip,
+  `statistics/qc_statistics.json`, `gates.json`'a m01 kapıları KORUNARAK m02 eklendi.
+- **Çalıştırma NOTU:** `python -m rnaforge.cli` ÇALIŞMAZ (main-guard/`__main__.py` yok);
+  kurulu entry point `rnaforge` kullan (`conda run -n rnaforge-core rnaforge validate|qc ...`).
 
 ## Tamamlanan (kalite kapıları planı)
 | Task | İş | Durum |
@@ -46,10 +49,12 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 1. ~~config.py sessiz hata fix'i~~ ✅ BİTTİ (2026-07-30)
 2. ~~Final whole-branch review + `_illumina` gölgeleme~~ ✅ BİTTİ (2026-07-30)
 3. ~~`feat/kalite-kapilari` → `main` merge~~ ✅ BİTTİ (2026-07-30)
-4. **m02 = FastQC — ilk gerçek biyoinformatik aracı. ← ŞİMDİ BURADAYIZ.**
-   Sonra m03 fastp → m04 quant → m05 count matrisi → m06 DESeq2 → m07 figürler → m08 rapor.
-   Her modül kendi veri kapısıyla. m02 kod öncesi brainstorm/spec gerek (çıktı sözleşmesi,
-   veri kapısı yok mu, FastQC 0.12.1 `rnaforge-qc` env'de kurulu).
+4. ~~m02 = FastQC~~ ✅ BİTTİ (2026-07-30) — spec+plan `docs/superpowers/{specs,plans}/2026-07-30-m02-fastqc*`.
+5. **`feat/m02-fastqc` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
+6. **m03 = fastp (nazik trimming).** Sonra m04 quant (ROUTER) → m05 count matrisi →
+   m06 DESeq2 → m07 figürler → m08 rapor. Her modül kendi veri kapısıyla.
+   - m04 ÖNCESİ: salmon **2.3.4** CLI/index davranışı doğrula (PLAN 1.x eski sürüm varsayar).
+   - m03 kod öncesi brainstorm/spec gerek (fastp NAZİK: adapter+min-length, agresif kalite YOK).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
