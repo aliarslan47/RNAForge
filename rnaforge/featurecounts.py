@@ -1,11 +1,17 @@
 """featureCounts çıktısını parse eder ve çalıştırır. Parserlar saftır."""
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 
 class FeatureCountsParseError(ValueError):
     """featureCounts çıktısı beklenen biçimde değil."""
+
+
+class FeatureCountsRunError(RuntimeError):
+    """featureCounts çalıştırılamadı ya da beklenen çıktıyı üretmedi."""
 
 
 @dataclass(frozen=True)
@@ -57,3 +63,31 @@ def parse_summary(summary_text: str) -> dict[str, float]:
             if status == "Assigned":
                 assigned[col] += v
     return {c: (assigned[c] / totals[c] if totals[c] > 0 else 0.0) for c in columns}
+
+
+def run_featurecounts(bams: list[Path], gff: Path, out_dir: Path, feature_type: str,
+                      attribute: str, paired: bool = False, threads: int = 4,
+                      env: str = "rnaforge-quant-prok") -> FeatureCountsResult:
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    counts_path = out_dir / "counts.txt"
+    cmd = ["conda", "run", "-n", env, "featureCounts",
+           "-a", str(gff), "-o", str(counts_path),
+           "-t", feature_type, "-g", attribute, "-T", str(threads)]
+    if paired:
+        cmd += ["-p", "--countReadPairs"]
+    cmd += [str(b) for b in bams]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise FeatureCountsRunError(
+            f"featureCounts failed (exit {r.returncode})\ncmd: {' '.join(cmd)}\n"
+            f"stderr: {r.stderr.strip()}"
+        )
+    summary_path = counts_path.with_name(counts_path.name + ".summary")
+    if not counts_path.exists() or not summary_path.exists():
+        raise FeatureCountsRunError(
+            f"featureCounts reported success but output missing at {counts_path}"
+        )
+    gene_ids, counts = parse_counts(counts_path.read_text())
+    rates = parse_summary(summary_path.read_text())
+    return FeatureCountsResult(gene_ids=gene_ids, counts=counts, assignment_rates=rates)
