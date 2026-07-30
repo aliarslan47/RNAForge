@@ -138,6 +138,18 @@ def test_quality_overrides_are_loaded(tmp_path):
     assert cfg.quality == {"alignment_rate": 0.4}
 
 
+def test_de_reference_defaults_none(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).de.reference is None
+
+
+def test_de_reference_loaded(tmp_path):
+    body = PROK_BODY.replace('de:\n  design: "~condition"\n',
+                             'de:\n  design: "~condition"\n  reference: control\n')
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.de.reference == "control"
+    assert cfg.de.design == "~condition"
+
+
 def test_quantification_defaults(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY))
     assert cfg.quantification.feature_type == "exon"
