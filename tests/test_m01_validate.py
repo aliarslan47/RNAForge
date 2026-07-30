@@ -7,6 +7,7 @@ import pytest
 
 from rnaforge.cli import main
 from rnaforge.config import load_config
+from rnaforge.gates import FAIL, PASS, GateFailure
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.platform import UnsupportedPlatformError
 from tests.conftest import write_fastq
@@ -45,7 +46,7 @@ def _setup(tmp_path, fastq_maker) -> tuple:
 
 
 def _illumina(path):
-    write_fastq(path, 50, 150, "I")
+    return write_fastq(path, 200, 150, "I")
 
 
 def _ont(path):
@@ -114,13 +115,6 @@ def test_cli_validate_returns_one_on_ont(tmp_path, capsys):
     ])
     assert code == 1
     assert "not supported" in capsys.readouterr().err
-
-
-from rnaforge.gates import FAIL, PASS, GateFailure
-
-
-def _illumina(path):
-    return write_fastq(path, 200, 150, "I")
 
 
 def test_m01_writes_gate_results(tmp_path):
