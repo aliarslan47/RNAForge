@@ -6,16 +6,31 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-07-30
+**Son güncelleme:** 2026-08-03
 
 ## Şu an nerede kaldık
-- **m06 = DESeq2 diferansiyel ekspresyon BİTTİ (2026-07-30), branch `feat/m06-deseq2`,
-  181/181 test.** 7 task TDD; **canlı doğrulandı** (gerçek DESeq2 1.50.2). MERGE bekliyor.
-- **PROKARYOT MVP DE'YE ULAŞTI:** `validate→trim→quant→counts→de` uçtan uca çalışıyor.
-  Canlı: 150 gen, ilk 15'i treated'da 4× → DESeq2 **15/15 doğru buldu** (log2FC≈2, padj≈1e-15),
-  null genler anlamsız, kontrast "treated vs control", min replika korelasyon 0.862. Tüm kapılar
-  PASS (m01×3+m03+m04+m05+m06), verdict TRUSTWORTHY.
-- **AÇIK KONU (kullanıcı vurguladı):** GERÇEK yayımlanmış veri seti ile doğrulama henüz YOK.
+- **GERÇEK YAYIN-VERİSİ DOĞRULAMASI BİTTİ (2026-08-03) — açık konu KAPANDI.** Veri: **GSE300731**
+  (Nature Microbiology 2025, "enterololin" dar-spektrum antibiyotik, Brown Lab). *E. coli* BW25113
+  ΔbamBΔtolC, **5× MIC enterololin vs kontrol, 4h, 3'er replika** (6 örnek, PRJNA1281986). Referans
+  BW25113 GCF_000750555.1. Girdiler gitignore'lu `raw/GSE300731/` + `references/ecoli_bw25113/`.
+  Config: prok GFF → `feature_type=CDS`, `attribute=locus_tag`; `de.reference=control`.
+- **Uçtan uca canlı koştu** (`runs/20260803_143036_GSE300731/`): hizalama %98.9–99.3, atama %85–86,
+  replika kor. min 0.98, **DE 1634 anlamlı/4398 gen**. Tek WARN: ctrl_rep3 ham-QC GC → dürüstçe
+  SUSPECT damgalandı (kapı sistemi çalışıyor). Kalan tüm kapılar PASS.
+- **KONKORDANS (Katman A/B) — güçlü:** makalenin kendi kallisto abundance'ları (GEO suppl) → aynı
+  DESeq2 → bizim ham-FASTQ (bowtie2+featureCounts) LFC'leriyle **Pearson r=0.972 / Spearman 0.958**
+  (3592 ortak gen), **makale DEG recall %92.6**, **yön uyumu %99.9**. Biyolojik: top UP = zarf-stres
+  imzası (pspA/pspC/spy + Rcs/kapsül rcsA/ugd/gmd/wzc) = makalenin doğruladığı **LolCDE** (lipoprotein
+  taşıma) hedefiyle birebir; top DOWN = asit-direnç (gad*/hde*) baskılanması.
+- **Analiz/figür script'leri scratchpad'de** (repo dışı): `run_all.sh`, `figures.R`, paper_de.
+  Konkordans + figürler tek seferlik prototip — **ASIL İŞ: bunları pipeline'a m07/m08 olarak kur.**
+- **YENİ İSTEK (kullanıcı, 2026-08-03):** figürler+rapor pipeline'ın kalıcı parçası olsun, **her koşuda
+  OTOMATİK** çıksın; **güncel/modern, güzel, YÜKSEK ÇÖZÜNÜRLÜK** görseller. → m07 (figürler) + m08 (rapor)
+  şimdi sıradaki iş; tasarım kalitesi çıtası yüksek. Plotlama: **rnaforge-de'de ggplot2 KURULU** (ggrepel
+  YOK — ya kur ya kaçın). matplotlib hiçbir env'de yok. Konkordans figürü STANDART DEĞİL (referans DEG
+  tablosu gerektirir; müşteri koşusunda olmaz) → yalnız doğrulama aracı, m07'ye girmez.
+- (Önceki) **m06 DESeq2 `main`'de**, 181 test. PROKARYOT MVP DE zinciri tam.
+- **AÇIK KONU (ARTIK KAPALI):** ~~GERÇEK yayımlanmış veri seti ile doğrulama henüz YOK.~~
   Testler + canlı smoke SENTETİK (Kural 8: gerçek/müşteri verisi repo'da yok — doğru). Ama
   Katman A/B doğruluğu için gerçek bakteri veri seti seçilmeli (bkz. "Açık konu" bölümü,
   demo veri kriterleri). SIRADAKİ GERÇEK İŞ olabilir.
