@@ -29,6 +29,12 @@
   şimdi sıradaki iş; tasarım kalitesi çıtası yüksek. Plotlama: **rnaforge-de'de ggplot2 KURULU** (ggrepel
   YOK — ya kur ya kaçın). matplotlib hiçbir env'de yok. Konkordans figürü STANDART DEĞİL (referans DEG
   tablosu gerektirir; müşteri koşusunda olmaz) → yalnız doğrulama aracı, m07'ye girmez.
+- **m07 SPEC + PLAN YAZILDI ve commit'lendi (2026-08-03), dal `feat/m07-figures`.** Kod HENÜZ YOK.
+  - Spec: `docs/superpowers/specs/2026-08-03-m07-figures-design.md` · Plan: `docs/superpowers/plans/2026-08-03-m07-figures.md` (6 task, TDD).
+  - Onaylı kararlar: figürler **PCA·Volcano·Heatmap·MA** (koşunun KENDİ verisinden); **statik yüksek çöz — PNG 300dpi + SVG**;
+    R/ggplot2 `rnaforge-de` env (ggrepel+svglite EKLENECEK); m07 **gate yok/FAIL yok** (m06 gibi); ön koşul m06; çıktı `runs/.../figures/` + `manifest.json` (m08 tüketir).
+  - **Konkordans/makale figürü m07'ye GİRMEZ** (Ali netleştirdi) — yalnız tek seferlik doğrulama aracıydı.
+  - **DEVAM: Task 1'den başla** (`gene_name_map`, saf TDD) → executing-plans/inline. `conda run -n rnaforge-core --cwd <repo> python -m pytest -q`.
 - (Önceki) **m06 DESeq2 `main`'de**, 181 test. PROKARYOT MVP DE zinciri tam.
 - **AÇIK KONU (ARTIK KAPALI):** ~~GERÇEK yayımlanmış veri seti ile doğrulama henüz YOK.~~
   Testler + canlı smoke SENTETİK (Kural 8: gerçek/müşteri verisi repo'da yok — doğru). Ama
