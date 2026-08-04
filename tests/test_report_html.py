@@ -116,11 +116,33 @@ def test_section_figures_loud_when_png_missing(tmp_path):
         section_figures(manifest, fig, LABELS["en"])
 
 
-def test_section_table_empty_note():
-    assert LABELS["tr"]["no_degs"] in section_table([], LABELS["tr"])
-    h = section_table([{"gene": "pspA", "log2fc": 3.0, "padj": 1e-8,
-                        "base_mean": 200.0, "direction": "Up"}], LABELS["tr"])
-    assert "pspA" in h
+from rnaforge.report_html import top_degs_by_direction
+
+
+def test_top_degs_by_direction_filters():
+    de = [
+        {"gene": "U1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8},
+        {"gene": "U2", "baseMean": 100.0, "log2FoldChange": 2.0, "padj": 1e-4},
+        {"gene": "D1", "baseMean": 100.0, "log2FoldChange": -4.0, "padj": 1e-9},
+    ]
+    up = top_degs_by_direction(de, {}, 0.05, 1.0, "Up", n=25)
+    down = top_degs_by_direction(de, {}, 0.05, 1.0, "Down", n=25)
+    assert [r["gene"] for r in up] == ["U1", "U2"]      # padj asc, Up only
+    assert [r["gene"] for r in down] == ["D1"]
+
+
+def test_section_table_has_up_and_down():
+    de = [
+        {"gene": "U1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8},
+        {"gene": "D1", "baseMean": 100.0, "log2FoldChange": -4.0, "padj": 1e-9},
+    ]
+    h = section_table(de, {"LT": "x"}, 0.05, 1.0, LABELS["tr"])
+    assert LABELS["tr"]["up_table"] in h and LABELS["tr"]["down_table"] in h
+    assert "U1" in h and "D1" in h
+
+
+def test_section_table_empty_both():
+    assert LABELS["tr"]["no_degs"] in section_table([], {}, 0.05, 1.0, LABELS["tr"])
 
 
 def test_section_methods_and_references():

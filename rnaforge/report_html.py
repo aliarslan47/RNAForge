@@ -68,6 +68,12 @@ def top_degs(de: list[dict], gene_map: dict, fdr: float, lfc: float, n: int = 50
     return out
 
 
+def top_degs_by_direction(de: list[dict], gene_map: dict, fdr: float, lfc: float,
+                          direction: str, n: int = 25) -> list[dict]:
+    rows = [r for r in top_degs(de, gene_map, fdr, lfc, n=10**9) if r["direction"] == direction]
+    return rows[:n]
+
+
 def embed_png(path: Path) -> str:
     data = Path(path).read_bytes()
     return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
@@ -119,6 +125,7 @@ LABELS: dict[str, dict[str, str]] = {
         "full_table_note": "Tam tablo: differential_expression/deseq2_results.tsv",
         "min_length": "Min uzunluk", "aggressive": "Agresif kalite trimming",
         "summary": "Özet",
+        "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -136,6 +143,7 @@ LABELS: dict[str, dict[str, str]] = {
         "full_table_note": "Full table: differential_expression/deseq2_results.tsv",
         "min_length": "Min length", "aggressive": "Aggressive quality trimming",
         "summary": "Summary",
+        "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
     },
 }
 
@@ -228,16 +236,24 @@ def section_figures(figures_manifest: dict, figures_dir: Path, L: dict) -> str:
     return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{"".join(blocks)}</section>'
 
 
-def section_table(top: list[dict], L: dict) -> str:
-    if not top:
-        return f'<section id="table"><h2>{_esc(L["table"])}</h2><p>{_esc(L["no_degs"])}</p></section>'
-    rows = [[r["gene"],
+def _deg_table(rows: list[dict], L: dict) -> str:
+    body = [[r["gene"],
              f'{r["log2fc"]:.2f}' if r["log2fc"] is not None else "—",
              f'{r["padj"]:.2e}' if r["padj"] is not None else "—",
-             f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—",
-             L["up"] if r["direction"] == "Up" else L["down"]] for r in top]
-    tbl = _table([L["gene"], L["log2fc"], L["padj"], L["base_mean"], L["direction"]], rows)
-    return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{tbl}'
+             f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—"] for r in rows]
+    return _table([L["gene"], L["log2fc"], L["padj"], L["base_mean"]], body)
+
+
+def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: dict) -> str:
+    up = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Up", n=25)
+    down = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Down", n=25)
+    if not up and not down:
+        return f'<section id="table"><h2>{_esc(L["table"])}</h2><p>{_esc(L["no_degs"])}</p></section>'
+    up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L)}' if up
+               else f'<h3>{_esc(L["up_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
+    down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L)}' if down
+                 else f'<h3>{_esc(L["down_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
+    return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{up_html}{down_html}'
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
 
 
@@ -295,8 +311,6 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     raw = inputs["raw"]
     trimming_cfg = {"min_length": config.trimming.min_length,
                     "aggressive": config.trimming.aggressive_quality}
-    top = top_degs(inputs["de_results"], inputs["gene_map"],
-                   config.de.fdr_threshold, config.de.log2fc_threshold, n=50)
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -308,7 +322,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L),
         section_de(inputs["de"], L),
         section_figures(inputs["figures"], inputs["figures_dir"], L),
-        section_table(top, L),
+        section_table(inputs["de_results"], inputs["gene_map"],
+                      config.de.fdr_threshold, config.de.log2fc_threshold, L),
         section_methods(config, L),
         section_references(L),
     ])
