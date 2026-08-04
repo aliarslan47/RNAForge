@@ -33,3 +33,48 @@ def test_figures_r_renders_all(tmp_path):
     assert len(man["figures"]) == 4
     for fig in man["figures"]:
         assert (out/fig["png"]).stat().st_size > 1000
+
+
+import json as _json
+from rnaforge.modules import m07_figures
+from rnaforge.state import RunState
+
+
+def _min_config(tmp_path):
+    from rnaforge.config import load_config
+    (tmp_path/"c.yaml").write_text(
+        "organism: E\norganism_type: prokaryote\nplatform: auto\n"
+        "reference:\n  genome_fasta: g.fa\n  annotation_gff: "+str(tmp_path/'g.gff')+"\n"
+        "de:\n  design: '~condition'\n  fdr_threshold: 0.05\n  log2fc_threshold: 1.0\n")
+    (tmp_path/"g.gff").write_text("chr\tx\tCDS\t1\t9\t.\t+\t0\tlocus_tag=LT_1;gene=pspA\n")
+    return load_config(tmp_path/"c.yaml")
+
+
+def test_run_figures_requires_m06(tmp_path, monkeypatch):
+    rd = tmp_path/"run"; (rd/"differential_expression").mkdir(parents=True)
+    cfg = _min_config(tmp_path); md = tmp_path/"m.tsv"
+    md.write_text("sample_id\tcondition\tfastq_1\nc1\tcontrol\t/x/a.fq\n")
+    with __import__("pytest").raises(ValueError):
+        m07_figures.run_figures(cfg, md, rd)
+
+
+def test_run_figures_orchestrates(tmp_path, monkeypatch):
+    rd = tmp_path/"run"; de=(rd/"differential_expression"); de.mkdir(parents=True)
+    (rd/"statistics").mkdir(); (rd/"logs").mkdir()
+    RunState(rd).mark_done("m06_de", [])
+    cfg = _min_config(tmp_path); md = tmp_path/"m.tsv"
+    md.write_text("sample_id\tcondition\tfastq_1\nc1\tcontrol\t/x/a.fq\n")
+    def fake_r(de_dir, gene_map, fdr, lfc, out_dir, env="rnaforge-de"):
+        from rnaforge.figures import FIGURE_SPECS
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        for _id,base,_t in FIGURE_SPECS:
+            (Path(out_dir)/f"{base}.png").write_bytes(b"x"*2000)
+            (Path(out_dir)/f"{base}.svg").write_text("<svg/>")
+    monkeypatch.setattr(m07_figures, "run_figures_r", fake_r)
+    s = m07_figures.run_figures(cfg, md, rd)
+    assert s["n_figures"] == 4
+    assert (rd/"figures"/"manifest.json").exists()
+    assert RunState(rd).is_done("m07_figures")
+    # resume
+    s2 = m07_figures.run_figures(cfg, md, rd)
+    assert s2.get("resumed") is True
