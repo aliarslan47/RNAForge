@@ -56,7 +56,8 @@ _SCRIPT = Path(__file__).parent / "scripts" / "figures.R"
 
 
 def run_figures_r(de_dir: Path, gene_map: Path, fdr: float, lfc: float,
-                  out_dir: Path, env: str = "rnaforge-de") -> None:
+                  out_dir: Path, env: str = "rnaforge-de") -> str:
+    """Run figures.R; return its combined stdout/stderr for logging. Raise loudly on failure."""
     de_dir, out_dir = Path(de_dir), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
@@ -65,3 +66,4 @@ def run_figures_r(de_dir: Path, gene_map: Path, fdr: float, lfc: float,
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"figures.R failed (exit {r.returncode}):\n{r.stderr}")
+    return (r.stdout or "") + (r.stderr or "")

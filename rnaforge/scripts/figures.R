@@ -38,15 +38,25 @@ p2 <- ggplot(de,aes(log2FoldChange,mlp,color=dir))+geom_point(size=0.7,alpha=0.6
   labs(title="Volcano",x="log2 fold change",y="-log10 padj")+theme_pub
 sav(p2,"02_volcano",7,5.5)
 
-## Heatmap (top 40 DEG)
+## Heatmap (top 40 DEG). Az/sifir DEG veya sifir-varyansli satir m07'yi ASLA dusurmemeli
+## (gorsel biyolojiyi gecersiz kilmaz) -> koru: NaN'lari temizle, <2 satirda kumeleme yapma.
+htitle <- "En güçlü 40 DEG (z-skor)"
 topg<-head(sig,40); m<-lg[topg$gene_id,,drop=FALSE]; rownames(m)<-lab_of(topg$gene_id)
-z<-t(scale(t(m))); ord<-hclust(dist(z))$order
-long<-data.frame(gene=factor(rep(rownames(z)[ord],ncol(z)),levels=rownames(z)[ord]),
-  sample=factor(rep(colnames(z),each=nrow(z)),levels=colnames(z)),z=as.vector(z[ord,]))
-p3 <- ggplot(long,aes(sample,gene,fill=z))+geom_tile()+
-  scale_fill_gradient2(low="#0072B2",mid="white",high="#D55E00",midpoint=0,name="z")+
-  labs(title="En güçlü 40 DEG (z-skor)",x=NULL,y=NULL)+
-  theme_minimal(base_size=10)+theme(axis.text.x=element_text(angle=45,hjust=1),panel.grid=element_blank())
+z<-t(scale(t(m)))
+z[!is.finite(z)]<-0                        # sifir-varyansli DEG scale -> NaN; 0'a indir
+z<-z[rowSums(abs(z))>0,,drop=FALSE]        # olceklemeden sonra tamamen sifir satirlari at
+if(nrow(z)>=2){ z<-z[hclust(dist(z))$order,,drop=FALSE] }  # >=2 satirda kumele
+if(nrow(z)>=1){
+  long<-data.frame(gene=factor(rep(rownames(z),ncol(z)),levels=rownames(z)),
+    sample=factor(rep(colnames(z),each=nrow(z)),levels=colnames(z)),z=as.vector(z))
+  p3 <- ggplot(long,aes(sample,gene,fill=z))+geom_tile()+
+    scale_fill_gradient2(low="#0072B2",mid="white",high="#D55E00",midpoint=0,name="z")+
+    labs(title=htitle,x=NULL,y=NULL)+
+    theme_minimal(base_size=10)+theme(axis.text.x=element_text(angle=45,hjust=1),panel.grid=element_blank())
+}else{
+  p3 <- ggplot()+annotate("text",x=0,y=0,label="Anlamlı/gösterilebilir DEG yok",size=5,color="grey40")+
+    labs(title=htitle)+theme_void(base_size=13)+theme(plot.title=element_text(face="bold"))
+}
 sav(p3,"03_heatmap",6.5,8)
 
 ## MA

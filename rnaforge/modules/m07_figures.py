@@ -35,8 +35,10 @@ def run_figures(config: Config, metadata_path: Path, run_dir: Path,
         gene_map = fig_dir / "gene_map.tsv"
         write_gene_map(config.reference.annotation_gff, gene_map)
         state.heartbeat()
-        run_figures_r(de_dir, gene_map, config.de.fdr_threshold,
-                      config.de.log2fc_threshold, fig_dir)
+        r_output = run_figures_r(de_dir, gene_map, config.de.fdr_threshold,
+                                 config.de.log2fc_threshold, fig_dir)
+        if r_output:
+            log_file.write(r_output if r_output.endswith("\n") else r_output + "\n")
         manifest = build_manifest(fig_dir)   # eksik PNG -> yuksek sesle
         write_manifest(fig_dir)
         summary = {
