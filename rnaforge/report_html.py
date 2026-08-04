@@ -147,6 +147,59 @@ LABELS: dict[str, dict[str, str]] = {
     },
 }
 
+FIGURE_CAPTIONS: dict[str, dict[str, str]] = {
+    "tr": {
+        "pca": "En değişken 500 genin ana bileşen izdüşümü. Aynı koşulun replikaları kümelenmeli; koşullar ayrışmalı.",
+        "sample_correlation": "Örnekler arası Pearson korelasyonu (log2 normalize). Yüksek blok = tutarlı replikalar; sapan örnek burada görünür.",
+        "expression_dist": "Örnek başına log2 normalize ekspresyon dağılımı. Kutular benzer olmalı; normalizasyonun dengeli olduğunu gösterir.",
+        "dispersion": "DESeq2 dispersiyon tahmini: gen-bazlı (gri) vs uyum (mavi) vs son (turuncu). Nokta bulutu uyum eğrisine çökmeli.",
+        "pval_histogram": "Ham p-değerlerinin dağılımı. Düz + 0'a yakın tepe sağlıklıdır; anormal biçim model/veri sorununa işaret eder.",
+        "volcano": "log2 kat değişimi vs -log10 padj. Sağ üst = anlamlı artan, sol üst = anlamlı azalan genler.",
+        "ma": "Ortalama ekspresyon vs log2 kat değişimi. Anlamlı genler renkli; düşük sayımda dağılım genişler.",
+        "heatmap": "En güçlü 40 DEG'in örnek-başı z-skoru. Koşullar arası zıt renk blokları beklenir.",
+    },
+    "en": {
+        "pca": "Principal-component projection of the 500 most variable genes. Replicates should cluster; conditions should separate.",
+        "sample_correlation": "Between-sample Pearson correlation (log2 normalized). High blocks = consistent replicates; an outlier stands out here.",
+        "expression_dist": "Per-sample log2 normalized expression distribution. Boxes should be similar, indicating balanced normalization.",
+        "dispersion": "DESeq2 dispersion estimates: gene-wise (grey) vs fit (blue) vs final (orange). The cloud should shrink toward the fit.",
+        "pval_histogram": "Distribution of raw p-values. Flat with a peak near 0 is healthy; an odd shape signals a model/data issue.",
+        "volcano": "log2 fold change vs -log10 padj. Top-right = significant up, top-left = significant down genes.",
+        "ma": "Mean expression vs log2 fold change. Significant genes coloured; spread widens at low counts.",
+        "heatmap": "Per-sample z-scores of the top 40 DEGs. Contrasting colour blocks between conditions are expected.",
+    },
+}
+
+SECTION_INTRO: dict[str, dict[str, str]] = {
+    "tr": {
+        "confidence": "Bu koşulun kalite kapılarının özeti. FAIL varsa sonuç geçersizdir; WARN varsa sonuç şüpheli damgalıdır.",
+        "dataset": "Analiz edilen organizma, platform, deney tasarımı ve örnekler.",
+        "quality": "Okuma işleme, hizalama ve gene atama oranları — verinin analize uygunluğu.",
+        "de": "Koşullar arası diferansiyel ekspresyon özeti (DESeq2).",
+        "figures": "Kalite, model tanısı ve sonuç görselleri. Her figürün altında nasıl okunacağı açıklanmıştır.",
+        "table": "İstatistiksel eşiği geçen en güçlü artan ve azalan genler.",
+        "methods": "Kullanılan araçlar ve parametreler.",
+        "references": "Yöntemlerin dayandığı yayınlar.",
+    },
+    "en": {
+        "confidence": "Summary of this run's quality gates. A FAIL invalidates the result; a WARN stamps it as suspect.",
+        "dataset": "Organism, platform, experimental design and samples analysed.",
+        "quality": "Read processing, alignment and gene-assignment rates — the data's fitness for analysis.",
+        "de": "Summary of differential expression between conditions (DESeq2).",
+        "figures": "Quality, model-diagnostic and result figures. Each figure includes how to read it.",
+        "table": "The strongest up- and down-regulated genes passing the statistical threshold.",
+        "methods": "Tools and parameters used.",
+        "references": "Publications the methods are based on.",
+    },
+}
+
+
+def _intro(section_id: str, L: dict) -> str:
+    # L is a language dict; find which language by identity to pick the intro set.
+    lang = "en" if L is LABELS["en"] else "tr"
+    text = SECTION_INTRO[lang].get(section_id, "")
+    return f'<p class="intro">{_esc(text)}</p>' if text else ""
+
 
 def _esc(x) -> str:
     if x is None:
@@ -179,7 +232,7 @@ def section_confidence(conf: dict, L: dict) -> str:
     overrides = prof.get("overrides") or {}
     ov = "" if not overrides else f"<p>overrides: {_esc(overrides)}</p>"
     return (
-        f'<section id="confidence"><h2>{_esc(L["confidence"])}</h2>'
+        f'<section id="confidence"><h2>{_esc(L["confidence"])}</h2>{_intro("confidence", L)}'
         f'<div class="banner verdict-{vclass}"><strong>{_esc(L["verdict"])}: {_esc(verdict)}</strong>'
         f' &nbsp; PASS={_esc(counts.get("PASS", 0))} WARN={_esc(counts.get("WARN", 0))} '
         f'FAIL={_esc(counts.get("FAIL", 0))}</div>'
@@ -195,7 +248,7 @@ def section_dataset(raw: dict, L: dict) -> str:
     rows = [[s.get("sample_id"), s.get("condition"), s.get("batch"), s.get("paired"),
              s.get("mean_read_length"), s.get("mean_quality")] for s in raw.get("samples", [])]
     tbl = _table([L["sample"], L["condition"], L["batch"], L["paired"], L["read_len"], L["quality_col"]], rows)
-    return f'<section id="dataset"><h2>{_esc(L["dataset"])}</h2>{meta}{tbl}</section>'
+    return f'<section id="dataset"><h2>{_esc(L["dataset"])}</h2>{_intro("dataset", L)}{meta}{tbl}</section>'
 
 
 def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict) -> str:
@@ -206,7 +259,7 @@ def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict) -> st
     rows = [[sid, _pct(asamp.get(sid, {}).get("alignment_rate")),
              _pct(csamp.get(sid, {}).get("assignment_rate"))] for sid in asamp]
     tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"]], rows)
-    return f'<section id="quality"><h2>{_esc(L["quality"])}</h2>{trim}{tbl}</section>'
+    return f'<section id="quality"><h2>{_esc(L["quality"])}</h2>{_intro("quality", L)}{trim}{tbl}</section>'
 
 
 def section_de(de: dict, L: dict) -> str:
@@ -221,19 +274,22 @@ def section_de(de: dict, L: dict) -> str:
         ["min replicate corr.", de.get("min_replicate_correlation")],
     ]
     tbl = _table([" ", " "], rows)
-    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{summary}{tbl}</section>'
+    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}</section>'
 
 
-def section_figures(figures_manifest: dict, figures_dir: Path, L: dict) -> str:
+def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: str = "tr") -> str:
     figures_dir = Path(figures_dir)
+    caps = FIGURE_CAPTIONS.get(lang, FIGURE_CAPTIONS["tr"])
     blocks = []
     for fig in figures_manifest.get("figures", []):
         png = figures_dir / fig["png"]
         if not png.exists():
             raise FileNotFoundError(f"m08: figure PNG missing for report: {png}")
-        blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/>'
-                      f'<figcaption>{_esc(fig.get("title"))}</figcaption></figure>')
-    return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{"".join(blocks)}</section>'
+        cap = caps.get(fig.get("id"), "")
+        cap_html = (f'<figcaption><strong>{_esc(fig.get("title"))}</strong> — {_esc(cap)}</figcaption>'
+                    if cap else f'<figcaption>{_esc(fig.get("title"))}</figcaption>')
+        blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/>{cap_html}</figure>')
+    return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{_intro("figures", L)}{"".join(blocks)}</section>'
 
 
 def _deg_table(rows: list[dict], L: dict) -> str:
@@ -248,12 +304,12 @@ def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: d
     up = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Up", n=25)
     down = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Down", n=25)
     if not up and not down:
-        return f'<section id="table"><h2>{_esc(L["table"])}</h2><p>{_esc(L["no_degs"])}</p></section>'
+        return f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}<p>{_esc(L["no_degs"])}</p></section>'
     up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L)}' if up
                else f'<h3>{_esc(L["up_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
     down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L)}' if down
                  else f'<h3>{_esc(L["down_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
-    return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{up_html}{down_html}'
+    return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}{up_html}{down_html}'
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
 
 
@@ -268,7 +324,7 @@ def section_methods(config, L: dict) -> str:
         f'DESeq2 (design={d.design}, FDR<{d.fdr_threshold}, |log2FC|>={d.log2fc_threshold}). '
         f'Figures: ggplot2. RNAForge pipeline.'
     )
-    return f'<section id="methods"><h2>{_esc(L["methods"])}</h2><p>{_esc(text)}</p></section>'
+    return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}<p>{_esc(text)}</p></section>'
 
 
 _REFERENCES = [
@@ -284,7 +340,7 @@ _REFERENCES = [
 
 def section_references(L: dict) -> str:
     items = "".join(f"<li>{_esc(r)}</li>" for r in _REFERENCES)
-    return f'<section id="references"><h2>{_esc(L["references"])}</h2><ol>{items}</ol></section>'
+    return f'<section id="references"><h2>{_esc(L["references"])}</h2>{_intro("references", L)}<ol>{items}</ol></section>'
 
 
 _CSS = """
@@ -301,6 +357,7 @@ th{background:#f6f6f6} .banner{padding:.8rem 1rem;border-radius:6px;margin:.6rem
 figure{margin:1rem 0;text-align:center} img{max-width:100%;height:auto}
 figcaption{color:#555;font-size:.9rem;margin-top:.3rem}
 .note{color:#666;font-size:.85rem} .summary{font-size:1.05rem;font-weight:600}
+.intro{color:#444;font-size:.95rem;margin:.2rem 0 .6rem}
 @media print{body{max-width:none} h2{page-break-after:avoid}}
 """
 
@@ -321,7 +378,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_dataset(raw, L),
         section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L),
         section_de(inputs["de"], L),
-        section_figures(inputs["figures"], inputs["figures_dir"], L),
+        section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L),
         section_methods(config, L),
