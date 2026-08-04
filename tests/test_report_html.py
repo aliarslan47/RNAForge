@@ -157,9 +157,19 @@ def test_section_methods_and_references():
                "de:\n  design: '~condition'\n  fdr_threshold: 0.05\n  log2fc_threshold: 1.0\n")
     p = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False); p.write(cfgtext); p.close()
     cfg = load_config(p.name); os.unlink(p.name)
-    hm = section_methods(cfg, LABELS["en"])
-    assert "DESeq2" in hm and "bowtie2" in hm and "36" in hm
-    assert "DESeq2" in section_references(LABELS["en"])
+    # EN methods: proper scientific narrative, parametrized from config
+    hm_en = section_methods(cfg, LABELS["en"])
+    assert "DESeq2" in hm_en and "Bowtie2" in hm_en and "featureCounts" in hm_en
+    assert "36" in hm_en and "Benjamini" in hm_en and "CDS" in hm_en
+    # TR methods differ (bilingual)
+    hm_tr = section_methods(cfg, LABELS["tr"])
+    assert "medyan" in hm_tr.lower() and hm_tr != hm_en
+    # References carry verified DOIs (links)
+    refs = section_references(LABELS["en"])
+    assert "10.1186/s13059-014-0550-8" in refs      # DESeq2
+    assert "10.1038/nmeth.1923" in refs             # Bowtie2
+    assert "10.1093/bioinformatics/bty560" in refs  # fastp
+    assert 'href="https://doi.org/' in refs
 
 
 from rnaforge.report_html import render_report, N_SECTIONS
