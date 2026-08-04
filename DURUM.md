@@ -6,9 +6,26 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-03
+**Son güncelleme:** 2026-08-04
 
 ## Şu an nerede kaldık
+- **m07 FİGÜRLER BİTTİ ve `main`'de (2026-08-04, merge `c46baf5`, push edildi).** `feat/m07-figures`
+  6 task TDD ile tamamlandı, branch silindi. `rnaforge figures` subcommand: m06 DE çıktısından her
+  koşuda OTOMATİK 4 statik figür (PCA·Volcano·Heatmap·MA), **PNG 300dpi + SVG**, `runs/.../figures/`
+  + `manifest.json`. YENİ veri-kapısı YOK; verdict m06'dan değişmeden taşınır. **191 test yeşil.**
+  - Kod: `rnaforge/figures.py` (saf yardımcılar + `run_figures_r`), `rnaforge/scripts/figures.R`
+    (ggplot2 + ggrepel, `rnaforge-de` env), `rnaforge/modules/m07_figures.py` (`run_figures`).
+  - `rnaforge-de` env'e **r-ggrepel + r-svglite** eklendi (kuruldu + `envs/rnaforge-de.yml`'de).
+  - **Code review 2 GERÇEK Critical yakaladı (ikisi de düzeltildi):** heatmap `hclust`, <2 anlamlı DEG
+    VEYA sıfır-varyanslı DEG'de çöküp tüm m07'yi exit 1 yapıyordu → "geçerli biyolojide FAIL yok"
+    kuralını ihlal. Fix: NaN ölçek satırlarını temizle, <2 satırda kümeleme yapma, 0 satırda boş-durum
+    paneli. Regresyon testi eklendi (0-DEG/1-DEG/sıfır-varyans, env-gated). R stdout/stderr artık
+    `logs/figures.log`'a yazılıyor.
+  - **Gerçek GSE300731 koşusunda doğrulandı:** 4 figür üretildi, biyoloji birebir doğru
+    (Volcano top UP=pspA/ugd/ycfJ zarf-stres+kapsül, top DOWN=gadABCE/hdeABD asit-direnç; PCA PC1 %95.8).
+  - **Kalan CİLA (Minor, acil değil):** PCA'da sağdaki örnek etiketleri panel kenarından kırpılıyor
+    (düz `geom_text`; ggrepel/expand ile çözülebilir); heatmap başlığı TR, diğerleri EN (dil tutarlılığı).
+    Manifest'te caption YOK (bilinçli — m08 üretecek). `run_figures(metadata_path)` kullanılmıyor (simetri).
 - **GERÇEK YAYIN-VERİSİ DOĞRULAMASI BİTTİ (2026-08-03) — açık konu KAPANDI.** Veri: **GSE300731**
   (Nature Microbiology 2025, "enterololin" dar-spektrum antibiyotik, Brown Lab). *E. coli* BW25113
   ΔbamBΔtolC, **5× MIC enterololin vs kontrol, 4h, 3'er replika** (6 örnek, PRJNA1281986). Referans
@@ -85,14 +102,16 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 7. ~~m05 = prokaryot count matrisi (featureCounts)~~ ✅ BİTTİ — `main`'de (`caba117`).
 8. ~~m06 = DESeq2~~ ✅ BİTTİ (2026-07-30) — spec+plan `.../2026-07-30-m06-deseq2*`; env `rnaforge-de`
    (bioconductor-deseq2 1.50.2), betik `rnaforge/scripts/deseq2.R` (dispersiyon fallback'li).
-9. **`feat/m06-deseq2` → `main` merge + push. ← ŞİMDİ BURADAYIZ.**
-10. **SIRADAKİ — iki yön:**
-    a) **GERÇEK VERİ doğrulaması (Katman A/B):** yayımlanmış bakteri RNA-seq (count matrisi + ham
-       FASTQ) ile pipeline'ı doğrula — demo veri seti seçimi (kriterler "Açık konu"da). Kullanıcı
-       gerçek veri istedi; muhtemelen öncelik.
-    b) **m07 figürler** (PCA/Volcano/Heatmap; `deseq2_results.tsv`+`normalized_counts.tsv` tüketir)
-       → **m08 HTML rapor** → MVP tamam. VE/VEYA ökaryot yolu (m04-euk salmon + m05-euk tximport).
-    - m06 = ilk ORTAK (organizma-agnostik) adım; asla FAIL üretmez (replicate_correlation WARN).
+9. ~~`feat/m06-deseq2` → `main` merge + push~~ ✅ BİTTİ.
+10. ~~GERÇEK VERİ doğrulaması (Katman A/B, GSE300731)~~ ✅ BİTTİ (2026-08-03) — konkordans r=0.972.
+11. ~~m07 figürler (PCA/Volcano/Heatmap/MA, otomatik, PNG300+SVG)~~ ✅ BİTTİ (2026-08-04) —
+    `main`'de (merge `c46baf5`). Manifest m08'in tüketeceği sözleşme.
+12. **SIRADAKİ — `main`'de bitince ← ŞİMDİ BURADAYIZ:**
+    a) **m08 = HTML rapor** → figures `manifest.json` + m06 istatistik + güvence kartını tüketip
+       tek dosya rapor üretir (dil config'ten `tr`|`en`). Bu biterse **prokaryot MVP TAMAM**.
+    b) VE/VEYA **ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport) — MVP'nin ikinci kolu.
+    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil tutarlılığı.
+    - m06/m07 = ORTAK (organizma-agnostik) adımlar; m07 asla FAIL üretmez (gate yok).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
