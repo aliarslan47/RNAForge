@@ -9,6 +9,12 @@
 **Son güncelleme:** 2026-08-04
 
 ## Şu an nerede kaldık
+- **DEG tablolarına KOŞUL-BAŞI ORTALAMA EKSPRESYON sütunları eklendi ve `main`'de (2026-08-04, merge
+  `bc4fba2`, push).** Up/Down tablolarında artık her koşul için ortalama normalize ekspresyon
+  (`<control> ort.`, `<enterololin> ort.`) + baseMean. `normalized_counts.tsv` + `coldata.tsv`
+  m08 girdisine eklendi (load_report_inputs zorunlu). Örn. gadE: kontrol 28071 → enterololin 12.6.
+  226 test yeşil. **NOT: GO/KEGG enrichment kullanıcı isteğiyle SONRAYA bırakıldı** (bkz. bellek
+  `reminder_rnaforge_go_enrichment`) — ökaryotla birlikte sıradaki büyük işler.
 - **Methods + References güncellendi ve `main`'de (2026-08-04, merge `5b1d545`, push).** Yöntemler bölümü
   artık çift dilli düzgün BİLİMSEL anlatı (DESeq2 makalesi Love ve ark. 2014'ten: medyan-oran norm. →
   empirical-Bayes dispersiyon → negatif binom GLM → Wald → Benjamini–Hochberg; config'ten parametreli).
