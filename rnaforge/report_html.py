@@ -315,33 +315,89 @@ def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: d
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
 
 
+# Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
+# config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
+_METHODS_TEXT: dict[str, str] = {
+    "tr": (
+        "Ham okumaların kalitesi FastQC ile değerlendirildi (taban kalitesi, adaptör ve GC içeriği). "
+        "Adaptör dizileri ve kısa okumalar fastp ile kırpıldı (asgari okuma uzunluğu {min_len} nt); "
+        "gen ekspresyon tahminlerini yanlıladığı için agresif kalite kırpması {aggr}. Kırpılan okumalar "
+        "referans genoma Bowtie2 ile (uçtan-uca) hizalandı. Hizalanan okumalar featureCounts ile "
+        "özniteliklere atanarak gen×örnek sayım matrisi oluşturuldu (öznitelik tipi {feature_type}, "
+        "kimlik özniteliği {attribute}). Diferansiyel ekspresyon DESeq2 ile hesaplandı: kütüphane "
+        "büyüklüğü medyan-oran yöntemiyle normalize edildi (boyut faktörleri); gen-bazlı dispersiyonlar "
+        "kestirilip ortalama-dispersiyon eğilimine doğru empirical-Bayes ile büzüldü; koşul etkisi negatif "
+        "binom genelleştirilmiş doğrusal modelle test edildi (Wald testi) ve p-değerleri çoklu-test için "
+        "Benjamini–Hochberg (FDR) ile düzeltildi. Tasarım formülü {design}. Bir gen, düzeltilmiş p (padj) "
+        "< {fdr} ve |log2 kat değişimi| ≥ {lfc} ise anlamlı diferansiyel eksprese sayıldı. Tüm görseller "
+        "ggplot2 ile üretildi."
+    ),
+    "en": (
+        "Raw read quality was assessed with FastQC (per-base quality, adapter and GC content). Adapter "
+        "sequences and short reads were trimmed with fastp (minimum read length {min_len} nt); aggressive "
+        "quality trimming was {aggr} because it biases gene-expression estimates. Trimmed reads were "
+        "aligned to the reference genome with Bowtie2 (end-to-end). Aligned reads were assigned to "
+        "features with featureCounts to build a gene×sample count matrix (feature type {feature_type}, "
+        "identifier attribute {attribute}). Differential expression was computed with DESeq2: library "
+        "sizes were normalized by the median-of-ratios method (size factors); gene-wise dispersions were "
+        "estimated and shrunk toward the mean–dispersion trend by empirical Bayes; the condition effect "
+        "was tested with a negative-binomial generalized linear model (Wald test) and p-values were "
+        "adjusted for multiple testing by Benjamini–Hochberg (FDR). Design formula {design}. A gene was "
+        "called significantly differentially expressed when adjusted p (padj) < {fdr} and |log2 fold "
+        "change| ≥ {lfc}. All figures were produced with ggplot2."
+    ),
+}
+_METHODS_AGGR: dict[str, dict[bool, str]] = {
+    "tr": {False: "kapatıldı (Williams ve ark. 2016)", True: "uygulandı"},
+    "en": {False: "disabled (Williams et al. 2016)", True: "enabled"},
+}
+
+
 def section_methods(config, L: dict) -> str:
+    lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
     d = config.de
-    text = (
-        f'FastQC + fastp (min_length={t.min_length}, aggressive_quality={t.aggressive_quality}; '
-        f'Williams et al. 2016). bowtie2 alignment; featureCounts '
-        f'(feature_type={q.feature_type}, attribute={q.attribute}). '
-        f'DESeq2 (design={d.design}, FDR<{d.fdr_threshold}, |log2FC|>={d.log2fc_threshold}). '
-        f'Figures: ggplot2. RNAForge pipeline.'
+    text = _METHODS_TEXT[lang].format(
+        min_len=t.min_length, aggr=_METHODS_AGGR[lang][bool(t.aggressive_quality)],
+        feature_type=q.feature_type, attribute=q.attribute,
+        design=d.design, fdr=d.fdr_threshold, lfc=d.log2fc_threshold,
     )
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}<p>{_esc(text)}</p></section>'
 
 
-_REFERENCES = [
-    "Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. Nat Methods. 2012.",
-    "Chen S et al. fastp: an ultra-fast all-in-one FASTQ preprocessor. Bioinformatics. 2018.",
-    "Liao Y et al. featureCounts. Bioinformatics. 2014.",
-    "Love MI et al. DESeq2. Genome Biol. 2014.",
-    "Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer. 2016.",
-    "Williams CR et al. Trimming of sequence reads alters RNA-Seq gene expression estimates. "
-    "BMC Bioinformatics. 2016.",
+# (atıf, DOI/URL). DOI'ler doğrulandı (doi.org). FastQC bir araçtır; DOI'si yoktur → proje URL'si.
+_REFERENCES: list[tuple[str, str]] = [
+    ("Andrews S. FastQC: a quality control tool for high throughput sequence data. 2010.",
+     "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/"),
+    ("Chen S, Zhou Y, Chen Y, Gu J. fastp: an ultra-fast all-in-one FASTQ preprocessor. "
+     "Bioinformatics. 2018;34(17):i884–i890.", "https://doi.org/10.1093/bioinformatics/bty560"),
+    ("Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. "
+     "Nat Methods. 2012;9(4):357–359.", "https://doi.org/10.1038/nmeth.1923"),
+    ("Liao Y, Smyth GK, Shi W. featureCounts: an efficient general purpose program for assigning "
+     "sequence reads to genomic features. Bioinformatics. 2014;30(7):923–930.",
+     "https://doi.org/10.1093/bioinformatics/btt656"),
+    ("Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data "
+     "with DESeq2. Genome Biol. 2014;15:550.", "https://doi.org/10.1186/s13059-014-0550-8"),
+    ("Williams CR, Baccarella A, Parrish JZ, Kim CC. Trimming of sequence reads alters RNA-Seq gene "
+     "expression estimates. BMC Bioinformatics. 2016;17:103.",
+     "https://doi.org/10.1186/s12859-016-0956-2"),
+    ("Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York; 2016.",
+     "https://doi.org/10.1007/978-3-319-24277-4"),
 ]
 
 
+def _ref_link_label(url: str) -> str:
+    return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
+
+
 def section_references(L: dict) -> str:
-    items = "".join(f"<li>{_esc(r)}</li>" for r in _REFERENCES)
+    items = "".join(
+        f'<li>{_esc(cite)} '
+        f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
+        f'{"doi:" if "doi.org/" in url else ""}{_esc(_ref_link_label(url))}</a></li>'
+        for cite, url in _REFERENCES
+    )
     return f'<section id="references"><h2>{_esc(L["references"])}</h2>{_intro("references", L)}<ol>{items}</ol></section>'
 
 
