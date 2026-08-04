@@ -35,7 +35,7 @@ def run_report(config: Config, metadata_path: Path, run_dir: Path,
     with log_path.open("w") as log_file:
         inputs = load_report_inputs(run_dir)
         state.heartbeat()
-        doc = render_report(inputs, config, version=__version__)
+        doc = render_report(inputs, config, version=__version__, run_id=run_dir.name)
         report_path = report_dir / "report.html"
         report_path.write_text(doc)
         summary = {

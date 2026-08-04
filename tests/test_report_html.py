@@ -189,3 +189,9 @@ def test_render_report_full(tmp_path):
 def test_render_report_language_switch(tmp_path):
     en = render_report(_full_inputs(tmp_path), _cfg("en"), version="0.1.0")
     assert "Confidence Card" in en and "Güvence" not in en
+
+
+def test_render_report_includes_run_id(tmp_path):
+    doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0",
+                        run_id="20260803_143036_GSE300731")
+    assert "20260803_143036_GSE300731" in doc

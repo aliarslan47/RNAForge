@@ -156,8 +156,13 @@ def _pct(v) -> str:
     return "—" if v is None else f"{float(v) * 100:.1f}%"
 
 
+_VERDICT_CLASSES = {"TRUSTWORTHY", "SUSPECT", "INVALID", "UNKNOWN"}
+
+
 def section_confidence(conf: dict, L: dict) -> str:
     verdict = conf.get("verdict", "UNKNOWN")
+    # verdict feeds a CSS class; keep it to the known enum so it can never break out of the attribute.
+    vclass = verdict.lower() if verdict in _VERDICT_CLASSES else "unknown"
     counts = conf.get("counts", {})
     prof = conf.get("profile", {})
     gate_rows = [[g.get("name"), g.get("status"), g.get("measured"), g.get("threshold")]
@@ -167,7 +172,7 @@ def section_confidence(conf: dict, L: dict) -> str:
     ov = "" if not overrides else f"<p>overrides: {_esc(overrides)}</p>"
     return (
         f'<section id="confidence"><h2>{_esc(L["confidence"])}</h2>'
-        f'<div class="banner verdict-{verdict.lower()}"><strong>{_esc(L["verdict"])}: {_esc(verdict)}</strong>'
+        f'<div class="banner verdict-{vclass}"><strong>{_esc(L["verdict"])}: {_esc(verdict)}</strong>'
         f' &nbsp; PASS={_esc(counts.get("PASS", 0))} WARN={_esc(counts.get("WARN", 0))} '
         f'FAIL={_esc(counts.get("FAIL", 0))}</div>'
         f'<p>{_esc(L["profile"])}: {_esc(prof.get("name"))}</p>{ov}{gate_tbl}</section>'
@@ -226,7 +231,9 @@ def section_figures(figures_manifest: dict, figures_dir: Path, L: dict) -> str:
 def section_table(top: list[dict], L: dict) -> str:
     if not top:
         return f'<section id="table"><h2>{_esc(L["table"])}</h2><p>{_esc(L["no_degs"])}</p></section>'
-    rows = [[r["gene"], f'{r["log2fc"]:.2f}', f'{r["padj"]:.2e}',
+    rows = [[r["gene"],
+             f'{r["log2fc"]:.2f}' if r["log2fc"] is not None else "—",
+             f'{r["padj"]:.2e}' if r["padj"] is not None else "—",
              f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—",
              L["up"] if r["direction"] == "Up" else L["down"]] for r in top]
     tbl = _table([L["gene"], L["log2fc"], L["padj"], L["base_mean"], L["direction"]], rows)
@@ -282,7 +289,7 @@ figcaption{color:#555;font-size:.9rem;margin-top:.3rem}
 """
 
 
-def render_report(inputs: dict, config, version: str) -> str:
+def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     lang = config.report.language
     L = LABELS.get(lang, LABELS["tr"])
     raw = inputs["raw"]
@@ -291,8 +298,9 @@ def render_report(inputs: dict, config, version: str) -> str:
     top = top_degs(inputs["de_results"], inputs["gene_map"],
                    config.de.fdr_threshold, config.de.log2fc_threshold, n=50)
     generated = datetime.now().isoformat(timespec="seconds")
+    run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
-              f'<p class="note">{_esc(generated)} · v{_esc(version)}</p>')
+              f'<p class="note">{run_part}{_esc(generated)} · v{_esc(version)}</p>')
     body = "".join([
         header,
         section_confidence(inputs["confidence"], L),
