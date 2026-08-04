@@ -96,9 +96,11 @@ from rnaforge.report_html import (
 
 def test_section_de_counts():
     de = {"contrast": "t vs c", "n_genes": 4398, "n_significant": 1634,
+          "n_up": 807, "n_down": 827,
           "fdr_threshold": 0.05, "log2fc_threshold": 1.0, "min_replicate_correlation": 0.98}
     h = section_de(de, LABELS["en"])
     assert "1634" in h and "4398" in h and "t vs c" in h
+    assert "807" in h and "827" in h    # n_up / n_down surfaced
 
 
 def test_section_figures_embeds(tmp_path):

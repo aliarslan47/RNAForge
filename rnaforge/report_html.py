@@ -271,6 +271,8 @@ def section_de(de: dict, L: dict) -> str:
         [L["contrast"], de.get("contrast")],
         [L["n_genes"], de.get("n_genes")],
         [L["n_sig"], n_sig],
+        [L["up"], de.get("n_up")],
+        [L["down"], de.get("n_down")],
         ["min replicate corr.", de.get("min_replicate_correlation")],
     ]
     tbl = _table([" ", " "], rows)
