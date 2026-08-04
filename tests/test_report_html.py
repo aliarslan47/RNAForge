@@ -46,3 +46,44 @@ def test_embed_png_data_uri(tmp_path):
 def test_load_report_inputs_loud_on_missing(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_report_inputs(tmp_path / "run")   # nothing there
+
+
+from rnaforge.report_html import (
+    LABELS, _esc, _table, section_confidence, section_dataset, section_quality,
+)
+
+
+def test_labels_tr_en_differ():
+    assert LABELS["tr"]["confidence"] != LABELS["en"]["confidence"]
+    assert set(LABELS["tr"]) == set(LABELS["en"])   # ayni anahtar seti
+
+
+def test_esc_and_table():
+    assert _esc(None) == "—"
+    assert _esc("<x>") == "&lt;x&gt;"
+    h = _table(["A", "B"], [["1", "<i>"]])
+    assert "<th>A</th>" in h and "&lt;i&gt;" in h
+
+
+def test_section_confidence_banner_and_gates():
+    conf = {"verdict": "SUSPECT", "counts": {"PASS": 10, "WARN": 1, "FAIL": 0},
+            "profile": {"name": "prokaryote", "overrides": {}},
+            "gates": [{"name": "gc_content", "status": "WARN", "measured": 0.7, "threshold": 0.6}]}
+    h = section_confidence(conf, LABELS["tr"])
+    assert "SUSPECT" in h and "verdict-suspect" in h and "gc_content" in h
+
+
+def test_section_dataset_lists_samples():
+    raw = {"organism": "E. coli", "platform": "illumina", "design": "~condition",
+           "conditions": {"control": 3, "enterololin": 3},
+           "samples": [{"sample_id": "c1", "condition": "control", "batch": None,
+                        "paired": True, "mean_read_length": 150.0, "mean_quality": 39.0}]}
+    h = section_dataset(raw, LABELS["tr"])
+    assert "E. coli" in h and "c1" in h
+
+
+def test_section_quality_rates():
+    align = {"samples": {"c1": {"alignment_rate": 0.99}}}
+    count = {"samples": {"c1": {"assignment_rate": 0.85}}, "n_genes": 4398}
+    h = section_quality(align, count, {"min_length": 36, "aggressive": False}, LABELS["tr"])
+    assert "c1" in h and "99" in h
