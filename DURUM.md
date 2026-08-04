@@ -9,6 +9,21 @@
 **Son güncelleme:** 2026-08-04
 
 ## Şu an nerede kaldık
+- **★ PROKARYOT MVP TAMAM (2026-08-04) — m08 HTML RAPOR `main`'de (merge `3c96644`, push).** Zincir
+  uçtan uca: FASTQ → validate → QC → trim → quant → count → DESeq2 → 4 figür → **tek self-contained
+  HTML rapor**. `rnaforge report` subcommand: m06/m07 çıktı sözleşmelerinden (istatistik JSON'ları +
+  güvence kartı + figür manifesti + deseq2_results.tsv) her koşuda OTOMATİK, çift dilli (`tr|en`),
+  figürler base64 gömülü tek `report/report.html` (~1.4 MB). **213 test yeşil.** Saf Python + stdlib
+  (R/jinja2 yok), YENİ kapı YOK, verdict m06/m07'den taşınır.
+  - Kod: `rnaforge/report_html.py` (girdi okuyucular + 8 bölüm kurucu + `render_report`),
+    `rnaforge/modules/m08_report.py` (`run_report`, m07 ön koşul). 7 task TDD, dal silindi.
+  - 9 bölüm: Başlık(run_id) · **Güvence banner(renk-kodlu)** · Dataset/Örnek · Kalite&İşleme ·
+    DE Sonuçları · 4 gömülü figür · Top-50 DEG tablo · Methods(config'ten) · References.
+  - Code review: Critical/Important YOK; 3 Minor cila uygulandı (başlığa run_id, verdict class
+    enum-güvenli, table None koruması). Kalan Minor (defer): DE'de UP/DOWN ayrımı + WARN damgası
+    (de_statistics split taşımıyor), figür caption dil-yerelleştirme (başlıklar özel ad).
+  - Gerçek GSE300731'de doğrulandı: verdict SUSPECT (m06/m07 ile birebir), 4 figür gömülü,
+    gen adları eşlenmiş (pspA/gad*/hde*/ugd), DE özeti "1634/4398".
 - **m07 FİGÜRLER BİTTİ ve `main`'de (2026-08-04, merge `c46baf5`, push edildi).** `feat/m07-figures`
   6 task TDD ile tamamlandı, branch silindi. `rnaforge figures` subcommand: m06 DE çıktısından her
   koşuda OTOMATİK 4 statik figür (PCA·Volcano·Heatmap·MA), **PNG 300dpi + SVG**, `runs/.../figures/`
@@ -106,12 +121,14 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 10. ~~GERÇEK VERİ doğrulaması (Katman A/B, GSE300731)~~ ✅ BİTTİ (2026-08-03) — konkordans r=0.972.
 11. ~~m07 figürler (PCA/Volcano/Heatmap/MA, otomatik, PNG300+SVG)~~ ✅ BİTTİ (2026-08-04) —
     `main`'de (merge `c46baf5`). Manifest m08'in tüketeceği sözleşme.
-12. **SIRADAKİ — `main`'de bitince ← ŞİMDİ BURADAYIZ:**
-    a) **m08 = HTML rapor** → figures `manifest.json` + m06 istatistik + güvence kartını tüketip
-       tek dosya rapor üretir (dil config'ten `tr`|`en`). Bu biterse **prokaryot MVP TAMAM**.
-    b) VE/VEYA **ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport) — MVP'nin ikinci kolu.
-    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil tutarlılığı.
-    - m06/m07 = ORTAK (organizma-agnostik) adımlar; m07 asla FAIL üretmez (gate yok).
+12. ~~m08 = HTML rapor~~ ✅ BİTTİ (2026-08-04) — `main`'de (merge `3c96644`). **PROKARYOT MVP TAMAM.**
+13. **SIRADAKİ — iki yön (← ŞİMDİ BURADAYIZ):**
+    a) **Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport/tx2gene) — MVP'nin ikinci kolu.
+       Ayrım yalnız m04/m05'te; m06/m07/m08 organizma tipini bilmez (zaten agnostik). salmon 2.3.4
+       CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme).
+    b) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme,
+       m08 DE'de UP/DOWN ayrımı (m06 de_statistics'e split eklenirse).
+    - m06/m07/m08 = ORTAK (organizma-agnostik) adımlar; hiçbiri yeni FAIL üretmez (gate yok).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
