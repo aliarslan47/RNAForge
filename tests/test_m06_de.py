@@ -10,9 +10,21 @@ from rnaforge.config import load_config
 from rnaforge.deseq2 import DeseqResult
 from rnaforge.gates import FAIL, PASS, WARN
 from rnaforge.modules import m06_de
-from rnaforge.modules.m06_de import build_de_gates, run_de
+from rnaforge.modules.m06_de import build_de_gates, count_up_down, run_de
 from rnaforge.quality import load_profile
 from rnaforge.state import RunState
+
+
+def test_count_up_down():
+    res = [
+        {"padj": 1e-8, "log2FoldChange": 3.0},   # up
+        {"padj": 1e-6, "log2FoldChange": -2.0},  # down
+        {"padj": 1e-9, "log2FoldChange": 0.2},   # |lfc|<1 -> neither
+        {"padj": 0.9,  "log2FoldChange": 5.0},   # padj high -> neither
+        {"padj": None, "log2FoldChange": 4.0},   # NA -> neither
+    ]
+    up, down = count_up_down(res, fdr=0.05, lfc=1.0)
+    assert (up, down) == (1, 1)
 
 
 def test_high_correlation_passes():
