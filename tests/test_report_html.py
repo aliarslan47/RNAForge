@@ -49,6 +49,44 @@ def test_load_report_inputs_loud_on_missing(tmp_path):
 
 
 from rnaforge.report_html import (
+    parse_coldata, parse_normalized_counts, condition_layout, cond_mean,
+)
+
+
+def test_parse_coldata_order(tmp_path):
+    p = tmp_path / "coldata.tsv"
+    p.write_text("sample\tcondition\nc1\tcontrol\nc2\tcontrol\nt1\ttreated\n")
+    assert parse_coldata(p) == [("c1", "control"), ("c2", "control"), ("t1", "treated")]
+
+
+def test_parse_normalized_counts(tmp_path):
+    p = tmp_path / "nc.tsv"
+    p.write_text("gene\tc1\tc2\nLT_1\t10\t20\nLT_2\t5\tNA\n")
+    nc = parse_normalized_counts(p)
+    assert nc["LT_1"] == {"c1": 10.0, "c2": 20.0}
+    assert nc["LT_2"]["c1"] == 5.0 and nc["LT_2"]["c2"] is None
+
+
+def test_condition_layout_first_appearance():
+    order, samples = condition_layout([("c1", "control"), ("t1", "treated"), ("c2", "control")])
+    assert order == ["control", "treated"]
+    assert samples == {"control": ["c1", "c2"], "treated": ["t1"]}
+
+
+def test_cond_mean():
+    nc = {"LT_1": {"c1": 10.0, "c2": 30.0, "t1": 100.0}}
+    assert cond_mean("LT_1", ["c1", "c2"], nc) == 20.0
+    assert cond_mean("LT_1", ["t1"], nc) == 100.0
+    assert cond_mean("missing", ["c1"], nc) is None    # gene not in matrix -> None
+
+
+def test_top_degs_keeps_gene_id():
+    de = [{"gene": "LT_1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8}]
+    out = top_degs(de, {"LT_1": "pspA"}, 0.05, 1.0)
+    assert out[0]["gene"] == "pspA" and out[0]["gene_id"] == "LT_1"
+
+
+from rnaforge.report_html import (
     LABELS, _esc, _table, section_confidence, section_dataset, section_quality,
 )
 

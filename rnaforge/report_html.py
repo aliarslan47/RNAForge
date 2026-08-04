@@ -59,6 +59,7 @@ def top_degs(de: list[dict], gene_map: dict, fdr: float, lfc: float, n: int = 50
     for r in sig[:n]:
         gid = r["gene"]
         out.append({
+            "gene_id": gid,
             "gene": gene_map.get(gid, gid),
             "log2fc": r["log2FoldChange"],
             "padj": r["padj"],
@@ -66,6 +67,56 @@ def top_degs(de: list[dict], gene_map: dict, fdr: float, lfc: float, n: int = 50
             "direction": "Up" if r["log2FoldChange"] > 0 else "Down",
         })
     return out
+
+
+def parse_coldata(path: Path) -> list[tuple[str, str]]:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"m08 report input missing: {path}")
+    out: list[tuple[str, str]] = []
+    with path.open() as f:
+        reader = csv.reader(f, delimiter="\t")
+        next(reader, None)  # header: sample, condition[, batch]
+        for row in reader:
+            if len(row) >= 2 and row[0]:
+                out.append((row[0], row[1]))
+    return out
+
+
+def parse_normalized_counts(path: Path) -> dict[str, dict[str, float]]:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"m08 report input missing: {path}")
+    out: dict[str, dict[str, float]] = {}
+    with path.open() as f:
+        reader = csv.reader(f, delimiter="\t")
+        header = next(reader, None)
+        samples = header[1:] if header else []
+        for row in reader:
+            if not row or not row[0]:
+                continue
+            out[row[0]] = {s: _num(v) for s, v in zip(samples, row[1:])}
+    return out
+
+
+def condition_layout(coldata: list[tuple[str, str]]) -> tuple[list[str], dict[str, list[str]]]:
+    """Koşulları ilk-görülme sırasında döndür + koşul -> örnek listesi."""
+    order: list[str] = []
+    samples: dict[str, list[str]] = {}
+    for sample, cond in coldata:
+        if cond not in samples:
+            samples[cond] = []
+            order.append(cond)
+        samples[cond].append(sample)
+    return order, samples
+
+
+def cond_mean(gene_id: str, samples: list[str], norm_counts: dict) -> float | None:
+    row = norm_counts.get(gene_id)
+    if not row:
+        return None
+    vals = [row[s] for s in samples if row.get(s) is not None]
+    return sum(vals) / len(vals) if vals else None
 
 
 def top_degs_by_direction(de: list[dict], gene_map: dict, fdr: float, lfc: float,
@@ -89,11 +140,14 @@ def _read_json(path: Path) -> dict:
 def load_report_inputs(run_dir: Path) -> dict:
     run_dir = Path(run_dir)
     stats = run_dir / "statistics"
-    de_tsv = run_dir / "differential_expression" / "deseq2_results.tsv"
+    de_dir = run_dir / "differential_expression"
+    de_tsv = de_dir / "deseq2_results.tsv"
     if not de_tsv.exists():
         raise FileNotFoundError(f"m08 report input missing: {de_tsv}")
     figures_dir = run_dir / "figures"
     return {
+        "norm_counts": parse_normalized_counts(de_dir / "normalized_counts.tsv"),
+        "coldata": parse_coldata(de_dir / "coldata.tsv"),
         "raw": _read_json(stats / "raw_statistics.json"),
         "qc": _read_json(stats / "qc_statistics.json"),
         "trimming": _read_json(stats / "trimming_statistics.json"),
