@@ -185,6 +185,19 @@ def test_section_table_empty_both():
     assert LABELS["tr"]["no_degs"] in section_table([], {}, 0.05, 1.0, LABELS["tr"])
 
 
+def test_section_table_condition_expression_columns():
+    de = [{"gene": "LT_1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8}]
+    cond_ctx = {
+        "norm_counts": {"LT_1": {"c1": 10.0, "c2": 30.0, "t1": 200.0, "t2": 220.0}},
+        "order": ["control", "treated"],
+        "samples": {"control": ["c1", "c2"], "treated": ["t1", "t2"]},
+    }
+    h = section_table(de, {}, 0.05, 1.0, LABELS["tr"], cond_ctx=cond_ctx)
+    assert f'control {LABELS["tr"]["mean_suffix"]}' in h     # condition header
+    assert f'treated {LABELS["tr"]["mean_suffix"]}' in h
+    assert "20.0" in h and "210.0" in h                       # control mean 20, treated mean 210
+
+
 def test_section_methods_and_references():
     from rnaforge.config import load_config
     import tempfile, os
@@ -236,6 +249,8 @@ def _full_inputs(tmp_path):
         "de_results": [{"gene": "LT_1", "baseMean": 200.0, "log2FoldChange": 3.0, "padj": 1e-8}],
         "gene_map": {"LT_1": "pspA"},
         "figures_dir": fig,
+        "norm_counts": {"LT_1": {"c1": 10.0, "t1": 200.0}},
+        "coldata": [("c1", "control"), ("t1", "treated")],
     }
 
 

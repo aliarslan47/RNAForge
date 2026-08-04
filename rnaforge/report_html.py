@@ -180,6 +180,7 @@ LABELS: dict[str, dict[str, str]] = {
         "min_length": "Min uzunluk", "aggressive": "Agresif kalite trimming",
         "summary": "Özet",
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
+        "mean_suffix": "ort.",
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -198,6 +199,7 @@ LABELS: dict[str, dict[str, str]] = {
         "min_length": "Min length", "aggressive": "Aggressive quality trimming",
         "summary": "Summary",
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
+        "mean_suffix": "mean",
     },
 }
 
@@ -348,22 +350,33 @@ def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: st
     return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{_intro("figures", L)}{"".join(blocks)}</section>'
 
 
-def _deg_table(rows: list[dict], L: dict) -> str:
-    body = [[r["gene"],
-             f'{r["log2fc"]:.2f}' if r["log2fc"] is not None else "—",
-             f'{r["padj"]:.2e}' if r["padj"] is not None else "—",
-             f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—"] for r in rows]
-    return _table([L["gene"], L["log2fc"], L["padj"], L["base_mean"]], body)
+def _deg_table(rows: list[dict], L: dict, cond_ctx: dict | None = None) -> str:
+    cond_order = cond_ctx["order"] if cond_ctx else []
+    headers = [L["gene"], L["log2fc"], L["padj"]]
+    headers += [f'{c} {L["mean_suffix"]}' for c in cond_order]
+    headers += [L["base_mean"]]
+    body = []
+    for r in rows:
+        row = [r["gene"],
+               f'{r["log2fc"]:.2f}' if r["log2fc"] is not None else "—",
+               f'{r["padj"]:.2e}' if r["padj"] is not None else "—"]
+        for c in cond_order:
+            m = cond_mean(r["gene_id"], cond_ctx["samples"][c], cond_ctx["norm_counts"])
+            row.append(f'{m:.1f}' if m is not None else "—")
+        row.append(f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—")
+        body.append(row)
+    return _table(headers, body)
 
 
-def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: dict) -> str:
+def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: dict,
+                  cond_ctx: dict | None = None) -> str:
     up = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Up", n=25)
     down = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Down", n=25)
     if not up and not down:
         return f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}<p>{_esc(L["no_degs"])}</p></section>'
-    up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L)}' if up
+    up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L, cond_ctx)}' if up
                else f'<h3>{_esc(L["up_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
-    down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L)}' if down
+    down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L, cond_ctx)}' if down
                  else f'<h3>{_esc(L["down_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
     return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}{up_html}{down_html}'
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
@@ -480,6 +493,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     raw = inputs["raw"]
     trimming_cfg = {"min_length": config.trimming.min_length,
                     "aggressive": config.trimming.aggressive_quality}
+    cond_order, cond_samples = condition_layout(inputs.get("coldata", []))
+    cond_ctx = {"norm_counts": inputs.get("norm_counts", {}),
+                "order": cond_order, "samples": cond_samples}
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -492,7 +508,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_de(inputs["de"], L),
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],
-                      config.de.fdr_threshold, config.de.log2fc_threshold, L),
+                      config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_methods(config, L),
         section_references(L),
     ])
