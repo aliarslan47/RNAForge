@@ -144,12 +144,19 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 11. ~~m07 figürler (PCA/Volcano/Heatmap/MA, otomatik, PNG300+SVG)~~ ✅ BİTTİ (2026-08-04) —
     `main`'de (merge `c46baf5`). Manifest m08'in tüketeceği sözleşme.
 12. ~~m08 = HTML rapor~~ ✅ BİTTİ (2026-08-04) — `main`'de (merge `3c96644`). **PROKARYOT MVP TAMAM.**
-13. **SIRADAKİ — iki yön (← ŞİMDİ BURADAYIZ):**
+13. **★ SIRADAKİ — YARIN (2026-08-05): GO ENRICHMENT + rapora ekleme (Ali onayladı).**
+    **A yalın yol** seçildi (B agnostik/eggNOG SONRAYA). Tam tasarım: bellek
+    `reminder_rnaforge_go_enrichment`. Özet:
+    - Anotasyon: E. coli GAF (EBI-GOA) veya kullanıcı-verili GO TSV + `go-basic.obo` (~35-40 MB) →
+      `references/go/` + `references/ecoli_bw25113/`. İnternet/büyük DB YOK. Disk yükü ~50 MB (584 GB boş).
+    - Yöntem: ORA (hipergeometrik/Fisher, **stdlib `math.comb`** — scipy şart değil) + BH; arka plan = test edilen tüm genler.
+    - Çıktı: GO tablosu (terim/kategori/kat-zenginleşme/padj) + 1 figür + **m08 yeni bölüm**.
+      Muhtemel yeni modül m09_enrichment; brainstorm→spec→plan→TDD→review→GSE300731 smoke. Gate yok.
+14. **SONRAKİ (GO'dan sonra):**
     a) **Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport/tx2gene) — MVP'nin ikinci kolu.
-       Ayrım yalnız m04/m05'te; m06/m07/m08 organizma tipini bilmez (zaten agnostik). salmon 2.3.4
-       CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme).
-    b) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme,
-       m08 DE'de UP/DOWN ayrımı (m06 de_statistics'e split eklenirse).
+       salmon 2.3.4 CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme).
+    b) GO agnostik genelleme (B: eggNOG-mapper ~40-100 GB → `/home/ali/eggnog_db/`).
+    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme.
     - m06/m07/m08 = ORTAK (organizma-agnostik) adımlar; hiçbiri yeni FAIL üretmez (gate yok).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
