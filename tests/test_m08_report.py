@@ -31,6 +31,8 @@ def _seed_run(rd):
     (fig / "gene_map.tsv").write_text("locus_tag\tgene\nLT_1\tpspA\n")
     (de / "deseq2_results.tsv").write_text(
         "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\nLT_1\t200\t3.0\t0.2\t5\t1e-9\t1e-8\n")
+    (de / "normalized_counts.tsv").write_text("gene\tc1\tt1\nLT_1\t50\t400\n")
+    (de / "coldata.tsv").write_text("sample\tcondition\nc1\tcontrol\nt1\ttreated\n")
     s = rd / "statistics"
     (s / "raw_statistics.json").write_text(json.dumps({"organism": "E. coli", "platform": "illumina",
         "design": "~condition", "conditions": {"control": 1, "treated": 1},
