@@ -55,6 +55,19 @@ def build_de_gates(min_correlation: float, profile: Profile) -> list[GateResult]
     )]
 
 
+def count_up_down(results: list[dict], fdr: float, lfc: float) -> tuple[int, int]:
+    up = down = 0
+    for r in results:
+        p = r.get("padj"); l = r.get("log2FoldChange")
+        if p is None or l is None or p >= fdr:
+            continue
+        if l >= lfc:
+            up += 1
+        elif l <= -lfc:
+            down += 1
+    return up, down
+
+
 def run_de(config: Config, metadata_path: Path, run_dir: Path,
            force: bool = False) -> dict:
     run_dir = Path(run_dir)
@@ -100,12 +113,15 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
             if r.get("padj") is not None and r["padj"] < fdr
             and r.get("log2FoldChange") is not None and abs(r["log2FoldChange"]) >= lfc
         )
+        n_up, n_down = count_up_down(result.results, fdr, lfc)
         min_corr = float(result.metrics.get("min_replicate_correlation", 1.0))
         gates = build_de_gates(min_corr, profile)
 
         summary = {
             "n_genes": len(result.results),
             "n_significant": n_sig,
+            "n_up": n_up,
+            "n_down": n_down,
             "contrast": result.metrics.get("contrast", ""),
             "min_replicate_correlation": min_corr,
             "fdr_threshold": fdr, "log2fc_threshold": lfc,

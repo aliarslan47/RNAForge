@@ -96,9 +96,11 @@ from rnaforge.report_html import (
 
 def test_section_de_counts():
     de = {"contrast": "t vs c", "n_genes": 4398, "n_significant": 1634,
+          "n_up": 807, "n_down": 827,
           "fdr_threshold": 0.05, "log2fc_threshold": 1.0, "min_replicate_correlation": 0.98}
     h = section_de(de, LABELS["en"])
     assert "1634" in h and "4398" in h and "t vs c" in h
+    assert "807" in h and "827" in h    # n_up / n_down surfaced
 
 
 def test_section_figures_embeds(tmp_path):
@@ -116,11 +118,33 @@ def test_section_figures_loud_when_png_missing(tmp_path):
         section_figures(manifest, fig, LABELS["en"])
 
 
-def test_section_table_empty_note():
-    assert LABELS["tr"]["no_degs"] in section_table([], LABELS["tr"])
-    h = section_table([{"gene": "pspA", "log2fc": 3.0, "padj": 1e-8,
-                        "base_mean": 200.0, "direction": "Up"}], LABELS["tr"])
-    assert "pspA" in h
+from rnaforge.report_html import top_degs_by_direction
+
+
+def test_top_degs_by_direction_filters():
+    de = [
+        {"gene": "U1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8},
+        {"gene": "U2", "baseMean": 100.0, "log2FoldChange": 2.0, "padj": 1e-4},
+        {"gene": "D1", "baseMean": 100.0, "log2FoldChange": -4.0, "padj": 1e-9},
+    ]
+    up = top_degs_by_direction(de, {}, 0.05, 1.0, "Up", n=25)
+    down = top_degs_by_direction(de, {}, 0.05, 1.0, "Down", n=25)
+    assert [r["gene"] for r in up] == ["U1", "U2"]      # padj asc, Up only
+    assert [r["gene"] for r in down] == ["D1"]
+
+
+def test_section_table_has_up_and_down():
+    de = [
+        {"gene": "U1", "baseMean": 100.0, "log2FoldChange": 3.0, "padj": 1e-8},
+        {"gene": "D1", "baseMean": 100.0, "log2FoldChange": -4.0, "padj": 1e-9},
+    ]
+    h = section_table(de, {"LT": "x"}, 0.05, 1.0, LABELS["tr"])
+    assert LABELS["tr"]["up_table"] in h and LABELS["tr"]["down_table"] in h
+    assert "U1" in h and "D1" in h
+
+
+def test_section_table_empty_both():
+    assert LABELS["tr"]["no_degs"] in section_table([], {}, 0.05, 1.0, LABELS["tr"])
 
 
 def test_section_methods_and_references():
@@ -195,3 +219,25 @@ def test_render_report_includes_run_id(tmp_path):
     doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0",
                         run_id="20260803_143036_GSE300731")
     assert "20260803_143036_GSE300731" in doc
+
+
+from rnaforge.report_html import FIGURE_CAPTIONS, SECTION_INTRO
+
+
+def test_caption_and_intro_bilingual():
+    assert set(FIGURE_CAPTIONS["tr"]) == set(FIGURE_CAPTIONS["en"])
+    assert FIGURE_CAPTIONS["tr"]["pca"] != FIGURE_CAPTIONS["en"]["pca"]
+    assert set(SECTION_INTRO["tr"]) == set(SECTION_INTRO["en"])
+
+
+def test_section_figures_shows_caption(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    (fig / "01_pca.png").write_bytes(b"\x89PNG")
+    manifest = {"figures": [{"id": "pca", "title": "PCA", "png": "01_pca.png", "svg": None}]}
+    h = section_figures(manifest, fig, LABELS["tr"], lang="tr")
+    assert FIGURE_CAPTIONS["tr"]["pca"][:12] in h    # caption metni basildi
+
+
+def test_render_report_has_section_intro(tmp_path):
+    doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
+    assert 'class="intro"' in doc and SECTION_INTRO["tr"]["confidence"][:12] in doc

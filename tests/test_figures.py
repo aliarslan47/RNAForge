@@ -4,6 +4,13 @@ from rnaforge.figures import gene_name_map
 from rnaforge.figures import FIGURE_SPECS, write_gene_map, build_manifest, write_manifest
 
 
+def test_figure_specs_has_eight_in_order():
+    from rnaforge.figures import FIGURE_SPECS
+    ids = [s[0] for s in FIGURE_SPECS]
+    assert ids == ["pca", "sample_correlation", "expression_dist", "dispersion",
+                   "pval_histogram", "volcano", "ma", "heatmap"]
+
+
 def test_gene_name_map_extracts_named_cds(tmp_path):
     gff = tmp_path / "g.gff"
     gff.write_text(
@@ -35,7 +42,7 @@ def test_build_manifest_ok_and_missing(tmp_path):
     assert [f["id"] for f in man["figures"]] == [s[0] for s in FIGURE_SPECS]
     assert man["figures"][0]["png"] == "01_pca.png"
     p = write_manifest(fig)
-    assert json.loads(p.read_text())["figures"][1]["id"] == "volcano"
+    assert json.loads(p.read_text())["figures"][1]["id"] == "sample_correlation"
     # eksik PNG -> yuksek sesle
     (fig / "01_pca.png").unlink()
     import pytest

@@ -84,3 +84,7 @@ def test_run_deseq2_detects_signal(tmp_path):
     assert by_gene["g0"]["log2FoldChange"] > 1
     assert result.metrics["contrast"] == "treated vs control"
     assert result.metrics["min_replicate_correlation"] > 0.5
+    disp = tmp_path / "de" / "dispersions.tsv"
+    assert disp.exists()
+    header = disp.read_text().splitlines()[0].split("\t")
+    assert header == ["gene_id", "baseMean", "dispGeneEst", "dispFit", "dispFinal"]
