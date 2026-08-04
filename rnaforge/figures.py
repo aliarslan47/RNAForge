@@ -6,9 +6,13 @@ from pathlib import Path
 
 FIGURE_SPECS: list[tuple[str, str, str]] = [
     ("pca", "01_pca", "PCA"),
-    ("volcano", "02_volcano", "Volcano"),
-    ("heatmap", "03_heatmap", "Heatmap"),
-    ("ma", "04_ma", "MA plot"),
+    ("sample_correlation", "02_sample_correlation", "Örnek korelasyonu"),
+    ("expression_dist", "03_expression_dist", "Ekspresyon dağılımı"),
+    ("dispersion", "04_dispersion", "Dispersiyon"),
+    ("pval_histogram", "05_pval_histogram", "p-değeri dağılımı"),
+    ("volcano", "06_volcano", "Volcano"),
+    ("ma", "07_ma", "MA plot"),
+    ("heatmap", "08_heatmap", "Heatmap"),
 ]
 
 
@@ -62,7 +66,8 @@ def run_figures_r(de_dir: Path, gene_map: Path, fdr: float, lfc: float,
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
            str(de_dir / "normalized_counts.tsv"), str(de_dir / "deseq2_results.tsv"),
-           str(de_dir / "coldata.tsv"), str(gene_map), str(fdr), str(lfc), str(out_dir)]
+           str(de_dir / "coldata.tsv"), str(gene_map), str(de_dir / "dispersions.tsv"),
+           str(fdr), str(lfc), str(out_dir)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"figures.R failed (exit {r.returncode}):\n{r.stderr}")

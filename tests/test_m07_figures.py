@@ -30,6 +30,10 @@ def _write_de(de, n_sig, zero_var_sig=False):
             lfc = 4.0 if sig else 0.1; padj = 1e-20 if sig else 0.9
             f.write(f"LT_{i}\t200\t{lfc}\t0.2\t5\t1e-22\t{padj}\n")
     (de/"coldata.tsv").write_text("sample\tcondition\nc1\tcontrol\nc2\tcontrol\nt1\ttreated\nt2\ttreated\n")
+    with (de/"dispersions.tsv").open("w") as f:
+        f.write("gene_id\tbaseMean\tdispGeneEst\tdispFit\tdispFinal\n")
+        for i in range(1,61):
+            f.write(f"LT_{i}\t200\t0.05\t0.04\t0.045\n")
 
 
 @pytest.mark.skipif(not _has_de_env(), reason="rnaforge-de env/ggplot2 yok")
@@ -43,7 +47,7 @@ def test_figures_r_renders_all(tmp_path, n_sig, zero_var):
     out = tmp_path/"figures"
     run_figures_r(de, gm, 0.05, 1.0, out)
     man = build_manifest(out)
-    assert len(man["figures"]) == 4
+    assert len(man["figures"]) == 8
     for fig in man["figures"]:
         assert (out/fig["png"]).stat().st_size > 1000
 
@@ -86,7 +90,7 @@ def test_run_figures_orchestrates(tmp_path, monkeypatch):
         return "figures.R done\n"
     monkeypatch.setattr(m07_figures, "run_figures_r", fake_r)
     s = m07_figures.run_figures(cfg, md, rd)
-    assert s["n_figures"] == 4
+    assert s["n_figures"] == 8
     assert (rd/"figures"/"manifest.json").exists()
     assert RunState(rd).is_done("m07_figures")
     # resume
