@@ -96,6 +96,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true",
         help="re-run even if m07 already completed in this run directory",
     )
+
+    report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
+    report.add_argument("--config", required=True, type=Path)
+    report.add_argument("--metadata", required=True, type=Path)
+    report.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    report.add_argument("--run-id", default="run")
+    report.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m08 already completed in this run directory",
+    )
     return parser
 
 
@@ -259,6 +269,25 @@ def _cmd_figures(args) -> int:
     return 0
 
 
+def _cmd_report(args) -> int:
+    from rnaforge.modules.m08_report import run_report
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_report(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m08_report already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"report OK: {run_dir / summary['report']}")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command is None:
@@ -277,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_de(args)
         if args.command == "figures":
             return _cmd_figures(args)
+        if args.command == "report":
+            return _cmd_report(args)
         return _cmd_validate(args)
     except GateFailure as exc:
         print(f"error: {exc}", file=sys.stderr)

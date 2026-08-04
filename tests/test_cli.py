@@ -21,3 +21,10 @@ def test_figures_subcommand_parses(capsys):
     args = build_parser().parse_args(["figures","--config","c.yaml","--metadata","m.tsv","--run-id","r"])
     assert args.command == "figures"
     assert args.run_id == "r"
+
+
+def test_report_subcommand_parses():
+    from rnaforge.cli import build_parser
+    args = build_parser().parse_args(["report","--config","c.yaml","--metadata","m.tsv","--run-id","r"])
+    assert args.command == "report"
+    assert args.run_id == "r"
