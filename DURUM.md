@@ -9,6 +9,18 @@
 **Son güncelleme:** 2026-08-04
 
 ## Şu an nerede kaldık
+- **RAPOR ZENGİNLEŞTİRME BİTTİ ve `main`'de (2026-08-04, merge `67bfd6d`, push).** Güncel DE raporlama
+  konvansiyonlarına (nf-core/differentialabundance, DEGreport, EnhancedVolcano) hizalandı. **220 test yeşil.**
+  - **m06:** `deseq2.R` artık `dispersions.tsv` üretir (gene_id/baseMean/dispGeneEst/dispFit/dispFinal);
+    `de_statistics.json`'a `n_up`/`n_down` eklendi (`count_up_down` helper).
+  - **m07:** figür sayısı **4→8**, anlatı sırasıyla: PCA · **örnek korelasyon heatmap** · **ekspresyon
+    boxplot** · **dispersiyon (plotDispEsts)** · **p-değeri histogramı** · Volcano · MA · Heatmap.
+    basename'ler 01–08 yeniden numaralandı; runner'a dispersions arg; korelasyon NaN korumalı (sabit örnek).
+  - **m08:** DEG tablosu **ARTAN 25 / AZALAN 25 ayrı tablo**; her figür altında **çift dilli caption**
+    (ne gösterir+nasıl okunur); her bölüm başında **intro** (sabit/sayısal, uydurma yorum yok);
+    DE bölümünde n_up/n_down gösteriliyor.
+  - Code review: Critical yok; 1 Important (n_up/n_down raporda göster) düzeltildi. Gerçek GSE300731'de
+    doğrulandı: 8 gömülü figür, n_up 807 + n_down 827 = 1634, verdict SUSPECT (değişmez).
 - **★ PROKARYOT MVP TAMAM (2026-08-04) — m08 HTML RAPOR `main`'de (merge `3c96644`, push).** Zincir
   uçtan uca: FASTQ → validate → QC → trim → quant → count → DESeq2 → 4 figür → **tek self-contained
   HTML rapor**. `rnaforge report` subcommand: m06/m07 çıktı sözleşmelerinden (istatistik JSON'ları +
