@@ -54,6 +54,15 @@ normdf <- cbind(gene = rownames(norm), as.data.frame(norm))
 write.table(normdf, file.path(out_dir, "normalized_counts.tsv"),
             sep = "\t", quote = FALSE, row.names = FALSE)
 
+# Dispersiyon tahminleri (m07 dispersiyon figürü için). dispFit fallback yolunda olmayabilir -> NA.
+mc <- mcols(dds)
+dispfit <- if ("dispFit" %in% colnames(mc)) mc$dispFit else rep(NA_real_, nrow(dds))
+disp <- data.frame(gene_id = rownames(dds), baseMean = mc$baseMean,
+                   dispGeneEst = mc$dispGeneEst, dispFit = dispfit,
+                   dispFinal = dispersions(dds))
+write.table(disp, file.path(out_dir, "dispersions.tsv"),
+            sep = "\t", quote = FALSE, row.names = FALSE)
+
 # min koşul-içi replika korelasyonu (log2 normalize sayım, Pearson)
 ln <- log2(norm + 1)
 mincor <- 1.0
