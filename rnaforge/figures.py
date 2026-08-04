@@ -1,6 +1,7 @@
 """m07 — Visualization helpers + R runner. Pure Python side; plotting lives in figures.R."""
 from __future__ import annotations
 import json
+import subprocess
 from pathlib import Path
 
 FIGURE_SPECS: list[tuple[str, str, str]] = [
@@ -49,3 +50,18 @@ def write_manifest(fig_dir: Path) -> Path:
     p = Path(fig_dir) / "manifest.json"
     p.write_text(json.dumps(build_manifest(fig_dir), indent=2))
     return p
+
+
+_SCRIPT = Path(__file__).parent / "scripts" / "figures.R"
+
+
+def run_figures_r(de_dir: Path, gene_map: Path, fdr: float, lfc: float,
+                  out_dir: Path, env: str = "rnaforge-de") -> None:
+    de_dir, out_dir = Path(de_dir), Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
+           str(de_dir / "normalized_counts.tsv"), str(de_dir / "deseq2_results.tsv"),
+           str(de_dir / "coldata.tsv"), str(gene_map), str(fdr), str(lfc), str(out_dir)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"figures.R failed (exit {r.returncode}):\n{r.stderr}")
