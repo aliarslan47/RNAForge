@@ -14,3 +14,10 @@ def test_version_flag_prints_version(capsys):
 
 def test_no_command_returns_usage_error():
     assert main([]) == 2
+
+
+def test_figures_subcommand_parses(capsys):
+    from rnaforge.cli import build_parser
+    args = build_parser().parse_args(["figures","--config","c.yaml","--metadata","m.tsv","--run-id","r"])
+    assert args.command == "figures"
+    assert args.run_id == "r"
