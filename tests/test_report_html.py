@@ -136,3 +136,56 @@ def test_section_methods_and_references():
     hm = section_methods(cfg, LABELS["en"])
     assert "DESeq2" in hm and "bowtie2" in hm and "36" in hm
     assert "DESeq2" in section_references(LABELS["en"])
+
+
+from rnaforge.report_html import render_report, N_SECTIONS
+
+
+def _full_inputs(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    for base in ("01_pca", "02_volcano", "03_heatmap", "04_ma"):
+        (fig / f"{base}.png").write_bytes(b"\x89PNG")
+    return {
+        "raw": {"organism": "E. coli", "platform": "illumina", "design": "~condition",
+                "conditions": {"control": 2, "treated": 2},
+                "samples": [{"sample_id": "c1", "condition": "control", "batch": None,
+                             "paired": True, "mean_read_length": 150.0, "mean_quality": 39.0}]},
+        "qc": {"samples": {}}, "trimming": {"samples": {}},
+        "alignment": {"samples": {"c1": {"alignment_rate": 0.99}}},
+        "count": {"samples": {"c1": {"assignment_rate": 0.85}}, "n_genes": 4398},
+        "de": {"contrast": "treated vs control", "n_genes": 4398, "n_significant": 2,
+               "fdr_threshold": 0.05, "log2fc_threshold": 1.0, "min_replicate_correlation": 0.98},
+        "confidence": {"verdict": "TRUSTWORTHY", "counts": {"PASS": 11, "WARN": 0, "FAIL": 0},
+                       "profile": {"name": "prokaryote", "overrides": {}}, "gates": []},
+        "figures": {"figures": [{"id": "pca", "title": "PCA", "png": "01_pca.png", "svg": None},
+                                {"id": "volcano", "title": "Volcano", "png": "02_volcano.png", "svg": None},
+                                {"id": "heatmap", "title": "Heatmap", "png": "03_heatmap.png", "svg": None},
+                                {"id": "ma", "title": "MA", "png": "04_ma.png", "svg": None}]},
+        "de_results": [{"gene": "LT_1", "baseMean": 200.0, "log2FoldChange": 3.0, "padj": 1e-8}],
+        "gene_map": {"LT_1": "pspA"},
+        "figures_dir": fig,
+    }
+
+
+def _cfg(lang):
+    from rnaforge.config import load_config
+    import tempfile, os
+    txt = (f"organism: E\norganism_type: prokaryote\nplatform: auto\n"
+           f"reference:\n  genome_fasta: g.fa\n  annotation_gff: g.gff\n"
+           f"de:\n  design: '~condition'\n  fdr_threshold: 0.05\n  log2fc_threshold: 1.0\n"
+           f"report:\n  language: {lang}\n")
+    p = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False); p.write(txt); p.close()
+    c = load_config(p.name); os.unlink(p.name); return c
+
+
+def test_render_report_full(tmp_path):
+    doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
+    assert doc.lstrip().startswith("<!doctype html>") or "<html" in doc
+    assert doc.count('src="data:image/png;base64,') == 4        # all figures embedded
+    assert "TRUSTWORTHY" in doc and "pspA" in doc and "Güvence" in doc
+    assert "0.1.0" in doc
+
+
+def test_render_report_language_switch(tmp_path):
+    en = render_report(_full_inputs(tmp_path), _cfg("en"), version="0.1.0")
+    assert "Confidence Card" in en and "Güvence" not in en

@@ -5,6 +5,7 @@ import base64
 import csv
 import html
 import json
+from datetime import datetime
 from pathlib import Path
 
 N_SECTIONS = 9
@@ -261,3 +262,49 @@ _REFERENCES = [
 def section_references(L: dict) -> str:
     items = "".join(f"<li>{_esc(r)}</li>" for r in _REFERENCES)
     return f'<section id="references"><h2>{_esc(L["references"])}</h2><ol>{items}</ol></section>'
+
+
+_CSS = """
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:960px;margin:2rem auto;
+padding:0 1rem;color:#1a1a1a;line-height:1.5}
+h1{font-size:1.7rem} h2{margin-top:2rem;border-bottom:2px solid #eee;padding-bottom:.3rem}
+table{border-collapse:collapse;width:100%;margin:.6rem 0;font-size:.9rem}
+th,td{border:1px solid #ddd;padding:.35rem .5rem;text-align:left}
+th{background:#f6f6f6} .banner{padding:.8rem 1rem;border-radius:6px;margin:.6rem 0;font-size:1.05rem}
+.verdict-trustworthy{background:#e6f4ea;border:1px solid #34a853}
+.verdict-suspect{background:#fef7e0;border:1px solid #f9ab00}
+.verdict-invalid{background:#fce8e6;border:1px solid #d93025}
+.verdict-unknown{background:#f1f3f4;border:1px solid #9aa0a6}
+figure{margin:1rem 0;text-align:center} img{max-width:100%;height:auto}
+figcaption{color:#555;font-size:.9rem;margin-top:.3rem}
+.note{color:#666;font-size:.85rem} .summary{font-size:1.05rem;font-weight:600}
+@media print{body{max-width:none} h2{page-break-after:avoid}}
+"""
+
+
+def render_report(inputs: dict, config, version: str) -> str:
+    lang = config.report.language
+    L = LABELS.get(lang, LABELS["tr"])
+    raw = inputs["raw"]
+    trimming_cfg = {"min_length": config.trimming.min_length,
+                    "aggressive": config.trimming.aggressive_quality}
+    top = top_degs(inputs["de_results"], inputs["gene_map"],
+                   config.de.fdr_threshold, config.de.log2fc_threshold, n=50)
+    generated = datetime.now().isoformat(timespec="seconds")
+    header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
+              f'<p class="note">{_esc(generated)} · v{_esc(version)}</p>')
+    body = "".join([
+        header,
+        section_confidence(inputs["confidence"], L),
+        section_dataset(raw, L),
+        section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L),
+        section_de(inputs["de"], L),
+        section_figures(inputs["figures"], inputs["figures_dir"], L),
+        section_table(top, L),
+        section_methods(config, L),
+        section_references(L),
+    ])
+    return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<title>RNAForge report</title><style>{_CSS}</style></head>'
+            f'<body>{body}</body></html>')
