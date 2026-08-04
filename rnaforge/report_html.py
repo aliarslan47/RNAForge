@@ -193,3 +193,71 @@ def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict) -> st
              _pct(csamp.get(sid, {}).get("assignment_rate"))] for sid in asamp]
     tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"]], rows)
     return f'<section id="quality"><h2>{_esc(L["quality"])}</h2>{trim}{tbl}</section>'
+
+
+def section_de(de: dict, L: dict) -> str:
+    n_sig = de.get("n_significant", 0)
+    summary = (f'<p class="summary">{_esc(L["summary"])}: {_esc(n_sig)} / '
+               f'{_esc(de.get("n_genes"))} — {_esc(de.get("contrast"))} '
+               f'(FDR<{_esc(de.get("fdr_threshold"))}, |log2FC|>={_esc(de.get("log2fc_threshold"))}).</p>')
+    rows = [
+        [L["contrast"], de.get("contrast")],
+        [L["n_genes"], de.get("n_genes")],
+        [L["n_sig"], n_sig],
+        ["min replicate corr.", de.get("min_replicate_correlation")],
+    ]
+    tbl = _table([" ", " "], rows)
+    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{summary}{tbl}</section>'
+
+
+def section_figures(figures_manifest: dict, figures_dir: Path, L: dict) -> str:
+    figures_dir = Path(figures_dir)
+    blocks = []
+    for fig in figures_manifest.get("figures", []):
+        png = figures_dir / fig["png"]
+        if not png.exists():
+            raise FileNotFoundError(f"m08: figure PNG missing for report: {png}")
+        blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/>'
+                      f'<figcaption>{_esc(fig.get("title"))}</figcaption></figure>')
+    return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{"".join(blocks)}</section>'
+
+
+def section_table(top: list[dict], L: dict) -> str:
+    if not top:
+        return f'<section id="table"><h2>{_esc(L["table"])}</h2><p>{_esc(L["no_degs"])}</p></section>'
+    rows = [[r["gene"], f'{r["log2fc"]:.2f}', f'{r["padj"]:.2e}',
+             f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—",
+             L["up"] if r["direction"] == "Up" else L["down"]] for r in top]
+    tbl = _table([L["gene"], L["log2fc"], L["padj"], L["base_mean"], L["direction"]], rows)
+    return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{tbl}'
+            f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
+
+
+def section_methods(config, L: dict) -> str:
+    t = config.trimming
+    q = config.quantification
+    d = config.de
+    text = (
+        f'FastQC + fastp (min_length={t.min_length}, aggressive_quality={t.aggressive_quality}; '
+        f'Williams et al. 2016). bowtie2 alignment; featureCounts '
+        f'(feature_type={q.feature_type}, attribute={q.attribute}). '
+        f'DESeq2 (design={d.design}, FDR<{d.fdr_threshold}, |log2FC|>={d.log2fc_threshold}). '
+        f'Figures: ggplot2. RNAForge pipeline.'
+    )
+    return f'<section id="methods"><h2>{_esc(L["methods"])}</h2><p>{_esc(text)}</p></section>'
+
+
+_REFERENCES = [
+    "Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. Nat Methods. 2012.",
+    "Chen S et al. fastp: an ultra-fast all-in-one FASTQ preprocessor. Bioinformatics. 2018.",
+    "Liao Y et al. featureCounts. Bioinformatics. 2014.",
+    "Love MI et al. DESeq2. Genome Biol. 2014.",
+    "Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer. 2016.",
+    "Williams CR et al. Trimming of sequence reads alters RNA-Seq gene expression estimates. "
+    "BMC Bioinformatics. 2016.",
+]
+
+
+def section_references(L: dict) -> str:
+    items = "".join(f"<li>{_esc(r)}</li>" for r in _REFERENCES)
+    return f'<section id="references"><h2>{_esc(L["references"])}</h2><ol>{items}</ol></section>'

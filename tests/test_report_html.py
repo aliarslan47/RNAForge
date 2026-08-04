@@ -87,3 +87,52 @@ def test_section_quality_rates():
     count = {"samples": {"c1": {"assignment_rate": 0.85}}, "n_genes": 4398}
     h = section_quality(align, count, {"min_length": 36, "aggressive": False}, LABELS["tr"])
     assert "c1" in h and "99" in h
+
+
+from rnaforge.report_html import (
+    section_de, section_figures, section_table, section_methods, section_references,
+)
+
+
+def test_section_de_counts():
+    de = {"contrast": "t vs c", "n_genes": 4398, "n_significant": 1634,
+          "fdr_threshold": 0.05, "log2fc_threshold": 1.0, "min_replicate_correlation": 0.98}
+    h = section_de(de, LABELS["en"])
+    assert "1634" in h and "4398" in h and "t vs c" in h
+
+
+def test_section_figures_embeds(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    (fig / "01_pca.png").write_bytes(b"\x89PNG")
+    manifest = {"figures": [{"id": "pca", "title": "PCA", "png": "01_pca.png", "svg": None}]}
+    h = section_figures(manifest, fig, LABELS["en"])
+    assert 'src="data:image/png;base64,' in h and "PCA" in h
+
+
+def test_section_figures_loud_when_png_missing(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    manifest = {"figures": [{"id": "pca", "title": "PCA", "png": "missing.png", "svg": None}]}
+    with pytest.raises(FileNotFoundError):
+        section_figures(manifest, fig, LABELS["en"])
+
+
+def test_section_table_empty_note():
+    assert LABELS["tr"]["no_degs"] in section_table([], LABELS["tr"])
+    h = section_table([{"gene": "pspA", "log2fc": 3.0, "padj": 1e-8,
+                        "base_mean": 200.0, "direction": "Up"}], LABELS["tr"])
+    assert "pspA" in h
+
+
+def test_section_methods_and_references():
+    from rnaforge.config import load_config
+    import tempfile, os
+    cfgtext = ("organism: E\norganism_type: prokaryote\nplatform: auto\n"
+               "reference:\n  genome_fasta: g.fa\n  annotation_gff: g.gff\n"
+               "trimming:\n  min_length: 36\n  aggressive_quality: false\n"
+               "quantification:\n  feature_type: CDS\n  attribute: locus_tag\n"
+               "de:\n  design: '~condition'\n  fdr_threshold: 0.05\n  log2fc_threshold: 1.0\n")
+    p = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False); p.write(cfgtext); p.close()
+    cfg = load_config(p.name); os.unlink(p.name)
+    hm = section_methods(cfg, LABELS["en"])
+    assert "DESeq2" in hm and "bowtie2" in hm and "36" in hm
+    assert "DESeq2" in section_references(LABELS["en"])
