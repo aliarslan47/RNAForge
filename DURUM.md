@@ -9,6 +9,10 @@
 **Son güncelleme:** 2026-08-04
 
 ## Şu an nerede kaldık
+- **Methods + References güncellendi ve `main`'de (2026-08-04, merge `5b1d545`, push).** Yöntemler bölümü
+  artık çift dilli düzgün BİLİMSEL anlatı (DESeq2 makalesi Love ve ark. 2014'ten: medyan-oran norm. →
+  empirical-Bayes dispersiyon → negatif binom GLM → Wald → Benjamini–Hochberg; config'ten parametreli).
+  References 7 kaynak + **doğrulanmış DOI linkleri** (doi.org). 220 test yeşil.
 - **RAPOR ZENGİNLEŞTİRME BİTTİ ve `main`'de (2026-08-04, merge `67bfd6d`, push).** Güncel DE raporlama
   konvansiyonlarına (nf-core/differentialabundance, DEGreport, EnhancedVolcano) hizalandı. **220 test yeşil.**
   - **m06:** `deseq2.R` artık `dispersions.tsv` üretir (gene_id/baseMean/dispGeneEst/dispFit/dispFinal);
