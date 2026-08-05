@@ -306,7 +306,7 @@ def test_render_report_has_section_intro(tmp_path):
     assert 'class="intro"' in doc and SECTION_INTRO["tr"]["confidence"][:12] in doc
 
 
-from rnaforge.report_html import parse_enrichment_tsv, section_enrichment, LABELS
+from rnaforge.report_html import parse_enrichment_tsv, section_go, section_kegg, LABELS
 
 
 def _enrich_rows_tsv(tmp_path):
@@ -331,37 +331,37 @@ def test_parse_enrichment_tsv_missing_empty(tmp_path):
     assert parse_enrichment_tsv(tmp_path / "nope.tsv") == []
 
 
-def test_section_enrichment_present(tmp_path):
+def test_section_go_present(tmp_path):
     up = _enrich_rows_tsv(tmp_path)
     inputs = {"enrichment_up": up, "enrichment_down": [], "enrichment_manifest": None,
               "enrichment_dir": tmp_path}
-    html = section_enrichment(inputs, LABELS["tr"], "tr")
-    assert "Fonksiyonel Zenginleştirme" in html
+    html = section_go(inputs, LABELS["tr"], "tr")
+    assert "GO Zenginleştirme" in html and 'id="go"' in html
     assert "outer membrane" in html                      # anlamlı terim (padj<0.05) tabloda
     assert "response to oxidative stress" not in html     # padj=0.8 -> anlamlı değil, elenmiş
     assert "bulunamadı" in html                           # down boş -> "no enrichment" notu
 
 
-def test_section_enrichment_not_run(tmp_path):
+def test_section_go_not_run(tmp_path):
     inputs = {"enrichment_up": None, "enrichment_down": None}
-    html = section_enrichment(inputs, LABELS["en"], "en")
+    html = section_go(inputs, LABELS["en"], "en")
     assert "was not run" in html                          # dürüst not, kırılmaz
 
 
 def test_render_report_go_section_absent_note(tmp_path):
     # _full_inputs enrichment içermez -> render_report "not run" bölümü basar, kırılmaz.
     doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
-    assert 'id="enrichment"' in doc and "çalıştırılmadı" in doc
+    assert 'id="go"' in doc and "çalıştırılmadı" in doc
 
 
 from rnaforge.report_html import section_methods, section_references
 
 
-def test_section_enrichment_has_legend(tmp_path):
+def test_section_go_has_legend(tmp_path):
     up = _enrich_rows_tsv(tmp_path)
     inputs = {"enrichment_up": up, "enrichment_down": [], "enrichment_manifest": None,
               "enrichment_dir": tmp_path}
-    html = section_enrichment(inputs, LABELS["tr"], "tr")
+    html = section_go(inputs, LABELS["tr"], "tr")
     assert "Biyolojik Süreç" in html and "Moleküler İşlev" in html and "Hücresel Bileşen" in html
     assert "Kat-zenginleşme" in html
     assert "<b>GO id</b>" in html          # açıklama ham HTML olarak render edilir (escape değil)
@@ -404,24 +404,24 @@ def _kegg_rows_tsv(tmp_path):
     return parse_enrichment_tsv(p)
 
 
-def test_section_enrichment_kegg_subsection(tmp_path):
-    inputs = {"enrichment_up": None, "enrichment_down": None,
-              "kegg_up": _kegg_rows_tsv(tmp_path), "kegg_down": [],
+def test_section_kegg_separate(tmp_path):
+    inputs = {"kegg_up": _kegg_rows_tsv(tmp_path), "kegg_down": [],
               "kegg_manifest": None, "kegg_dir": tmp_path}
-    html = section_enrichment(inputs, LABELS["tr"], "tr")
-    assert "KEGG Yolakları" in html
-    assert "Two-component system" in html          # KEGG namespace tabloda görünüyor
-    assert "çalıştırılmadı" not in html            # KEGG koştu -> not-run notu yok
+    html = section_kegg(inputs, LABELS["tr"], "tr")
+    assert "KEGG Yolak Zenginleştirme" in html and 'id="kegg"' in html
+    assert "Two-component system" in html
+    assert "çalıştırılmadı" not in html
 
 
-def test_section_enrichment_both_go_and_kegg(tmp_path):
+def test_go_and_kegg_are_separate_sections(tmp_path):
     inputs = {"enrichment_up": _enrich_rows_tsv(tmp_path), "enrichment_down": [],
               "enrichment_manifest": None, "enrichment_dir": tmp_path,
               "kegg_up": _kegg_rows_tsv(tmp_path), "kegg_down": [],
               "kegg_manifest": None, "kegg_dir": tmp_path}
-    html = section_enrichment(inputs, LABELS["en"], "en")
-    assert "Gene Ontology (GO)" in html and "KEGG Pathways" in html
-    assert "outer membrane" in html and "Two-component system" in html
+    doc = section_go(inputs, LABELS["en"], "en") + section_kegg(inputs, LABELS["en"], "en")
+    assert 'id="go"' in doc and 'id="kegg"' in doc
+    assert "GO Enrichment (ORA)" in doc and "KEGG Pathway Enrichment (ORA)" in doc
+    assert "outer membrane" in doc and "Two-component system" in doc
 
 
 def test_methods_and_refs_kegg_when_ran():
