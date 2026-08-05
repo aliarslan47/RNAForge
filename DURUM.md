@@ -9,6 +9,17 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m13b AMRFinderPlus (İKİNCİ AMR ARACI, YAN-YANA) TAMAM ve `main`'de (2026-08-05, merge `b04480b`, push).**
+  Reviewer geri bildirimi (bağımsız DB-eşleşmeli AMR modülü) karşılandı — aslında m13 zaten CARD/VFDB'yi bağımsız
+  modül olarak veriyordu; şimdi **AMRFinderPlus** ikinci araç olarak eklendi ve AMR tablosunda CARD ile **yan yana**
+  (konkordans). `abricate.py`: `run_amrfinder`+`parse_amrfinder` (Type AMR/STRESS, abricate ile aynı dict şekli →
+  map/overlay yeniden kullanılır). `m13_amr.py`: CARD ∪ AMRFinderPlus locus_tag'te birleşir; tablo sütunları
+  `gene·CARD·AMRFinderPlus·%id·DE`. `config.amr.amrfinder_organism`(verilmezse eski davranış)/`amrfinder_env`
+  (**ali-amrfinder** mevcut, DB 2026-05-15). Rapor Feldgarden 2021 kaynak. **370 test.** GSE300731 canlı:
+  **CARD 43, AMRFinderPlus 5, her ikisi 4** (efflux mdtM/acrF/emrE + ampC β-laktamaz; ariR yalnız AMRFinderPlus;
+  ~39 yalnız CARD = küratörlü vs geniş). Verdict değişmedi. Spec `docs/.../2026-08-05-m13b-amrfinder-design.md`.
+- **★ README (EN+TR) TAM GÜNCELLENDİ (2026-08-05, `5446a72`).** m01-m15, tüm subcommand'lar, referans-prep
+  komutları, kalite kapıları, envler. (Eski "sadece m01" metni kaldırıldı.)
 - **★ GÖRSEL CİLA TAMAM ve `main`'de (2026-08-05, merge `604bf7e`, push).** 4 figür işi:
   (1) **m07 PCA** etiketleri ggrepel + eksen expand (kırpılma giderildi). (2) **m12 REVIGO** semantik-uzay
   **MDS scatter** (`semantic.R`, base R `cmdscale` + Lin uzaklık) kaynak başına. (3) **m14 operon** koordineli
