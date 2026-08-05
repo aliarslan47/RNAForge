@@ -6,9 +6,31 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-04
+**Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m09 GO FONKSİYONEL ZENGİNLEŞTİRME (ORA) TAMAM ve `main`'de (2026-08-05, merge `874068a`, push).**
+  A yalın yol. Zincir: m06→m07→**m09**→m08. Yeni `rnaforge enrich` subcommand; **gate YOK**, verdict
+  m06/m07'den değişmeden taşınır. **263 test yeşil** (37 yeni).
+  - **Annotation birleştirme** (`go_annotation.py`): GFF **otorite** (Ontology_term + go_process/
+    function/component → id/namespace/ad) → **GAF güvenli doldurma** (yalnız GFF-GO'suz genlere,
+    TAM+BENZERSİZ gen sembolü; belirsiz eşleşme ATILIR; kaynak damgalı GFF|GOA) → **obo propagation**
+    (`go-basic.obo` is_a+part_of ata-kapanış, döngü/obsolete korumalı).
+  - **ORA** (`enrichment.py`): stdlib **hipergeometrik** (`math.comb`) + **BH FDR** namespace başına;
+    UP/DOWN ayrı; arka plan = anotasyonlu test edilen genler; `min_term_size` gürültü filtresi.
+    Çıktı `enrichment/enrichment_{up,down}.tsv` + `gene2go.tsv` denetim izi.
+  - **Figür** (`scripts/enrichment.R`, rnaforge-de): namespace-facet dot-plot (fold×padj×gen), PNG300+SVG,
+    boş-durum panelli. **m08 rapora GO bölümü** (opsiyonel/tolerant, çift dilli, çalıştırılmadıysa dürüst not).
+  - **Referans (gitignore'lu):** `references/go/go-basic.obo` (32 MB, 48329 term, 2026-06 sürümü);
+    `references/ecoli_bw25113/ecoli.gaf` = **EBI-GOA `18.E_coli_MG1655.goa`** (54437 anot., 3973 sembol;
+    K-12 MG1655 aynı gen sembolleri). QuickGO indirmesi kapalıydı → GOA FTP proteome dosyası kullanıldı.
+  - **GSE300731 canlı doğrulandı:** 58 UP + 51 DOWN anlamlı GO terimi. **UP = colanic acid/slime layer/
+    polysaccharide biyosentezi + membran** (Rcs/kapsül zarf-stres imzası — makaleyle uyumlu), **DOWN =
+    respirasyon/enerji metabolizması** (büyüme durması). Anotasyonlu gen **2278→3835** (GAF doldurma katkısı).
+    Rapor 3.14 MB, 10 gömülü figür (8 DE + 2 enrichment). Verdict SUSPECT değişmedi (gate yok).
+  - Spec: `docs/superpowers/specs/2026-08-05-m09-go-enrichment-design.md` · Plan: `.../plans/2026-08-05-m09-go-enrichment.md`.
+
+### (önceki durak)
 - **DEG tablolarına KOŞUL-BAŞI ORTALAMA EKSPRESYON sütunları eklendi ve `main`'de (2026-08-04, merge
   `bc4fba2`, push).** Up/Down tablolarında artık her koşul için ortalama normalize ekspresyon
   (`<control> ort.`, `<enterololin> ort.`) + baseMean. `normalized_counts.tsv` + `coldata.tsv`
@@ -144,20 +166,16 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 11. ~~m07 figürler (PCA/Volcano/Heatmap/MA, otomatik, PNG300+SVG)~~ ✅ BİTTİ (2026-08-04) —
     `main`'de (merge `c46baf5`). Manifest m08'in tüketeceği sözleşme.
 12. ~~m08 = HTML rapor~~ ✅ BİTTİ (2026-08-04) — `main`'de (merge `3c96644`). **PROKARYOT MVP TAMAM.**
-13. **★ SIRADAKİ — YARIN (2026-08-05): GO ENRICHMENT + rapora ekleme (Ali onayladı).**
-    **A yalın yol** seçildi (B agnostik/eggNOG SONRAYA). Tam tasarım: bellek
-    `reminder_rnaforge_go_enrichment`. Özet:
-    - Anotasyon: E. coli GAF (EBI-GOA) veya kullanıcı-verili GO TSV + `go-basic.obo` (~35-40 MB) →
-      `references/go/` + `references/ecoli_bw25113/`. İnternet/büyük DB YOK. Disk yükü ~50 MB (584 GB boş).
-    - Yöntem: ORA (hipergeometrik/Fisher, **stdlib `math.comb`** — scipy şart değil) + BH; arka plan = test edilen tüm genler.
-    - Çıktı: GO tablosu (terim/kategori/kat-zenginleşme/padj) + 1 figür + **m08 yeni bölüm**.
-      Muhtemel yeni modül m09_enrichment; brainstorm→spec→plan→TDD→review→GSE300731 smoke. Gate yok.
-14. **SONRAKİ (GO'dan sonra):**
-    a) **Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport/tx2gene) — MVP'nin ikinci kolu.
-       salmon 2.3.4 CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme).
-    b) GO agnostik genelleme (B: eggNOG-mapper ~40-100 GB → `/home/ali/eggnog_db/`).
-    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme.
-    - m06/m07/m08 = ORTAK (organizma-agnostik) adımlar; hiçbiri yeni FAIL üretmez (gate yok).
+13. ~~m09 = GO ENRICHMENT + rapora ekleme~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `874068a`).
+    A yalın yol; GFF+GAF+obo; `rnaforge enrich`; GSE300731 canlı doğrulandı. **PROKARYOT MVP + GO TAMAM.**
+14. **★ SIRADAKİ — Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport/tx2gene) — MVP'nin ikinci kolu.
+    salmon 2.3.4 CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme). Bellek
+    `reminder_rnaforge_eukaryote`. m06/m07/m08/m09 zaten organizma-agnostik; ayrım YALNIZ m04/m05'te.
+15. **SONRAKİ:**
+    b) GO agnostik genelleme (B: eggNOG-mapper ~40-100 GB → `/home/ali/eggnog_db/`) — herhangi organizma.
+    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme;
+       m09 enrichment.R çift dilli başlık; m09 build_gene2go GFF'i iki kez parse ediyor (küçük verimlilik).
+    - m06/m07/m08/m09 = ORTAK (organizma-agnostik) adımlar; hiçbiri yeni FAIL üretmez (gate yok).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
