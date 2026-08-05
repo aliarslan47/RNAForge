@@ -117,6 +117,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m10 already completed in this run directory",
     )
 
+    gsea = sub.add_parser("gsea", help="GSEA on ranked genes with fgsea (m11)")
+    gsea.add_argument("--config", required=True, type=Path)
+    gsea.add_argument("--metadata", required=True, type=Path)
+    gsea.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    gsea.add_argument("--run-id", default="run")
+    gsea.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m11 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -333,6 +343,28 @@ def _cmd_kegg(args) -> int:
     return 0
 
 
+def _cmd_gsea(args) -> int:
+    from rnaforge.modules.m11_gsea import run_gsea
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_gsea(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m11_gsea already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    colls = ", ".join(f"{k}: +{v['n_sig_pos']}/-{v['n_sig_neg']}"
+                      for k, v in summary["collections"].items())
+    print(f"GSEA OK: {summary['n_ranked']} ranked genes; significant NES ({colls})")
+    print(f"run directory: {run_dir}")
+    # GATE YOK: güvence kartı yalnız m06/m07 verdict'ini taşır.
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -374,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_enrich(args)
         if args.command == "kegg":
             return _cmd_kegg(args)
+        if args.command == "gsea":
+            return _cmd_gsea(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)
