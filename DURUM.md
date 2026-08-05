@@ -9,6 +9,15 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★★ SIRADAKİ İŞ — UZUN-OKUMA (ONT/PacBio) YOLU (Ali: "kaydet yarın başla", 2026-08-06 başlar).**
+  Tasarım ONAYLI, kod YOK. Tasarım+literatür: `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
+  Ali'nin kararları: **ONT cDNA + ONT direct-RNA + PacBio HiFi**; **gen-seviyesi** (minimap2→featureCounts→
+  mevcut DESeq2 downstream, izoform YOK); **prokaryot uzun-okuma ÖNCE**. Fikir: `platform.py` uzun okumayı
+  şu an REDDEDİYOR → **yönlendirmeye** çevrilecek. Yeni boyut **read_type (short|long)**, m02'den itibaren;
+  m06–m18 değişmez (ortak count matrisi). Araçlar: NanoPlot (QC) · Pychopper+chopper (cDNA ön-işleme) ·
+  minimap2 (hizalama) · featureCounts `-L` (sayım); yeni env `rnaforge-longread`; config `library.chemistry`
+  (cdna|direct_rna). **YARIN İLK ADIM:** spec (`docs/.../specs/`) → writing-plans → Adım 1 (tespit+yönlendirme,
+  TDD). Ayrıca gerçek bakteri ONT doğrulama veri seti seçilecek (microbepore *E.coli* aday).
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
