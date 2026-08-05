@@ -55,10 +55,17 @@ def rrna_fasta_from_reference(genome_fa: Path, gff: Path, out_fasta: Path) -> in
     return n
 
 
-def subsample_fastq(src_gz: Path, n_reads: int, out_path: Path) -> int:
-    """İlk n_reads okumayı (4·n satır) düz FASTQ'a yaz. Yazılan okuma sayısını döndürür."""
+def _open_text(path: Path):
+    """FASTQ'yu gzip veya düz otomatik açar (m03 trimlenmiş çıktı gzipli DEĞİL)."""
+    with open(path, "rb") as fh:
+        gzipped = fh.read(2) == b"\x1f\x8b"
+    return gzip.open(path, "rt") if gzipped else open(path, "rt")
+
+
+def subsample_fastq(src: Path, n_reads: int, out_path: Path) -> int:
+    """İlk n_reads okumayı (4·n satır) düz FASTQ'a yaz. Kaynak gzip veya düz olabilir. Sayı döndürür."""
     written = 0
-    with gzip.open(src_gz, "rt") as fi, Path(out_path).open("w") as fo:
+    with _open_text(src) as fi, Path(out_path).open("w") as fo:
         for i, line in enumerate(fi):
             if i >= n_reads * 4:
                 break
