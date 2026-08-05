@@ -9,6 +9,21 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m11 GSEA TAMAM ve `main`'de (2026-08-05, merge `835b651`, push). Dalga 1 #2.**
+  Motor **fgsea** (Bioconductor, altın standart — DESeq2 kararıyla tutarlı; `rnaforge-de` env'ine kuruldu,
+  `envs/rnaforge-de.yml` güncel). ORA'dan farklı: **tüm genlerin ranked listesi** (DESeq2 `stat` = Wald).
+  Gen-seti kurucuları (GO/KEGG) m09/m10'dan yeniden kullanıldı. Yeni `rnaforge gsea`; gate YOK. **298 test.**
+  - **Girdi** (`gsea.py`): `write_rnk` (stat, NA atılır) + `invert_to_gmt` (gen→set ters çevir → GMT).
+  - **Motor** (`scripts/gsea.R`): `fgsea::fgsea(minSize/maxSize)`; çıktı işaretli **NES** + öncü genler
+    (locus_tag→sembol); NES dot-plot (okunur layout, 0-çizgisi). `gsea_min_size`(15)/`gsea_max_size`(500) config.
+  - **Rapor:** yeni "Gen Seti Zenginleştirme (GSEA)" bölümü — GO+KEGG için ±NES tablo (term/NES/padj/size/
+    **öncü genler**) + figür; Yöntem/Kaynak (Subramanian 2005 + fgsea) yalnız gsea koştuysa. Rapor 4.4 MB,
+    14 gömülü figür (8 DE + 2 GO + 2 KEGG + 2 GSEA).
+  - **GSE300731 canlı:** GO +34/−47, KEGG +3/−7 anlamlı NES. **Pozitif (artan):** polisakkarit/external
+    encapsulating (kapsül), peptidoglikan biyosentezi, ribozom. **Negatif (azalan):** oksidatif fosforilasyon,
+    glikoliz, **quorum sensing (NES −2.25)**, amino asit metabolizması. **ORA (GO+KEGG) ile birebir uyumlu**,
+    enterololin zarf-stres mekanizmasıyla tutarlı. Verdict SUSPECT değişmedi.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m11-gsea*`.
 - **★ m10 KEGG PATHWAY ORA TAMAM ve `main`'de (2026-08-05, merge `b78c62a`, push). Dalga 1 #1.**
   m09 motorunu (`enrichment.py`) **DEĞİŞTİRMEDEN** kullanır (jenerik gen→set). Yeni `rnaforge kegg`
   subcommand; gate YOK, verdict m06'dan taşınır. **282 test yeşil.**
@@ -190,12 +205,13 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
     A yalın yol; GFF+GAF+obo; `rnaforge enrich`; GSE300731 canlı doğrulandı. **PROKARYOT MVP + GO TAMAM.**
 14. ~~m10 = KEGG pathway ORA (Dalga 1 #1)~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `b78c62a`).
     Motor yeniden kullanım; `rnaforge kegg`; GSE300731 canlı (peptidoglikan/respirasyon, GO ile uyumlu).
+14b. ~~m11 = GSEA (Dalga 1 #2)~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `835b651`). fgsea (rnaforge-de),
+    işaretli NES; `rnaforge gsea`; GSE300731 canlı (ORA GO+KEGG ile birebir uyumlu).
 
 ### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
-- **Dalga 1 (m09 motoru + agnostik):** ~~KEGG ORA~~ ✅ → **★ SIRADAKİ: GSEA** (ranked liste, ORA'dan farklı;
-  fgsea/GSEApy; log2FC/stat bizde hazır; GO+KEGG gen setleri üstünde) → Semantic similarity + REVIGO
-  (obo bizde; GO çıktısını indirger; saf Python).
+- **Dalga 1 (m09 motoru + agnostik):** ~~KEGG ORA~~ ✅ → ~~GSEA~~ ✅ (m11, fgsea) → **★ SIRADAKİ:
+  Semantic similarity + REVIGO** (obo bizde; çok GO terimini indirger/kümeler; saf Python; GOSemSim mantığı).
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
 - **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
