@@ -86,6 +86,8 @@ class Enrichment:
     # m11 GSEA (fgsea): gen-seti boyut eşikleri (fgsea minSize/maxSize). Eşik = veri/config ilkesi.
     gsea_min_size: int = 15
     gsea_max_size: int = 500
+    # m12 REVIGO: semantik benzerlik eşiği (Lin, [0,1]); üstündeki terimler tek temsilcide toplanır.
+    revigo_similarity: float = 0.7
 
 
 @dataclass(frozen=True)
@@ -257,5 +259,7 @@ def load_config(path: Path | str) -> Config:
             kegg_dir=(Path(enrichment_raw["kegg_dir"]) if enrichment_raw.get("kegg_dir") else None),
             gsea_min_size=_as_int(enrichment_raw.get("gsea_min_size", 15), "enrichment.gsea_min_size"),
             gsea_max_size=_as_int(enrichment_raw.get("gsea_max_size", 500), "enrichment.gsea_max_size"),
+            revigo_similarity=_as_float(
+                enrichment_raw.get("revigo_similarity", 0.7), "enrichment.revigo_similarity"),
         ),
     )
