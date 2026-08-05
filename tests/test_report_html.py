@@ -519,3 +519,43 @@ def test_methods_refs_semantic_when_ran():
     refs = section_references(LABELS["en"], semantic_ran=True)
     assert "10.1371/journal.pone.0021800" in refs        # Supek 2011 (REVIGO)
     assert "10.1371/journal.pone.0021800" not in section_references(LABELS["en"], semantic_ran=False)
+
+
+from rnaforge.report_html import parse_amr_tsv, section_amr
+
+
+def _amr_rows(tmp_path):
+    p = tmp_path / "amr_genes.tsv"
+    p.write_text(
+        "gene\tlocus_tag\tdb\tlabel\tpct_identity\tpct_coverage\tlog2fc\tpadj\tde_status\n"
+        "acrB\tLT_1\tcard\tMULTIDRUG efflux\t99.5\t100.0\t2.30\t1.0e-08\tup\n"
+        "mdtK\tLT_2\tcard\tefflux\t98.0\t100.0\t-0.10\t0.8\tns\n")
+    return parse_amr_tsv(p)
+
+
+def test_parse_amr_tsv_types(tmp_path):
+    rows = _amr_rows(tmp_path)
+    assert rows[0]["pct_identity"] == 99.5 and rows[0]["log2fc"] == 2.30
+    assert rows[0]["de_status"] == "up"
+
+
+def test_section_amr_present(tmp_path):
+    inputs = {"amr_genes": _amr_rows(tmp_path), "virulence_genes": []}
+    html = section_amr(inputs, LABELS["tr"], "tr")
+    assert "Direnç ve Virülans" in html and "acrB" in html
+    assert "MULTIDRUG efflux" in html
+    assert "abricate-get_db" in html          # DB güncellik notu
+
+
+def test_section_amr_absent_note():
+    html = section_amr({"amr_genes": None, "virulence_genes": None}, LABELS["en"], "en")
+    assert "was not run" in html
+
+
+def test_methods_refs_amr_when_ran():
+    withm = section_methods(_cfg("tr"), LABELS["tr"], amr_ran=True)
+    assert "abricate" in withm
+    refs = section_references(LABELS["en"], amr_ran=True)
+    assert "10.1093/nar/gkz935" in refs        # CARD 2020
+    assert "gky1080" in refs                    # VFDB
+    assert "10.1093/nar/gkz935" not in section_references(LABELS["en"], amr_ran=False)

@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 12
+N_SECTIONS = 13
 
 
 def _num(v):
@@ -80,6 +80,21 @@ def parse_reduced_tsv(path: Path) -> list[dict]:
             row = dict(r)
             row["padj"] = _num(row.get("padj"))
             row["n_collapsed"] = int(row["n_collapsed"]) if row.get("n_collapsed") else 1
+            rows.append(row)
+    return rows
+
+
+def parse_amr_tsv(path: Path) -> list[dict]:
+    """m13 amr_genes.tsv / virulence_genes.tsv -> tipli satırlar."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            for k in ("pct_identity", "pct_coverage", "log2fc", "padj"):
+                row[k] = _num(row.get(k))
             rows.append(row)
     return rows
 
@@ -242,6 +257,13 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "semantic" / "reduced_ora_down.tsv").exists() else None,
         "reduced_gsea_go": parse_reduced_tsv(run_dir / "semantic" / "reduced_gsea_go.tsv")
         if (run_dir / "semantic" / "reduced_gsea_go.tsv").exists() else None,
+        # m13 AMR/virülans — opsiyonel: çalıştırılmadıysa None.
+        "amr_genes": parse_amr_tsv(run_dir / "amr" / "amr_genes.tsv")
+        if (run_dir / "amr" / "amr_genes.tsv").exists() else None,
+        "virulence_genes": parse_amr_tsv(run_dir / "amr" / "virulence_genes.tsv")
+        if (run_dir / "amr" / "virulence_genes.tsv").exists() else None,
+        "amr_stats": _read_json(stats / "amr_statistics.json")
+        if (stats / "amr_statistics.json").exists() else None,
     }
 
 
@@ -303,6 +325,16 @@ LABELS: dict[str, dict[str, str]] = {
             "her kümeden en iyi padj'li <b>temsilci</b> tutulur (REVIGO fikri). <b>Temsil ettiği terim</b> = "
             "o temsilcinin altında toplanan terim sayısı. Namespace (BP/MF/CC) ayrı işlenir; tam üye "
             "listesi semantic/ TSV dosyalarındadır."),
+        "amr": "Direnç ve Virülans (AMR / VFDB)", "amr_genes": "Direnç genleri (AMR)",
+        "vir_genes": "Virülans genleri (VFDB)", "de_status": "DE durumu",
+        "identity": "%kimlik", "amr_label": "Sınıf / faktör",
+        "amr_not_run": "AMR/virülans taraması bu koşuda çalıştırılmadı (rnaforge amr ile üretilir).",
+        "amr_more": "… ve {n} DE-olmayan gen daha (tam liste amr/ TSV dosyalarında).",
+        "amr_legend": (
+            "Suşun genomu abricate ile <b>CARD</b> (direnç) ve <b>VFDB</b> (virülans) veritabanlarına "
+            "tarandı; bulunan genler koordinatla locus_tag'e eşlenip <b>DE durumu</b> (artan/azalan/ns) "
+            "eklendi. Not: veritabanları abricate ile paket halinde gelir; en güncel sürüm için "
+            "<code>abricate-get_db</code> ile yenilenebilir."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -350,6 +382,16 @@ LABELS: dict[str, dict[str, str]] = {
             "that ranking. <b>NES</b> = normalized enrichment score: positive → the set is enriched among "
             "up-regulated (high) genes, negative → among down-regulated genes. <b>Leading edge</b> = the "
             "core genes driving the score. Only padj &lt; 0.05 shown; full lists in the gsea/ TSV files."),
+        "amr": "Resistance and Virulence (AMR / VFDB)", "amr_genes": "Resistance genes (AMR)",
+        "vir_genes": "Virulence genes (VFDB)", "de_status": "DE status",
+        "identity": "%identity", "amr_label": "Class / factor",
+        "amr_not_run": "AMR/virulence scan was not run for this run (produced by rnaforge amr).",
+        "amr_more": "… and {n} more non-DE genes (full list in the amr/ TSV files).",
+        "amr_legend": (
+            "The strain genome was scanned with abricate against <b>CARD</b> (resistance) and <b>VFDB</b> "
+            "(virulence); hits were mapped to locus tags by coordinate and annotated with their <b>DE "
+            "status</b> (up/down/ns). Note: the databases are bundled with abricate; refresh with "
+            "<code>abricate-get_db</code> for the latest versions."),
         "semantic": "Semantic Reduction (REVIGO)", "n_collapsed": "Terms represented",
         "sem_ora_up": "Up GO terms (representatives)", "sem_ora_down": "Down GO terms (representatives)",
         "sem_gsea_go": "GSEA GO terms (representatives)",
@@ -420,6 +462,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                 "ORA'nın kaçırabildiği zayıf ama tutarlı sinyalleri yakalar.",
         "semantic": "Zenginleşen GO terimlerinin fazlalığı, semantik benzerlikle temsilcilere indirgenmiş "
                     "öz görünümü. Uzun listeleri okunur kılar.",
+        "amr": "Suşun taşıdığı antibiyotik direnç (CARD) ve virülans (VFDB) genleri; her biri için "
+               "diferansiyel ekspresyon durumu — tedavi altında indüklenen direnç/virülans yanıtını gösterir.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -436,6 +480,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                 "Captures weak but consistent signals that ORA can miss.",
         "semantic": "A concise view of the enriched GO terms, reduced to representatives by semantic "
                     "similarity. Makes long lists readable.",
+        "amr": "Antibiotic-resistance (CARD) and virulence (VFDB) genes carried by the strain, each with "
+               "its differential-expression status — showing the resistance/virulence response under treatment.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -727,6 +773,45 @@ def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("semantic", L)}{"".join(blocks)}</section>')
 
 
+def _amr_table(rows: list[dict], L: dict, cap: int = 40) -> str:
+    """AMR/virülans gen tablosu: gene, sınıf/faktör, %kimlik, DE durumu (up/down önce). Uzunsa kırp."""
+    if not rows:
+        return f'<p>{_esc(L["no_degs"])}</p>'
+    de = [r for r in rows if r.get("de_status") in ("up", "down")]
+    shown = rows[:cap]
+    headers = [L["gene"], L["amr_label"], L["identity"], L["log2fc"], L["padj"], L["de_status"]]
+    body = []
+    for r in shown:
+        body.append([
+            r.get("gene"), r.get("label"),
+            f'{r["pct_identity"]:.1f}' if r.get("pct_identity") is not None else "—",
+            f'{r["log2fc"]:.2f}' if r.get("log2fc") is not None else "—",
+            f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
+            r.get("de_status"),
+        ])
+    tbl = _table(headers, body)
+    note = ""
+    if len(rows) > cap:
+        note = f'<p class="note">{_esc(L["amr_more"].format(n=len(rows) - cap))}</p>'
+    summary = f'<p class="note">{len(rows)} gen · {len(de)} DE</p>'
+    return summary + tbl + note
+
+
+def section_amr(inputs: dict, L: dict, lang: str = "tr") -> str:
+    amr, vir = inputs.get("amr_genes"), inputs.get("virulence_genes")
+    if amr is None and vir is None:
+        return (f'<section id="amr"><h2>{_esc(L["amr"])}</h2>'
+                f'<p class="note">{_esc(L["amr_not_run"])}</p></section>')
+    blocks = []
+    if amr is not None:
+        blocks.append(f'<h3>{_esc(L["amr_genes"])}</h3>{_amr_table(amr, L)}')
+    if vir is not None:
+        blocks.append(f'<h3>{_esc(L["vir_genes"])}</h3>{_amr_table(vir, L)}')
+    blocks.append(f'<p class="note">{L["amr_legend"]}</p>')
+    return (f'<section id="amr"><h2>{_esc(L["amr"])}</h2>'
+            f'{_intro("amr", L)}{"".join(blocks)}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -839,8 +924,24 @@ _SEMANTIC_METHODS: dict[str, str] = {
 }
 
 
+_AMR_METHODS: dict[str, str] = {
+    "tr": (
+        "Suşun referans genomu abricate ({amr_db} ve {vir_db} veritabanları) ile tarandı; en az %{min_id} "
+        "kimlik ve %{min_cov} kapsama sağlayan gen isabetleri, genom koordinatlarıyla anotasyon "
+        "genlerine (locus_tag) eşlendi ve diferansiyel ekspresyon durumları eklendi. Veritabanları "
+        "abricate ile paket halinde gelir."
+    ),
+    "en": (
+        "The strain reference genome was scanned with abricate (databases {amr_db} and {vir_db}); gene "
+        "hits passing at least {min_id}% identity and {min_cov}% coverage were mapped to annotation genes "
+        "(locus tags) by genome coordinates and annotated with their differential-expression status. "
+        "The databases are bundled with abricate."
+    ),
+}
+
+
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
-                    gsea_ran: bool = False, semantic_ran: bool = False) -> str:
+                    gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -864,6 +965,10 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
     if semantic_ran:
         s = _SEMANTIC_METHODS[lang].format(thr=config.enrichment.revigo_similarity)
         paras += f'<p>{_esc(s)}</p>'
+    if amr_ran:
+        am = _AMR_METHODS[lang].format(amr_db=config.amr.amr_db, vir_db=config.amr.virulence_db,
+                                       min_id=config.amr.min_identity, min_cov=config.amr.min_coverage)
+        paras += f'<p>{_esc(am)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -924,17 +1029,31 @@ _SEMANTIC_REFERENCES: list[tuple[str, str]] = [
      "ontology terms. PLoS One. 2011;6(7):e21800.", "https://doi.org/10.1371/journal.pone.0021800"),
 ]
 
+# AMR/virülans kaynakları — yalnız m13 çalıştıysa (DOI doğrulandı).
+_AMR_REFERENCES: list[tuple[str, str]] = [
+    ("Seemann T. Abricate: mass screening of contigs for antimicrobial and virulence genes. "
+     "GitHub.", "https://github.com/tseemann/abricate"),
+    ("Alcock BP, Raphenya AR, Lau TTY, et al. CARD 2020: antibiotic resistome surveillance with the "
+     "comprehensive antibiotic resistance database. Nucleic Acids Res. 2020;48(D1):D517–D525.",
+     "https://doi.org/10.1093/nar/gkz935"),
+    ("Liu B, Zheng D, Jin Q, Chen L, Yang J. VFDB 2019: a comparative pathogenomic platform with an "
+     "interactive web interface. Nucleic Acids Res. 2019;47(D1):D687–D692.",
+     "https://doi.org/10.1093/nar/gky1080"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
 
 
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
-                       gsea_ran: bool = False, semantic_ran: bool = False) -> str:
+                       gsea_ran: bool = False, semantic_ran: bool = False,
+                       amr_ran: bool = False) -> str:
     refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
             + (_GSEA_REFERENCES if gsea_ran else [])
-            + (_SEMANTIC_REFERENCES if semantic_ran else []))
+            + (_SEMANTIC_REFERENCES if semantic_ran else [])
+            + (_AMR_REFERENCES if amr_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -980,6 +1099,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                 or inputs.get("gsea_kegg") is not None)
     semantic_ran = any(inputs.get(k) is not None for k in
                        ("reduced_ora_up", "reduced_ora_down", "reduced_gsea_go"))
+    amr_ran = (inputs.get("amr_genes") is not None
+               or inputs.get("virulence_genes") is not None)
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -996,8 +1117,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_enrichment(inputs, L, lang),
         section_gsea(inputs, L, lang),
         section_semantic(inputs, L, lang),
-        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran),
-        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran),
+        section_amr(inputs, L, lang),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
