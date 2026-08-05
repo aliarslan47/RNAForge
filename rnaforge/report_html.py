@@ -5,10 +5,11 @@ import base64
 import csv
 import html
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 15
+N_SECTIONS = 16
 
 
 def _num(v):
@@ -338,6 +339,12 @@ LABELS: dict[str, dict[str, str]] = {
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
         "mean_suffix": "ort.",
         "enrichment": "Fonksiyonel Zenginleştirme (GO)",
+        "go_section": "GO Zenginleştirme (ORA)", "kegg_section": "KEGG Yolak Zenginleştirme (ORA)",
+        "kegg_not_run": "KEGG zenginleştirme bu koşuda çalıştırılmadı (rnaforge kegg ile üretilir).",
+        "kegg_legend": (
+            "Artan/azalan DEG'lerde aşırı temsil edilen KEGG yolakları (hipergeometrik ORA + BH-FDR). "
+            "<b>Set / arka plan</b>: yolaktaki DEG / arka plandaki gen; <b>Kat-zenginleşme</b>: gözlenen/beklenen; "
+            "<b>padj</b>: BH-düzeltilmiş p. Yalnız anlamlı (padj &lt; 0,05), en güçlü ilk 10; tam liste kegg/ TSV'de."),
         "go_term": "GO terimi", "go_id": "GO id", "namespace": "Kategori",
         "fold": "Kat-zenginleşme", "study_bg": "Set / arka plan",
         "enrichment_up": "Artan genlerde zenginleşen GO terimleri",
@@ -424,6 +431,12 @@ LABELS: dict[str, dict[str, str]] = {
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
         "mean_suffix": "mean",
         "enrichment": "Functional Enrichment (GO)",
+        "go_section": "GO Enrichment (ORA)", "kegg_section": "KEGG Pathway Enrichment (ORA)",
+        "kegg_not_run": "KEGG enrichment was not run for this run (produced by rnaforge kegg).",
+        "kegg_legend": (
+            "KEGG pathways over-represented among up/down DEGs (hypergeometric ORA + BH-FDR). "
+            "<b>Study / background</b>: DEGs in the pathway / genes in the background; <b>Fold enrichment</b>: "
+            "observed/expected; <b>padj</b>: BH-adjusted p. Only significant (padj &lt; 0.05), top 10; full list in kegg/ TSV."),
         "go_term": "GO term", "go_id": "GO id", "namespace": "Category",
         "fold": "Fold enrichment", "study_bg": "Study / background",
         "enrichment_up": "GO terms enriched among up-regulated genes",
@@ -547,6 +560,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "table": "İstatistiksel eşiği geçen en güçlü artan ve azalan genler.",
         "enrichment": "Artan ve azalan DEG'lerde aşırı temsil edilen GO terimleri (hipergeometrik ORA, BH-FDR). "
                       "Anlamlı terimler (padj<0.05) hangi biyolojik süreçlerin değiştiğini özetler.",
+        "kegg": "Artan ve azalan DEG'lerde aşırı temsil edilen KEGG yolakları (hipergeometrik ORA, BH-FDR). "
+                "Değişen metabolik/sinyal yolaklarını özetler.",
         "gsea": "Tüm genlerin sıralı listesinde koordineli değişen gen setleri (GSEA, fgsea). "
                 "ORA'nın kaçırabildiği zayıf ama tutarlı sinyalleri yakalar.",
         "semantic": "Zenginleşen GO terimlerinin fazlalığı, semantik benzerlikle temsilcilere indirgenmiş "
@@ -569,6 +584,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "table": "The strongest up- and down-regulated genes passing the statistical threshold.",
         "enrichment": "GO terms over-represented among up- and down-regulated DEGs (hypergeometric ORA, BH-FDR). "
                       "Significant terms (padj<0.05) summarise which biological processes changed.",
+        "kegg": "KEGG pathways over-represented among up- and down-regulated DEGs (hypergeometric ORA, BH-FDR). "
+                "Summarises which metabolic/signalling pathways changed.",
         "gsea": "Gene sets that change coordinately across the full ranked gene list (GSEA, fgsea). "
                 "Captures weak but consistent signals that ORA can miss.",
         "semantic": "A concise view of the enriched GO terms, reduced to representatives by semantic "
@@ -761,29 +778,30 @@ def _enrichment_collection(up, down, manifest, figs_dir: Path, L: dict, lang: st
     return "".join(blocks)
 
 
-def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
-    go_up, go_down = inputs.get("enrichment_up"), inputs.get("enrichment_down")
-    kegg_up, kegg_down = inputs.get("kegg_up"), inputs.get("kegg_down")
-    go_ran = go_up is not None or go_down is not None
-    kegg_ran = kegg_up is not None or kegg_down is not None
-    if not go_ran and not kegg_ran:      # m09/m10 çalıştırılmadı — dürüst not, kırılmaz
-        return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
+def section_go(inputs: dict, L: dict, lang: str = "tr") -> str:
+    """GO zenginleştirme (ORA) — ayrı bölüm."""
+    up, down = inputs.get("enrichment_up"), inputs.get("enrichment_down")
+    if up is None and down is None:
+        return (f'<section id="go"><h2>{_esc(L["go_section"])}</h2>'
                 f'<p class="note">{_esc(L["enrichment_not_run"])}</p></section>')
-    blocks = []
-    if go_ran:
-        blocks.append(f'<h3>{_esc(L["go_heading"])}</h3>')
-        blocks.append(_enrichment_collection(
-            go_up, go_down, inputs.get("enrichment_manifest"), inputs.get("enrichment_dir", "."),
-            L, lang, "enrichment_up", "enrichment_down", ("enrichment_up", "enrichment_down")))
-    if kegg_ran:
-        blocks.append(f'<h3>{_esc(L["kegg_heading"])}</h3>')
-        blocks.append(_enrichment_collection(
-            kegg_up, kegg_down, inputs.get("kegg_manifest"), inputs.get("kegg_dir", "."),
-            L, lang, "kegg_up", "kegg_down", ("kegg_up", "kegg_down")))
-    # Tabloların altına sütun + kısaltma (BP/MF/CC, KEGG) açıklaması. Sabit, kontrollü HTML.
-    blocks.append(f'<p class="note">{L["enrichment_legend"]}</p>')
-    return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
-            f'{_intro("enrichment", L)}{"".join(blocks)}</section>')
+    block = _enrichment_collection(
+        up, down, inputs.get("enrichment_manifest"), inputs.get("enrichment_dir", "."),
+        L, lang, "enrichment_up", "enrichment_down", ("enrichment_up", "enrichment_down"))
+    return (f'<section id="go"><h2>{_esc(L["go_section"])}</h2>'
+            f'{_intro("enrichment", L)}{block}<p class="note">{L["enrichment_legend"]}</p></section>')
+
+
+def section_kegg(inputs: dict, L: dict, lang: str = "tr") -> str:
+    """KEGG yolak zenginleştirme (ORA) — ayrı bölüm."""
+    up, down = inputs.get("kegg_up"), inputs.get("kegg_down")
+    if up is None and down is None:
+        return (f'<section id="kegg"><h2>{_esc(L["kegg_section"])}</h2>'
+                f'<p class="note">{_esc(L["kegg_not_run"])}</p></section>')
+    block = _enrichment_collection(
+        up, down, inputs.get("kegg_manifest"), inputs.get("kegg_dir", "."),
+        L, lang, "kegg_up", "kegg_down", ("kegg_up", "kegg_down"))
+    return (f'<section id="kegg"><h2>{_esc(L["kegg_section"])}</h2>'
+            f'{_intro("kegg", L)}{block}<p class="note">{L["kegg_legend"]}</p></section>')
 
 
 def _gsea_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
@@ -929,7 +947,8 @@ def _embed_first_figure(manifest: dict | None, figs_dir) -> str:
     for fig in manifest.get("figures", []):
         png = figs_dir / fig.get("png", "")
         if png.exists():
-            blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/></figure>')
+            blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/>'
+                          f'<figcaption><strong>{_esc(fig.get("title"))}</strong></figcaption></figure>')
     return "".join(blocks)
 
 
@@ -1315,7 +1334,14 @@ figure{margin:1rem 0;text-align:center} img{max-width:100%;height:auto}
 figcaption{color:#555;font-size:.9rem;margin-top:.3rem}
 .note{color:#666;font-size:.85rem} .summary{font-size:1.05rem;font-weight:600}
 .intro{color:#444;font-size:.95rem;margin:.2rem 0 .6rem}
-@media print{body{max-width:none} h2{page-break-after:avoid}}
+section{padding-top:.5rem}
+/* Her analiz bir sayfada: yazdırma/PDF'te her bölüm yeni sayfada başlar. */
+@media print{
+  body{max-width:none}
+  section{break-before:page;page-break-before:always}
+  section#confidence{break-before:auto;page-break-before:avoid}
+  h2{page-break-after:avoid} figure{page-break-inside:avoid} img{max-width:100%}
+}
 """
 
 
@@ -1344,6 +1370,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
               f'<p class="note">{run_part}{_esc(generated)} · v{_esc(version)}</p>')
+    # Bölüm sırası kullanıcının standart RNA-seq listesine göre: QC/işleme → DESeq2 → figürler
+    # (PCA…heatmap) → Top DEG → GO → KEGG → GSEA → REVIGO → (ek: AMR/operon/PPI) → yöntem/kaynak.
     body = "".join([
         header,
         section_confidence(inputs["confidence"], L),
@@ -1353,7 +1381,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
-        section_enrichment(inputs, L, lang),
+        section_go(inputs, L, lang),
+        section_kegg(inputs, L, lang),
         section_gsea(inputs, L, lang),
         section_semantic(inputs, L, lang),
         section_amr(inputs, L, lang),
@@ -1362,6 +1391,14 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
         section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
     ])
+    # Figürleri belge sırasına göre numaralandır: "Şekil N." / "Figure N."
+    fig_word = "Şekil" if lang == "tr" else "Figure"
+    _fig = {"n": 0}
+
+    def _numbered(_m):
+        _fig["n"] += 1
+        return f'<figcaption>{fig_word} {_fig["n"]}. '
+    body = re.sub(r'<figcaption>', _numbered, body)
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>RNAForge report</title><style>{_CSS}</style></head>'
