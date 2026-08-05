@@ -9,6 +9,14 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ GÖRSEL CİLA TAMAM ve `main`'de (2026-08-05, merge `604bf7e`, push).** 4 figür işi:
+  (1) **m07 PCA** etiketleri ggrepel + eksen expand (kırpılma giderildi). (2) **m12 REVIGO** semantik-uzay
+  **MDS scatter** (`semantic.R`, base R `cmdscale` + Lin uzaklık) kaynak başına. (3) **m14 operon** koordineli
+  operon **bar figürü** (`operon.R`). (4) **m15 PPI** en büyük modüller **ağ figürü** (`ppi.R`, networkx spring
+  layout — **numpy+scipy rnaforge-core'a pip** eklendi; beyaz zemin). Tüm yeni figürler **best-effort** (çekirdek
+  tabloları bozmaz, hata loglanır) + rapora gömüldü. **366 test.** Rapor **6.2 MB, 19 gömülü figür.** Canlı
+  doğrulandı (PPI modülleri: kapsül wcaJ/ugd · hücre-duvarı fts · ribozom rpl · glikoliz pgi/pykF; operon bar
+  wca/wz UP; MDS semantik harita). Verdict SUSPECT değişmedi.
 - **★ m15 PPI + COMMUNITY DETECTION TAMAM ve `main`'de (2026-08-05, merge `2163e86`, push). Dalga 2 #C (son).
   DOWNSTREAM DALGA 2 TAMAMEN BİTTİ (AMR/Operon/PPI).** STRING PPI alt-ağı + Louvain (networkx, rnaforge-core'a
   pip). Yeni `rnaforge ppi`; gate YOK. **366 test.**
@@ -260,9 +268,10 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
 - **Dalga 1 ✅ TAMAM:** ~~KEGG ORA~~ (m10) → ~~GSEA~~ (m11, fgsea) → ~~Semantic/REVIGO~~ (m12, Lin). Hepsi agnostik.
 - **Dalga 2 (bakteri overlay) ✅ TAMAM:** ~~#A AMR~~ (m13) · ~~#B Operon~~ (m14) · ~~#C PPI+community~~ (m15).
+  ~~Cila (PPI/operon figür, REVIGO MDS, PCA etiket)~~ ✅ BİTTİ (604bf7e).
   **★ SIRADAKİ SEÇENEKLER (Ali seçecek):** (a) **Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport) —
-  MVP'nin ikinci kolu, `reminder_rnaforge_eukaryote`. (b) **Cila:** PPI/operon ağ figürü, REVIGO MDS scatter,
-  m07 PCA etiket kırpması. (c) GO agnostik (eggNOG). (d) Regulon/Sigma (E.coli-özel, agnostik-kırar — en sona).
+  MVP'nin ikinci kolu, `reminder_rnaforge_eukaryote`. (b) GO agnostik (eggNOG). (c) Regulon/Sigma (E.coli-özel,
+  agnostik-kırar — en sona). (d) README/PLAN v1.4 dokümantasyon güncellemesi (uzun süredir ertelendi).
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
 - **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
