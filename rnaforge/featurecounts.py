@@ -19,6 +19,7 @@ class FeatureCountsResult:
     gene_ids: list[str]
     counts: dict[str, list[int]]           # sütun (BAM) -> sayımlar
     assignment_rates: dict[str, float]     # sütun (BAM) -> atama oranı
+    lengths: dict[str, int] | None = None  # gen -> uzunluk (bç), TPM/FPKM için
 
 
 def parse_counts(counts_text: str) -> tuple[list[str], dict[str, list[int]]]:
@@ -65,11 +66,8 @@ def parse_lengths(counts_text: str) -> dict[str, int]:
     return lengths
 
 
-def compute_tpm_fpkm(counts_text: str):
-    """featureCounts ham çıktısından TPM ve FPKM matrisleri (gen uzunluğuyla normalize).
-    Returns: (gene_ids, columns, tpm{col:[...]}, fpkm{col:[...]})."""
-    gene_ids, counts = parse_counts(counts_text)
-    lengths = parse_lengths(counts_text)
+def tpm_fpkm(gene_ids: list[str], counts: dict[str, list[int]], lengths: dict[str, int]):
+    """Gen uzunluğuyla normalize TPM + FPKM matrisleri. Returns: (columns, tpm, fpkm)."""
     kb = [max(lengths.get(g, 0), 1) / 1000.0 for g in gene_ids]     # gen uzunluğu (kb), 0-koruması
     columns = list(counts)
     tpm: dict[str, list[float]] = {}
@@ -82,6 +80,13 @@ def compute_tpm_fpkm(counts_text: str):
         tpm[col] = [round(r / scale, 4) if scale > 0 else 0.0 for r in rpk]
         fpkm[col] = [round(c[i] / (kb[i] * (total / 1e6)), 4) if total > 0 else 0.0
                      for i in range(len(gene_ids))]
+    return columns, tpm, fpkm
+
+
+def compute_tpm_fpkm(counts_text: str):
+    """featureCounts ham çıktı METNİNDEN TPM/FPKM. Returns: (gene_ids, columns, tpm, fpkm)."""
+    gene_ids, counts = parse_counts(counts_text)
+    columns, tpm, fpkm = tpm_fpkm(gene_ids, counts, parse_lengths(counts_text))
     return gene_ids, columns, tpm, fpkm
 
 
@@ -126,6 +131,8 @@ def run_featurecounts(bams: list[Path], gff: Path, out_dir: Path, feature_type: 
         raise FeatureCountsRunError(
             f"featureCounts reported success but output missing at {counts_path}"
         )
-    gene_ids, counts = parse_counts(counts_path.read_text())
+    counts_text = counts_path.read_text()
+    gene_ids, counts = parse_counts(counts_text)
     rates = parse_summary(summary_path.read_text())
-    return FeatureCountsResult(gene_ids=gene_ids, counts=counts, assignment_rates=rates)
+    return FeatureCountsResult(gene_ids=gene_ids, counts=counts, assignment_rates=rates,
+                               lengths=parse_lengths(counts_text))

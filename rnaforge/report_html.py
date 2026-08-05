@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 16
+N_SECTIONS = 17
 
 
 def _num(v):
@@ -343,6 +343,10 @@ LABELS: dict[str, dict[str, str]] = {
         "cap_gates": "Kalite kapıları", "cap_samples": "Örnekler",
         "cap_quality": "Hizalama, atama ve rRNA oranları", "cap_de": "Diferansiyel ekspresyon özeti",
         "cap_operon": "Koordineli operonlar", "cap_ppi": "Protein etkileşim modülleri",
+        "software": "Yazılım ve Veritabanları", "sw_tool": "Yazılım", "sw_version": "Sürüm",
+        "sw_purpose": "Amaç", "db_name": "Veritabanı", "db_version": "Sürüm / kaynak", "db_purpose": "Amaç",
+        "cap_software": "Kullanılan yazılımlar", "cap_database": "Kullanılan veritabanları",
+        "expr_note": "Gen ekspresyon değerleri TPM ve FPKM olarak quantification/tpm.tsv ve fpkm.tsv'de üretildi.",
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
         "mean_suffix": "ort.",
         "enrichment": "Fonksiyonel Zenginleştirme (GO)",
@@ -439,6 +443,10 @@ LABELS: dict[str, dict[str, str]] = {
         "cap_gates": "Quality gates", "cap_samples": "Samples",
         "cap_quality": "Alignment, assignment and rRNA rates", "cap_de": "Differential expression summary",
         "cap_operon": "Coordinated operons", "cap_ppi": "Protein interaction modules",
+        "software": "Software and Databases", "sw_tool": "Software", "sw_version": "Version",
+        "sw_purpose": "Purpose", "db_name": "Database", "db_version": "Version / source", "db_purpose": "Purpose",
+        "cap_software": "Software used", "cap_database": "Databases used",
+        "expr_note": "Gene expression values were produced as TPM and FPKM in quantification/tpm.tsv and fpkm.tsv.",
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
         "mean_suffix": "mean",
         "enrichment": "Functional Enrichment (GO)",
@@ -583,6 +591,7 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                   "düzenlenen transkripsiyon birimlerini gen-düzeyinin üstünde gösterir.",
         "ppi": "DEG'lerin STRING protein etkileşim ağındaki modülleri — birlikte işleyen fonksiyonel "
                "gen gruplarını (kompleksler/yolaklar) ağ topolojisinden çıkarır.",
+        "software": "Bu koşuda kullanılan yazılımların sürümleri ve referans veritabanları (tekrarlanabilirlik için).",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -607,6 +616,7 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                   "transcription units above the gene level.",
         "ppi": "Modules of the DEGs in the STRING protein-interaction network — revealing co-functioning "
                "gene groups (complexes/pathways) from network topology.",
+        "software": "Versions of the software used in this run and the reference databases (for reproducibility).",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -710,7 +720,8 @@ def section_de(de: dict, L: dict) -> str:
         ["min replicate corr.", de.get("min_replicate_correlation")],
     ]
     tbl = _table([" ", " "], rows, L["cap_de"])
-    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}</section>'
+    expr = f'<p class="note">{_esc(L["expr_note"])}</p>'
+    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}{expr}</section>'
 
 
 def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: str = "tr") -> str:
@@ -1029,6 +1040,53 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
             f'{_intro("ppi", L)}{summary}{fig_html}{body_html}{legend}</section>')
 
 
+# Kullanılan yazılım sürümleri (envs/*.yml ile eşleşir). (araç, sürüm, amaç_tr, amaç_en, koşul).
+_SOFTWARE: list[tuple] = [
+    ("Python", "3.11", "Orkestrasyon", "Orchestration", None),
+    ("FastQC", "0.12.1", "Ham okuma QC", "Raw read QC", None),
+    ("fastp", "1.3.6", "Kırpma", "Trimming", None),
+    ("Bowtie2", "2.5.5", "Hizalama", "Alignment", None),
+    ("Subread/featureCounts", "2.1.1", "Sayım (TPM/FPKM)", "Quantification (TPM/FPKM)", None),
+    ("DESeq2 (R)", "1.50.2", "Diferansiyel ekspresyon", "Differential expression", None),
+    ("ggplot2 (R)", "4.0", "Figürler", "Figures", None),
+    ("fgsea (R)", "1.36.2", "GSEA", "GSEA", "gsea"),
+    ("abricate", "1.4.0", "AMR/virülans (CARD/VFDB)", "AMR/virulence (CARD/VFDB)", "amr"),
+    ("AMRFinderPlus", "4.2.7", "AMR (küratörlü)", "AMR (curated)", "amr"),
+    ("SortMeRNA", "7.0.0", "rRNA%", "rRNA%", "seqqc"),
+    ("RSeQC", "5.0.5", "Strandedness", "Strandedness", "seqqc"),
+    ("networkx", "3.6.1", "PPI community", "PPI community", "ppi"),
+]
+
+
+def section_software(config, L: dict, inputs: dict, flags: dict) -> str:
+    lang = "en" if L is LABELS["en"] else "tr"
+    sw_rows = [[t, v, (ptr if lang == "tr" else pen)] for t, v, ptr, pen, cond in _SOFTWARE
+               if cond is None or flags.get(cond)]
+    sw_tbl = _table([L["sw_tool"], L["sw_version"], L["sw_purpose"]], sw_rows, L["cap_software"])
+    # Veritabanları — yalnız koşan analizler
+    e = config.enrichment
+    db_rows = []
+    if flags.get("enrichment"):
+        db_rows.append(["Gene Ontology (go-basic)", "obo", "GO anotasyonu" if lang == "tr" else "GO annotation"])
+        db_rows.append(["EBI-GOA", "GAF", "GO anotasyonu (tamamlayıcı)" if lang == "tr" else "GO annotation (supplement)"])
+    if flags.get("kegg"):
+        db_rows.append(["KEGG", f"REST ({e.kegg_organism or '—'})", "Yolak" if lang == "tr" else "Pathways"])
+    if flags.get("gsea") or flags.get("enrichment"):
+        pass
+    if flags.get("amr"):
+        db_rows.append(["CARD", "abricate 1.4.0", "Direnç" if lang == "tr" else "Resistance"])
+        db_rows.append(["VFDB", "abricate 1.4.0", "Virülans" if lang == "tr" else "Virulence"])
+        db_rows.append(["AMRFinderPlus DB", "2026-05-15", "Direnç (küratörlü)" if lang == "tr" else "Resistance (curated)"])
+    if flags.get("ppi"):
+        db_rows.append(["STRING", f"v12.0 ({config.ppi.taxid or '—'})", "PPI ağı" if lang == "tr" else "PPI network"])
+    if inputs.get("seqqc"):
+        db_rows.append(["rRNA referansı", "referans genom" if lang == "tr" else "reference genome",
+                        "rRNA%" if lang == "tr" else "rRNA%"])
+    db_html = _table([L["db_name"], L["db_version"], L["db_purpose"]], db_rows, L["cap_database"]) if db_rows else ""
+    return (f'<section id="software"><h2>{_esc(L["software"])}</h2>'
+            f'{_intro("software", L)}{sw_tbl}{db_html}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -1250,6 +1308,16 @@ _REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1186/s12859-016-0956-2"),
     ("Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York; 2016.",
      "https://doi.org/10.1007/978-3-319-24277-4"),
+    # Genel RNA-seq analiz/raporlama metodolojisi (kullanıcı sağladı).
+    ("Dawadi P, Pokharel B, Shrestha A, et al. From bench to bytes: a practical guide to RNA sequencing "
+     "data analysis. Front Genet. 2025;16:1697922.", "https://doi.org/10.3389/fgene.2025.1697922"),
+    ("Deshpande D, Chhugani K, Chang Y, et al. RNA-seq data science: from raw data to effective "
+     "interpretation. Front Genet. 2023;14:997383.", "https://doi.org/10.3389/fgene.2023.997383"),
+    ("Pola-Sánchez E, Hernández-Martínez KM, Pérez-Estrada R, et al. RNA-Seq data analysis: a practical "
+     "guide for model and non-model organisms. Curr Protoc. 2024;4(4):e1054.",
+     "https://doi.org/10.1002/cpz1.1054"),
+    ("Claussen H. Bulk RNAseq Methodology and Analysis Guide. Emory Integrated Computational Core "
+     "(EICC); 2023.", "https://www.cores.emory.edu/eicc/"),
 ]
 
 # GO ORA kaynakları — yalnız m09 çalıştıysa eklenir (DOI'ler doğrulandı).
@@ -1416,6 +1484,10 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_amr(inputs, L, lang),
         section_operon(inputs, L, lang),
         section_ppi(inputs, L, lang),
+        section_software(config, L, inputs, {
+            "enrichment": enrichment_ran, "kegg": kegg_ran, "gsea": gsea_ran,
+            "amr": amr_ran, "operon": operon_ran, "ppi": ppi_ran,
+            "seqqc": inputs.get("seqqc") is not None}),
         section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
         section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
     ])
