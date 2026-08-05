@@ -9,6 +9,19 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ EKSİK KAPATMA (TPM/FPKM + Software/DB tabloları + genel kaynaklar) TAMAM ve `main`'de (2026-08-05,
+  merge `16576a3`, push).** Ali 5 referans PDF verdi (r1 ticari şablon + 4 metodoloji makalesi); RNAForge'u
+  bunlarla karşılaştırdım (çekirdeği tam karşılıyor, downstream'de ötesinde; "fazla" yok). Kapatılan eksikler:
+  - **TPM/FPKM ekspresyon değerleri:** `featurecounts.py` `tpm_fpkm(gene_ids,counts,lengths)` (Length raw
+    featureCounts'tan; lengths artık `FeatureCountsResult`'ta). m05 → `quantification/{tpm,fpkm}.tsv`. Rapor
+    DE bölümüne "Ekspresyon Düzeyi" notu. (TPM sütun toplamı 1e6 doğrulandı.)
+  - **Software + Database sürüm tabloları:** yeni rapor bölümü "Yazılım ve Veritabanları" (koşan araçlar+
+    sürümler: FastQC/fastp/Bowtie2/featureCounts/DESeq2/fgsea/abricate/AMRFinderPlus/SortMeRNA/RSeQC/networkx
+    + kullanılan DB'ler CARD/VFDB/STRING/KEGG/GO). N_SECTIONS=17, 21 tablo.
+  - **Genel kaynaklar:** Dawadi 2025 (Front Genet), Deshpande 2023 (Front Genet), Pola-Sánchez 2024 (Curr
+    Protoc), Claussen/EICC 2023 — koşulsuz References'a eklendi. **391 test.** GSE300731_final güncel.
+  - **Kalan düşük-öncelik eksik:** insert-size dağılımı, MultiQC toplu, per-base baz komp./duplikasyon,
+    hizalama görselleştirme/coverage, RSeQC read-distribution. Spec `docs/.../2026-08-05-m13b-*` (ilgisiz).
 - **★ m16 SEKANS QC (rRNA% + STRANDEDNESS) TAMAM ve `main`'de (2026-08-05, merge `05b04ea`, push).** Ali'nin
   "QC ekle" isteği — eksik girdi-QC kapıları. İki bağımsız araç (Ali seçti): **SortMeRNA** (rRNA%) + **RSeQC**
   (strandedness), yeni `rnaforge-seqqc` env. **İki yeni WARN kapısı** (asla FAIL): `rrna_fraction` (>eşik,
