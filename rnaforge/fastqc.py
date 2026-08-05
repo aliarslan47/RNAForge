@@ -22,6 +22,10 @@ class FastQCRunError(RuntimeError):
 class FastQCReport:
     modules: dict[str, str]
     basic_stats: dict[str, str]
+    # Per-base A/T/G/C kompozisyonu: [(pozisyon etiketi, {"A":%, "T":%, "G":%, "C":%}), ...]
+    per_base_content: tuple = ()
+    # 'Total Deduplicated Percentage' (Sequence Duplication Levels); yoksa None.
+    deduplication: float | None = None
 
 
 def parse_fastqc_report(summary_text: str, data_text: str) -> FastQCReport:
@@ -41,7 +45,57 @@ def parse_fastqc_report(summary_text: str, data_text: str) -> FastQCReport:
         modules[name] = status
 
     basic_stats = _parse_basic_stats(data_text)
-    return FastQCReport(modules=modules, basic_stats=basic_stats)
+    return FastQCReport(
+        modules=modules, basic_stats=basic_stats,
+        per_base_content=tuple(parse_per_base_content(data_text)),
+        deduplication=parse_deduplication(data_text),
+    )
+
+
+def parse_per_base_content(data_text: str) -> list[tuple[str, dict[str, float]]]:
+    """>>Per base sequence content modülünden pozisyon başına A/T/G/C yüzdeleri.
+    Header sütun sırası FastQC sürümüne göre değişir (ör. 'G A T C') — sıra
+    header'dan okunur. Modül yoksa boş liste döner (I/O yok, saf)."""
+    rows: list[tuple[str, dict[str, float]]] = []
+    header: list[str] | None = None
+    in_mod = False
+    for line in data_text.splitlines():
+        if line.startswith(">>Per base sequence content"):
+            in_mod = True
+            continue
+        if not in_mod:
+            continue
+        if line.startswith(">>END_MODULE"):
+            break
+        if line.startswith("#"):
+            # #Base<TAB>G<TAB>A<TAB>T<TAB>C
+            header = [c.strip() for c in line.lstrip("#").split("\t")][1:]
+            continue
+        if not line.strip() or header is None:
+            continue
+        fields = line.split("\t")
+        pos = fields[0].strip()
+        comp: dict[str, float] = {}
+        for name, value in zip(header, fields[1:]):
+            try:
+                comp[name.upper()] = float(value)
+            except ValueError:
+                continue
+        rows.append((pos, comp))
+    return rows
+
+
+def parse_deduplication(data_text: str) -> float | None:
+    """Sequence Duplication Levels modülündeki 'Total Deduplicated Percentage'
+    (benzersiz okuma yüzdesi). Bulunmazsa None."""
+    for line in data_text.splitlines():
+        if "Total Deduplicated Percentage" in line:
+            _, _, value = line.partition("\t")
+            try:
+                return float(value.strip())
+            except ValueError:
+                return None
+    return None
 
 
 def _parse_basic_stats(data_text: str) -> dict[str, str]:

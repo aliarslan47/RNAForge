@@ -100,3 +100,47 @@ def test_run_fastqc_produces_parsable_zip(tmp_path):
     report = parse_fastqc_zip(zip_path)
     assert "Basic Statistics" in report.modules
     assert int(report.basic_stats["Total Sequences"]) == 500
+
+
+# --- per-base kompozisyon + duplikasyon parser'ları (F1) ---
+from rnaforge.fastqc import parse_per_base_content, parse_deduplication  # noqa: E402
+
+_PBC = (
+    ">>Per base sequence content\tfail\n"
+    "#Base\tG\tA\tT\tC\n"
+    "1\t22.5\t28.0\t19.7\t29.7\n"
+    "2-3\t27.0\t25.1\t24.1\t23.7\n"
+    ">>END_MODULE\n"
+    ">>Sequence Duplication Levels\twarn\n"
+    "#Total Deduplicated Percentage\t56.966\n"
+    "#Duplication Level\tPercentage of deduplicated\tPercentage of total\n"
+    ">>END_MODULE\n"
+)
+
+
+def test_parse_per_base_content_reads_header_order():
+    rows = parse_per_base_content(_PBC)
+    assert rows[0][0] == "1"
+    assert rows[0][1] == {"G": 22.5, "A": 28.0, "T": 19.7, "C": 29.7}
+    assert rows[1][0] == "2-3"
+    assert rows[1][1]["A"] == 25.1
+
+
+def test_parse_per_base_content_absent_returns_empty():
+    assert parse_per_base_content(">>Basic Statistics\tpass\n>>END_MODULE\n") == []
+
+
+def test_parse_deduplication_reads_value():
+    assert parse_deduplication(_PBC) == 56.966
+
+
+def test_parse_deduplication_absent_returns_none():
+    assert parse_deduplication(">>Basic Statistics\tpass\n>>END_MODULE\n") is None
+
+
+def test_parse_fastqc_report_fills_new_fields():
+    from rnaforge.fastqc import parse_fastqc_report
+    full_data = DATA + _PBC
+    report = parse_fastqc_report(SUMMARY, full_data)
+    assert report.deduplication == 56.966
+    assert len(report.per_base_content) == 2

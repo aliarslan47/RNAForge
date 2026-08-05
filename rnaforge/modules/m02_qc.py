@@ -13,9 +13,12 @@ from rnaforge.config import Config
 from rnaforge.fastqc import FastQCReport, parse_fastqc_zip, run_fastqc
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, write_gate_results
 from rnaforge.metadata import load_metadata
+from rnaforge.qcplots import QCPlotError, render_qc_figure
+from rnaforge.quality import Profile, load_profile
 from rnaforge.state import RunState
 
 MODULE_NAME = "m02_qc"
+_DEDUP_GATE = "dedup_fraction"
 
 # curated set: FastQC modül adı -> (kapı adı, WARN remedy)
 _GATE_MAP = {
@@ -69,6 +72,52 @@ def build_qc_gates(reports: dict[str, FastQCReport]) -> list[GateResult]:
     return gates
 
 
+def build_dedup_gate(dedup_by_sample: dict[str, float | None],
+                     profile: Profile) -> GateResult:
+    """Duplikasyon WARN kapısı. `deduplication` = benzersiz okuma yüzdesi (FastQC);
+    fraksiyon eşiğin altındaysa (aşırı duplikasyon) WARN — m02 asla FAIL üretmez.
+    RNA-seq'te bir miktar duplikasyon beklenir; eşik bilinçle gevşektir."""
+    thr = profile.threshold(_DEDUP_GATE)
+    fracs = {sid: v / 100.0 for sid, v in dedup_by_sample.items() if v is not None}
+    mean = sum(fracs.values()) / len(fracs) if fracs else 1.0
+    offenders = sorted(sid for sid, f in fracs.items() if f < thr)
+    overridden = profile.is_overridden(_DEDUP_GATE)
+    if offenders:
+        status = WARN
+        message = (f"benzersiz-okuma fraksiyonu eşiğin altında ({len(offenders)} örnek: "
+                   f"{', '.join(offenders)}); ortalama {mean:.1%} < {thr:.0%}. Yüksek "
+                   "duplikasyon; sonuç ŞÜPHELİ damgalanabilir.")
+    else:
+        status = PASS
+        message = (f"benzersiz-okuma fraksiyonu tüm örneklerde ≥ {thr:.0%} "
+                   f"(ortalama {mean:.1%}).")
+    return GateResult(
+        name=_DEDUP_GATE, module=MODULE_NAME, status=status, message=message,
+        remedy=("Yüksek duplikasyon PCR fazlası veya düşük kütüphane karmaşıklığı olabilir; "
+                "girdi miktarı/PCR döngülerini gözden geçirin. RNA-seq'te yüksek ekspresyon "
+                "nedeniyle bir miktar duplikasyon normaldir."),
+        measured=round(mean, 4), threshold=thr, overridden=overridden,
+        samples=tuple(offenders))
+
+
+def mean_per_base_composition(
+        reports: dict[str, FastQCReport]) -> tuple[list[str], dict[str, list[float]]]:
+    """Örnekler arası pozisyon-başına ortalama A/T/G/C. En kısa profil uzunluğuna
+    hizalanır (aynı okuma uzunluğunda FastQC binning'i aynıdır). Veri yoksa ([],{})."""
+    profiles = [r.per_base_content for r in reports.values() if r.per_base_content]
+    if not profiles:
+        return [], {}
+    n = min(len(p) for p in profiles)
+    labels = [profiles[0][i][0] for i in range(n)]
+    bases = ["A", "T", "G", "C"]
+    means = {b: [] for b in bases}
+    for i in range(n):
+        for b in bases:
+            vals = [p[i][1].get(b, 0.0) for p in profiles]
+            means[b].append(round(sum(vals) / len(vals), 3))
+    return labels, means
+
+
 def run_qc(config: Config, metadata_path: Path, run_dir: Path,
            force: bool = False) -> dict:
     run_dir = Path(run_dir)
@@ -114,10 +163,34 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
             module_flags[sample.sample_id] = report.modules
             log(f"{sample.sample_id}: FastQC OK ({zip_path.name})")
 
+        profile = load_profile(config.organism_type, config.quality)
         gates = build_qc_gates(reports)
+        dedup_by_sample = {sid: r.deduplication for sid, r in reports.items()}
+        gates.append(build_dedup_gate(dedup_by_sample, profile))
         write_gate_results(run_dir, gates)
         for g in gates:
             log(f"gate {g.name}: {g.status} — {g.message}")
+
+        # Per-base baz kompozisyonu figürü (F1) — best-effort; başarısızlık SESSİZCE
+        # yutulmaz: log'a ve summary'ye yazılır (m02 diagnostik, bunun için durmaz).
+        labels, comp = mean_per_base_composition(reports)
+        composition_figure = None
+        composition_error = None
+        if labels:
+            figures_dir = run_dir / "figures"
+            fig_path = figures_dir / "qc_per_base_composition.png"
+            spec = {
+                "type": "lines", "title": "Per-base baz kompozisyonu (örnek ortalaması)",
+                "xlabel": "Okuma pozisyonu (bç)", "ylabel": "%",
+                "x": labels, "series": comp,
+            }
+            try:
+                render_qc_figure(spec, fig_path)
+                composition_figure = fig_path.name
+                log(f"per-base composition figure written: {fig_path}")
+            except QCPlotError as exc:
+                composition_error = str(exc)
+                log(f"WARNING: per-base composition figure FAILED (diagnostik atlandı): {exc}")
 
         gate_counts = dict(Counter(g.status for g in gates))
         summary = {
@@ -125,6 +198,12 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
             "samples": {sid: r.basic_stats for sid, r in reports.items()},
             "module_flags": module_flags,
             "gate_counts": gate_counts,
+            "deduplication": {sid: v for sid, v in dedup_by_sample.items()},
+            "mean_dedup_fraction": round(
+                sum(v for v in dedup_by_sample.values() if v is not None)
+                / max(1, sum(1 for v in dedup_by_sample.values() if v is not None)) / 100.0, 4),
+            "per_base_composition_figure": composition_figure,
+            "per_base_composition_error": composition_error,
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         log(f"qc statistics written: {stats_path}")

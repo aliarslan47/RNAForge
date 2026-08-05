@@ -12,4 +12,5 @@ thresholds:
   alignment_rate: 0.50
   assignment_rate: 0.40
   rrna_fraction: 0.30
+  dedup_fraction: 0.15
   replicate_correlation: 0.80
