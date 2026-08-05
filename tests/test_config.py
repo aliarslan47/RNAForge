@@ -254,3 +254,11 @@ def test_amr_config_defaults(tmp_path):
 def test_amr_config_parsed(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY + "\namr:\n  amr_db: ncbi\n  min_identity: 90\n"))
     assert cfg.amr.amr_db == "ncbi" and cfg.amr.min_identity == 90.0
+
+
+def test_operon_config_default(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).operon.max_gap == 50
+
+
+def test_operon_config_parsed(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY + "\noperon:\n  max_gap: 100\n")).operon.max_gap == 100
