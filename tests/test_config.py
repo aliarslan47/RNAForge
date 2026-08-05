@@ -262,3 +262,13 @@ def test_operon_config_default(tmp_path):
 
 def test_operon_config_parsed(tmp_path):
     assert load_config(_write(tmp_path, PROK_BODY + "\noperon:\n  max_gap: 100\n")).operon.max_gap == 100
+
+
+def test_ppi_config_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.ppi.taxid is None and cfg.ppi.min_score == 700 and cfg.ppi.min_community_size == 3
+
+
+def test_ppi_config_parsed(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\nppi:\n  taxid: '511145'\n  min_score: 400\n"))
+    assert cfg.ppi.taxid == "511145" and cfg.ppi.min_score == 400

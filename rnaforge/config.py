@@ -19,7 +19,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
-    "quantification", "enrichment", "amr", "operon",
+    "quantification", "enrichment", "amr", "operon", "ppi",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -108,6 +108,16 @@ class Operon:
 
 
 @dataclass(frozen=True)
+class PPI:
+    # m15 STRING PPI + community. taxid: STRING organizma (ör. "511145" E.coli K-12); ZORUNLU (yoksa çalışmaz).
+    # min_score: STRING combined_score eşiği (700=yüksek); min_community_size: rapora giren en küçük modül.
+    taxid: str | None = None
+    string_dir: Path | None = None
+    min_score: int = 700
+    min_community_size: int = 3
+
+
+@dataclass(frozen=True)
 class Report:
     language: str = "tr"
 
@@ -135,6 +145,7 @@ class Config:
     enrichment: Enrichment = field(default_factory=Enrichment)
     amr: AMR = field(default_factory=AMR)
     operon: Operon = field(default_factory=Operon)
+    ppi: PPI = field(default_factory=PPI)
 
 
 def _one_of(value, allowed, field: str):
@@ -227,6 +238,7 @@ def load_config(path: Path | str) -> Config:
     enrichment_raw = _section(raw, "enrichment")
     amr_raw = _section(raw, "amr")
     operon_raw = _section(raw, "operon")
+    ppi_raw = _section(raw, "ppi")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -291,4 +303,11 @@ def load_config(path: Path | str) -> Config:
             min_coverage=_as_float(amr_raw.get("min_coverage", 80.0), "amr.min_coverage"),
         ),
         operon=Operon(max_gap=_as_int(operon_raw.get("max_gap", 50), "operon.max_gap")),
+        ppi=PPI(
+            taxid=(str(ppi_raw["taxid"]) if ppi_raw.get("taxid") else None),
+            string_dir=(Path(ppi_raw["string_dir"]) if ppi_raw.get("string_dir") else None),
+            min_score=_as_int(ppi_raw.get("min_score", 700), "ppi.min_score"),
+            min_community_size=_as_int(
+                ppi_raw.get("min_community_size", 3), "ppi.min_community_size"),
+        ),
     )
