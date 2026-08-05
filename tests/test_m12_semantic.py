@@ -11,6 +11,12 @@ from rnaforge.config import load_config
 from rnaforge.modules import m12_semantic
 from rnaforge.state import RunState
 
+
+@pytest.fixture(autouse=True)
+def _no_semantic_r(monkeypatch):
+    # MDS figürü best-effort; birim testte R çağrısını atla (env-bağımsız).
+    monkeypatch.setattr(m12_semantic, "run_semantic_r", lambda *a, **k: "")
+
 # GFF: kardeş GO'lar aynı gene ailesinde; obo BP zinciri.
 GFF = (
     "NZ\tX\tCDS\t1\t9\t.\t+\t0\tOntology_term=GO:0000002;go_process=alpha|0000002||IEA;gene=gA;locus_tag=LT_A\n"

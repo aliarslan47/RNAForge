@@ -5,9 +5,13 @@ Fazlalık GO terimlerini (parent/child, benzer süreç) temsilcilere indirir. nu
 """
 from __future__ import annotations
 
+import subprocess
 from math import log
+from pathlib import Path
 
 from rnaforge.go_annotation import _ancestors
+
+_SCRIPT = Path(__file__).parent / "scripts" / "semantic.R"
 
 
 def compute_ic(gene2go: dict[str, set[str]]) -> dict[str, float]:
@@ -75,3 +79,36 @@ def reduce_terms(terms: list[dict], obo: dict, ic: dict[str, float],
             "n_collapsed": len(members), "members": members,
         })
     return out
+
+
+def lin_distance_matrix(go_ids: list[str], obo: dict, ic: dict[str, float]):
+    """Temsilci terimler için simetrik Lin uzaklık matrisi (1 − Lin). MDS (cmdscale) girdisi."""
+    cache: dict[str, set[str]] = {}
+    n = len(go_ids)
+    mat = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = 1.0 - lin_similarity(go_ids[i], go_ids[j], obo, ic, cache)
+            mat[i][j] = mat[j][i] = d
+    return mat
+
+
+def write_distance_matrix(go_ids: list[str], mat: list[list[float]], out_path: Path) -> None:
+    """Kare uzaklık matrisi TSV: ilk sütun go_id, sonra mesafeler (semantic.R cmdscale okur)."""
+    with Path(out_path).open("w") as f:
+        f.write("go_id\t" + "\t".join(go_ids) + "\n")
+        for gid, row in zip(go_ids, mat):
+            f.write(gid + "\t" + "\t".join(f"{d:.6f}" for d in row) + "\n")
+
+
+def run_semantic_r(dist_tsv: Path, reduced_tsv: Path, out_dir: Path, basename: str,
+                   title: str, env: str = "rnaforge-de") -> str:
+    """semantic.R (MDS scatter, cmdscale + ggplot). stdout/stderr döndür, hatada gürültülü yüksel."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
+           str(dist_tsv), str(reduced_tsv), str(out_dir), basename, title]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"semantic.R failed (exit {r.returncode}):\n{r.stderr}")
+    return (r.stdout or "") + (r.stderr or "")

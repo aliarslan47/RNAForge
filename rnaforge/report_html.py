@@ -289,6 +289,9 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "semantic" / "reduced_ora_down.tsv").exists() else None,
         "reduced_gsea_go": parse_reduced_tsv(run_dir / "semantic" / "reduced_gsea_go.tsv")
         if (run_dir / "semantic" / "reduced_gsea_go.tsv").exists() else None,
+        "semantic_manifest": json.loads((run_dir / "semantic" / "manifest.json").read_text())
+        if (run_dir / "semantic" / "manifest.json").exists() else None,
+        "semantic_dir": run_dir / "semantic",
         # m13 AMR/virülans — opsiyonel: çalıştırılmadıysa None.
         "amr_genes": parse_amr_tsv(run_dir / "amr" / "amr_genes.tsv")
         if (run_dir / "amr" / "amr_genes.tsv").exists() else None,
@@ -854,6 +857,7 @@ def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
             continue
         blocks.append(f'<h3>{_esc(L[label])}</h3>')
         blocks.append(_reduced_table(rows, L))
+    blocks.append(_embed_first_figure(inputs.get("semantic_manifest"), inputs.get("semantic_dir", ".")))
     blocks.append(f'<p class="note">{L["semantic_legend"]}</p>')
     return (f'<section id="semantic"><h2>{_esc(L["semantic"])}</h2>'
             f'{_intro("semantic", L)}{"".join(blocks)}</section>')
