@@ -301,6 +301,9 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "operon" / "operons.tsv").exists() else None,
         "operon_stats": _read_json(stats / "operon_statistics.json")
         if (stats / "operon_statistics.json").exists() else None,
+        "operon_manifest": json.loads((run_dir / "operon" / "manifest.json").read_text())
+        if (run_dir / "operon" / "manifest.json").exists() else None,
+        "operon_dir": run_dir / "operon",
         # m15 PPI — opsiyonel: çalıştırılmadıysa None.
         "communities": parse_community_tsv(run_dir / "ppi" / "communities.tsv")
         if (run_dir / "ppi" / "communities.tsv").exists() else None,
@@ -895,6 +898,19 @@ def section_amr(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("amr", L)}{"".join(blocks)}</section>')
 
 
+def _embed_first_figure(manifest: dict | None, figs_dir) -> str:
+    """Manifest'teki figürleri (varsa) gömer. Yoksa/dosya yoksa boş döner (tolerant)."""
+    if not manifest:
+        return ""
+    figs_dir = Path(figs_dir)
+    blocks = []
+    for fig in manifest.get("figures", []):
+        png = figs_dir / fig.get("png", "")
+        if png.exists():
+            blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/></figure>')
+    return "".join(blocks)
+
+
 def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> str:
     operons = inputs.get("operons")
     if operons is None:
@@ -916,9 +932,10 @@ def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> st
                 direction, f'{o["mean_log2fc"]:.2f}' if o.get("mean_log2fc") is not None else "—",
             ])
         body_html = _table(headers, rows)
+    fig_html = _embed_first_figure(inputs.get("operon_manifest"), inputs.get("operon_dir", "."))
     legend = f'<p class="note">{L["operon_legend"].format(gap=gap)}</p>'
     return (f'<section id="operon"><h2>{_esc(L["operon"])}</h2>'
-            f'{_intro("operon", L)}{summary}{body_html}{legend}</section>')
+            f'{_intro("operon", L)}{summary}{body_html}{fig_html}{legend}</section>')
 
 
 def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:

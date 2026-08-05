@@ -5,7 +5,23 @@ Operonlar TAHMİN (deneysel değil). DB/araç yok, organizma-agnostik.
 """
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+
+_SCRIPT = Path(__file__).parent / "scripts" / "operon.R"
+
+
+def run_operon_r(operons_tsv: Path, out_dir: Path, top_n: int = 20,
+                 env: str = "rnaforge-de") -> str:
+    """operon.R (koordineli operon bar figürü). stdout/stderr döndür, hatada gürültülü yüksel."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
+           str(operons_tsv), str(out_dir), str(top_n)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"operon.R failed (exit {r.returncode}):\n{r.stderr}")
+    return (r.stdout or "") + (r.stderr or "")
 
 
 def _genes_from_gff(gff: Path) -> list[dict]:

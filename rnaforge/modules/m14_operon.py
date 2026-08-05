@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from rnaforge.config import Config
-from rnaforge.operon import aggregate_operon_de, predict_operons
+from rnaforge.operon import aggregate_operon_de, predict_operons, run_operon_r
 from rnaforge.state import RunState
 
 MODULE_NAME = "m14_operon"
@@ -59,9 +59,24 @@ def run_operon(config: Config, metadata_path: Path, run_dir: Path, force: bool =
         _write_operons_tsv(rows, out_dir / "operons.tsv")
         n_multi = sum(1 for r in rows if r["size"] >= 2)
         n_coord = sum(1 for r in rows if r["coordinated"])
+        # Figür best-effort: çekirdek tabloyu bozmasın; hata loglanır (sessiz değil).
+        n_figures = 0
+        try:
+            r_out = run_operon_r(out_dir / "operons.tsv", out_dir)
+            if r_out:
+                log_file.write(r_out if r_out.endswith("\n") else r_out + "\n")
+            if (out_dir / "operon_coord.png").exists():
+                (out_dir / "manifest.json").write_text(json.dumps(
+                    {"figures": [{"id": "operon_coord", "title": "Koordineli operonlar",
+                                  "png": "operon_coord.png",
+                                  "svg": "operon_coord.svg" if (out_dir / "operon_coord.svg").exists() else None}]},
+                    indent=2))
+                n_figures = 1
+        except Exception as exc:  # noqa: BLE001 — figür opsiyonel; yüksek sesle logla, koşuyu bozma
+            log_file.write(f"m14: operon figürü üretilemedi (opsiyonel): {exc}\n")
         summary = {
             "n_operons": len(rows), "n_multi_gene": n_multi,
-            "n_coordinated": n_coord, "max_gap": max_gap,
+            "n_coordinated": n_coord, "max_gap": max_gap, "n_figures": n_figures,
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         log_file.write(f"m14 operon done: {summary}\n")
