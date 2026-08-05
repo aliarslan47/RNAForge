@@ -641,3 +641,25 @@ def test_methods_refs_ppi_when_ran():
     refs = section_references(LABELS["en"], ppi_ran=True)
     assert "10.1093/nar/gkac1000" in refs and "P10008" in refs
     assert "10.1093/nar/gkac1000" not in section_references(LABELS["en"], ppi_ran=False)
+
+
+from rnaforge.report_html import section_quality
+
+
+def test_section_quality_with_seqqc():
+    align = {"samples": {"c1": {"alignment_rate": 0.99}}}
+    count = {"samples": {"c1": {"assignment_rate": 0.85}}}
+    seqqc = {"rrna_per_sample": {"c1": 0.08}, "mean_rrna_fraction": 0.08,
+             "inferred_strandedness": "unstranded", "declared_strandedness": "unstranded",
+             "strandedness_match": True}
+    html = section_quality(align, count, {"min_length": 36, "aggressive": False}, LABELS["tr"], seqqc)
+    assert "rRNA %" in html and "Strandedness" in html
+    assert "unstranded" in html and "uyumlu" in html
+
+
+def test_section_quality_without_seqqc():
+    align = {"samples": {"c1": {"alignment_rate": 0.99}}}
+    count = {"samples": {"c1": {"assignment_rate": 0.85}}}
+    html = section_quality(align, count, {"min_length": 36, "aggressive": False}, LABELS["en"])
+    assert "rRNA" in html            # sütun başlığı var, değer "—"
+    assert "Strandedness (inferred)" not in html or "inferred" in html  # özet satırı yok

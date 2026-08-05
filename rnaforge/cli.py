@@ -167,6 +167,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m15 already completed in this run directory",
     )
 
+    seqqc = sub.add_parser("seqqc", help="rRNA% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
+    seqqc.add_argument("--config", required=True, type=Path)
+    seqqc.add_argument("--metadata", required=True, type=Path)
+    seqqc.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    seqqc.add_argument("--run-id", default="run")
+    seqqc.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m16 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -492,6 +502,28 @@ def _cmd_ppi(args) -> int:
     return 0
 
 
+def _cmd_seqqc(args) -> int:
+    from rnaforge.modules.m16_seqqc import run_seqqc
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_seqqc(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m16_seqqc already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    match = "match" if summary["strandedness_match"] else "MISMATCH"
+    print(f"seqqc OK: mean rRNA {summary['mean_rrna_fraction']:.1%}, "
+          f"strandedness inferred={summary['inferred_strandedness']} vs "
+          f"declared={summary['declared_strandedness']} ({match})")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -543,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_operon(args)
         if args.command == "ppi":
             return _cmd_ppi(args)
+        if args.command == "seqqc":
+            return _cmd_seqqc(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)

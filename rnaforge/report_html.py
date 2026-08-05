@@ -313,6 +313,9 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "ppi" / "communities.tsv").exists() else None,
         "ppi_stats": _read_json(stats / "ppi_statistics.json")
         if (stats / "ppi_statistics.json").exists() else None,
+        # m16 seqqc — opsiyonel: çalıştırılmadıysa None.
+        "seqqc": _read_json(stats / "seqqc_statistics.json")
+        if (stats / "seqqc_statistics.json").exists() else None,
         "ppi_manifest": json.loads((run_dir / "ppi" / "manifest.json").read_text())
         if (run_dir / "ppi" / "manifest.json").exists() else None,
         "ppi_dir": run_dir / "ppi",
@@ -328,6 +331,7 @@ LABELS: dict[str, dict[str, str]] = {
         "sample": "Örnek", "condition": "Koşul", "batch": "Batch", "paired": "Eşleşmiş",
         "read_len": "Ort. okuma uzunluğu", "quality_col": "Ort. kalite",
         "alignment_rate": "Hizalama oranı", "assignment_rate": "Atama oranı",
+        "rrna_pct": "rRNA %", "rrna_mean": "Ortalama rRNA", "strandedness": "Strandedness (çıkarılan)",
         "organism": "Organizma", "platform": "Platform", "design": "Tasarım",
         "gate": "Kapı", "status": "Durum", "measured": "Ölçülen", "threshold": "Eşik",
         "profile": "Profil", "contrast": "Kontrast", "n_genes": "Gen sayısı",
@@ -420,6 +424,7 @@ LABELS: dict[str, dict[str, str]] = {
         "sample": "Sample", "condition": "Condition", "batch": "Batch", "paired": "Paired",
         "read_len": "Mean read length", "quality_col": "Mean quality",
         "alignment_rate": "Alignment rate", "assignment_rate": "Assignment rate",
+        "rrna_pct": "rRNA %", "rrna_mean": "Mean rRNA", "strandedness": "Strandedness (inferred)",
         "organism": "Organism", "platform": "Platform", "design": "Design",
         "gate": "Gate", "status": "Status", "measured": "Measured", "threshold": "Threshold",
         "profile": "Profile", "contrast": "Contrast", "n_genes": "Genes",
@@ -659,15 +664,28 @@ def section_dataset(raw: dict, L: dict) -> str:
     return f'<section id="dataset"><h2>{_esc(L["dataset"])}</h2>{_intro("dataset", L)}{meta}{tbl}</section>'
 
 
-def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict) -> str:
+def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict,
+                    seqqc: dict | None = None) -> str:
     trim = (f'<p>{_esc(L["min_length"])}: {_esc(trimming_cfg.get("min_length"))} · '
             f'{_esc(L["aggressive"])}: {_esc(trimming_cfg.get("aggressive"))}</p>')
     asamp = align.get("samples", {})
     csamp = count.get("samples", {})
+    seqqc = seqqc or {}
+    rrna = (seqqc.get("rrna_per_sample") or {})
     rows = [[sid, _pct(asamp.get(sid, {}).get("alignment_rate")),
-             _pct(csamp.get(sid, {}).get("assignment_rate"))] for sid in asamp]
-    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"]], rows)
-    return f'<section id="quality"><h2>{_esc(L["quality"])}</h2>{_intro("quality", L)}{trim}{tbl}</section>'
+             _pct(csamp.get(sid, {}).get("assignment_rate")),
+             _pct(rrna[sid]) if sid in rrna else "—"] for sid in asamp]
+    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"], L["rrna_pct"]], rows)
+    # rRNA% + strandedness özet satırı (m16 çalıştıysa)
+    seq_line = ""
+    if seqqc:
+        match = ("uyumlu" if seqqc.get("strandedness_match") else "UYUŞMUYOR") if L is LABELS["tr"] \
+            else ("match" if seqqc.get("strandedness_match") else "MISMATCH")
+        seq_line = (f'<p>{_esc(L["rrna_mean"])}: {_pct(seqqc.get("mean_rrna_fraction"))} · '
+                    f'{_esc(L["strandedness"])}: {_esc(seqqc.get("inferred_strandedness"))} '
+                    f'(≟ {_esc(seqqc.get("declared_strandedness"))} — {_esc(match)})</p>')
+    return (f'<section id="quality"><h2>{_esc(L["quality"])}</h2>'
+            f'{_intro("quality", L)}{trim}{seq_line}{tbl}</section>')
 
 
 def section_de(de: dict, L: dict) -> str:
@@ -1376,7 +1394,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         header,
         section_confidence(inputs["confidence"], L),
         section_dataset(raw, L),
-        section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L),
+        section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L, inputs.get("seqqc")),
         section_de(inputs["de"], L),
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],
