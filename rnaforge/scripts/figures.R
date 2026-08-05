@@ -23,7 +23,9 @@ v <- apply(lg,1,var); top <- head(order(v,decreasing=TRUE),500)
 pc <- prcomp(t(lg[top,])); ve <- round(100*pc$sdev^2/sum(pc$sdev^2),1)
 d1 <- data.frame(PC1=pc$x[,1],PC2=pc$x[,2],condition=cond,sample=colnames(nc))
 p1 <- ggplot(d1,aes(PC1,PC2,color=condition,label=sample))+geom_point(size=4)+
-  geom_text(vjust=-1,size=3,show.legend=FALSE)+
+  ggrepel::geom_text_repel(size=3,show.legend=FALSE,max.overlaps=Inf,min.segment.length=0,seed=42)+
+  scale_x_continuous(expand=expansion(mult=0.15))+   # etiketler panel kenarından taşmasın
+  scale_y_continuous(expand=expansion(mult=0.10))+
   labs(title="PCA",x=paste0("PC1 (",ve[1],"%)"),y=paste0("PC2 (",ve[2],"%)"))+theme_pub
 sav(p1,"01_pca",6.5,5)
 
