@@ -223,3 +223,14 @@ def test_enrichment_kegg_fields(tmp_path):
 def test_enrichment_kegg_defaults(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY))
     assert cfg.enrichment.kegg_organism is None and cfg.enrichment.kegg_dir is None
+
+
+def test_enrichment_gsea_sizes(tmp_path):
+    body = PROK_BODY + "\nenrichment:\n  gsea_min_size: 10\n  gsea_max_size: 300\n"
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.enrichment.gsea_min_size == 10 and cfg.enrichment.gsea_max_size == 300
+
+
+def test_enrichment_gsea_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.enrichment.gsea_min_size == 15 and cfg.enrichment.gsea_max_size == 500
