@@ -9,6 +9,24 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM — dal `feat/qc-completion` (2026-08-05).** Ali "hepsini
+  sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
+  - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
+    `parse_deduplication` (mevcut FastQC zip'inden, yeni araç yok); **dedup_fraction WARN kapısı** (profilde
+    prok 0.20/euk 0.15, asla FAIL); per-base kompozisyon figürü. Canlı: dedup %55-62 → PASS.
+  - **F2 insert-size** + **F3 read-distribution** + **F4 coverage** → yeni **`m17_alignqc`** (ortak BAM döngüsü,
+    kapı yok). `alignqc.py`: samtools stats (insert-size+IS histogram), samtools coverage (kontig derinliği),
+    RSeQC read_distribution (CDS/UTR/Intron/Intergenic %). insert-size figürü (paired-only, SE'de atla) +
+    coverage figürü. Yeni `rnaforge alignqc`. Canlı: insert **269.6bp**, genom derinlik **324×**, read-dist
+    **CDS %91.5 / Intergenic %8.5** (bakteriyel mRNA doğru).
+  - **F5 MultiQC toplu görünüm** → yeni **`m18_multiqc`** (kapstone, en son koşar). `multiqc.py` + run dizinini
+    tarar → toplu HTML; rapora göreli link. **multiqc 1.35 rnaforge-seqqc'e pip** (env yml güncel). Canlı:
+    **6 modül / 20 örnek** topladı.
+  - **Figür altyapısı:** bağımsız `qc_plot.py` (matplotlib, rnaforge-seqqc) + `qcplots.py` sarmalayıcı;
+    lines/bars tipleri. Figürler best-effort ama **sessiz değil** (hata log+stats'e yazılır).
+  - **Rapor:** kalite bölümü genişledi — benzersiz-% sütunu, read-distribution tablosu, 3 QC figürü,
+    MultiQC linki (çift dilli). Spec `docs/.../2026-08-05-qc-completion-design.md`. **~423 test.**
+  - **SIRADA:** raporu sıfırdan üret + doğrula → `main`'e merge → bellek güncelle.
 - **★ EKSİK KAPATMA (TPM/FPKM + Software/DB tabloları + genel kaynaklar) TAMAM ve `main`'de (2026-08-05,
   merge `16576a3`, push).** Ali 5 referans PDF verdi (r1 ticari şablon + 4 metodoloji makalesi); RNAForge'u
   bunlarla karşılaştırdım (çekirdeği tam karşılıyor, downstream'de ötesinde; "fazla" yok). Kapatılan eksikler:
