@@ -147,6 +147,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m13 already completed in this run directory",
     )
 
+    operon = sub.add_parser("operon", help="operon prediction + DE coordination (m14)")
+    operon.add_argument("--config", required=True, type=Path)
+    operon.add_argument("--metadata", required=True, type=Path)
+    operon.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    operon.add_argument("--run-id", default="run")
+    operon.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m14 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -429,6 +439,27 @@ def _cmd_amr(args) -> int:
     return 0
 
 
+def _cmd_operon(args) -> int:
+    from rnaforge.modules.m14_operon import run_operon
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_operon(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m14_operon already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"operon OK: {summary['n_operons']} operon(s) predicted "
+          f"({summary['n_multi_gene']} multi-gene, {summary['n_coordinated']} coordinated DE)")
+    print(f"run directory: {run_dir}")
+    # GATE YOK: güvence kartı yalnız m06/m07 verdict'ini taşır.
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -476,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_semantic(args)
         if args.command == "amr":
             return _cmd_amr(args)
+        if args.command == "operon":
+            return _cmd_operon(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)

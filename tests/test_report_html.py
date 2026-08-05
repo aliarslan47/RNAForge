@@ -559,3 +559,44 @@ def test_methods_refs_amr_when_ran():
     assert "10.1093/nar/gkz935" in refs        # CARD 2020
     assert "gky1080" in refs                    # VFDB
     assert "10.1093/nar/gkz935" not in section_references(LABELS["en"], amr_ran=False)
+
+
+from rnaforge.report_html import parse_operon_tsv, section_operon
+
+
+def _operon_rows(tmp_path):
+    p = tmp_path / "operons.tsv"
+    p.write_text(
+        "operon_id\tcontig\tstrand\tgenes\tsize\tn_tested\tn_deg\tn_up\tn_down\tmean_log2fc\tcoordinated\n"
+        "operon_1\tc1\t+\tentC;entE;entB;entA\t4\t4\t4\t4\t0\t2.60\tyes\n"
+        "operon_2\tc1\t-\tgadA\t1\t1\t1\t0\t1\t-5.10\tno\n")
+    return parse_operon_tsv(p)
+
+
+def test_parse_operon_tsv_types(tmp_path):
+    rows = _operon_rows(tmp_path)
+    assert rows[0]["size"] == 4 and rows[0]["n_up"] == 4 and rows[0]["coordinated"] is True
+    assert rows[0]["mean_log2fc"] == 2.60
+
+
+def test_section_operon_present(tmp_path):
+    inputs = {"operons": _operon_rows(tmp_path),
+              "operon_stats": {"n_operons": 2, "n_multi_gene": 1, "n_coordinated": 1, "max_gap": 50}}
+    html = section_operon(inputs, LABELS["tr"], "tr")
+    assert "Operon Analizi" in html
+    assert "entC, entE, entB, entA" in html        # koordineli operon üyeleri
+    assert "tahmin" in html                         # "tahmin" dürüst notu
+    assert "2 operon tahmin edildi" in html
+
+
+def test_section_operon_absent_note():
+    html = section_operon({"operons": None}, LABELS["en"], "en")
+    assert "was not run" in html
+
+
+def test_methods_refs_operon_when_ran():
+    witho = section_methods(_cfg("tr"), LABELS["tr"], operon_ran=True)
+    assert "Operon" in witho and "Moreno-Hagelsieb" in witho
+    refs = section_references(LABELS["en"], operon_ran=True)
+    assert "18.suppl_1.S329" in refs
+    assert "18.suppl_1.S329" not in section_references(LABELS["en"], operon_ran=False)

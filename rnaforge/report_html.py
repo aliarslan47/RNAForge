@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 13
+N_SECTIONS = 14
 
 
 def _num(v):
@@ -95,6 +95,23 @@ def parse_amr_tsv(path: Path) -> list[dict]:
             row = dict(r)
             for k in ("pct_identity", "pct_coverage", "log2fc", "padj"):
                 row[k] = _num(row.get(k))
+            rows.append(row)
+    return rows
+
+
+def parse_operon_tsv(path: Path) -> list[dict]:
+    """m14 operons.tsv -> tipli satırlar."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            for k in ("size", "n_tested", "n_deg", "n_up", "n_down"):
+                row[k] = int(row[k]) if row.get(k) not in (None, "") else 0
+            row["mean_log2fc"] = _num(row.get("mean_log2fc"))
+            row["coordinated"] = row.get("coordinated") == "yes"
             rows.append(row)
     return rows
 
@@ -264,6 +281,11 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "amr" / "virulence_genes.tsv").exists() else None,
         "amr_stats": _read_json(stats / "amr_statistics.json")
         if (stats / "amr_statistics.json").exists() else None,
+        # m14 operon — opsiyonel: çalıştırılmadıysa None.
+        "operons": parse_operon_tsv(run_dir / "operon" / "operons.tsv")
+        if (run_dir / "operon" / "operons.tsv").exists() else None,
+        "operon_stats": _read_json(stats / "operon_statistics.json")
+        if (stats / "operon_statistics.json").exists() else None,
     }
 
 
@@ -335,6 +357,15 @@ LABELS: dict[str, dict[str, str]] = {
             "tarandı; bulunan genler koordinatla locus_tag'e eşlenip <b>DE durumu</b> (artan/azalan/ns) "
             "eklendi. Not: veritabanları abricate ile paket halinde gelir; en güncel sürüm için "
             "<code>abricate-get_db</code> ile yenilenebilir."),
+        "operon": "Operon Analizi", "operon_genes": "Genler", "operon_size": "Boyut",
+        "operon_dir": "Yön", "operon_not_run": "Operon analizi bu koşuda çalıştırılmadı "
+                                               "(rnaforge operon ile üretilir).",
+        "operon_summary": "{n} operon tahmin edildi · {m} çok-genli · {k} koordineli DE",
+        "operon_legend": (
+            "Operonlar <b>tahmin</b>: aynı yönde bitişik ve intergenik boşluğu ≤ {gap} bp olan genler aynı "
+            "transkripsiyon birimi sayıldı (Moreno-Hagelsieb ve Collado-Vides 2002). Deneysel doğrulanmamıştır. "
+            "<b>Koordineli</b> = ≥2 geni ve ≥2 DEG'i aynı yönde değişen operon (birlikte-düzenlenen yanıt). "
+            "Tam liste operon/operons.tsv'de."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -392,6 +423,15 @@ LABELS: dict[str, dict[str, str]] = {
             "(virulence); hits were mapped to locus tags by coordinate and annotated with their <b>DE "
             "status</b> (up/down/ns). Note: the databases are bundled with abricate; refresh with "
             "<code>abricate-get_db</code> for the latest versions."),
+        "operon": "Operon Analysis", "operon_genes": "Genes", "operon_size": "Size",
+        "operon_dir": "Direction", "operon_not_run": "Operon analysis was not run for this run "
+                                                     "(produced by rnaforge operon).",
+        "operon_summary": "{n} operons predicted · {m} multi-gene · {k} coordinated DE",
+        "operon_legend": (
+            "Operons are <b>predicted</b>: genes on the same strand with an intergenic gap ≤ {gap} bp were "
+            "taken as one transcription unit (Moreno-Hagelsieb and Collado-Vides 2002). Not experimentally "
+            "validated. <b>Coordinated</b> = an operon with ≥2 genes and ≥2 DEGs changing in the same direction "
+            "(a co-regulated response). Full list in operon/operons.tsv."),
         "semantic": "Semantic Reduction (REVIGO)", "n_collapsed": "Terms represented",
         "sem_ora_up": "Up GO terms (representatives)", "sem_ora_down": "Down GO terms (representatives)",
         "sem_gsea_go": "GSEA GO terms (representatives)",
@@ -464,6 +504,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                     "öz görünümü. Uzun listeleri okunur kılar.",
         "amr": "Suşun taşıdığı antibiyotik direnç (CARD) ve virülans (VFDB) genleri; her biri için "
                "diferansiyel ekspresyon durumu — tedavi altında indüklenen direnç/virülans yanıtını gösterir.",
+        "operon": "Tahmin edilen operonlar ve içlerindeki genlerin koordineli değişimi — birlikte "
+                  "düzenlenen transkripsiyon birimlerini gen-düzeyinin üstünde gösterir.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -482,6 +524,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                     "similarity. Makes long lists readable.",
         "amr": "Antibiotic-resistance (CARD) and virulence (VFDB) genes carried by the strain, each with "
                "its differential-expression status — showing the resistance/virulence response under treatment.",
+        "operon": "Predicted operons and the coordinated change of their genes — revealing co-regulated "
+                  "transcription units above the gene level.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -812,6 +856,32 @@ def section_amr(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("amr", L)}{"".join(blocks)}</section>')
 
 
+def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> str:
+    operons = inputs.get("operons")
+    if operons is None:
+        return (f'<section id="operon"><h2>{_esc(L["operon"])}</h2>'
+                f'<p class="note">{_esc(L["operon_not_run"])}</p></section>')
+    stats = inputs.get("operon_stats") or {}
+    gap = stats.get("max_gap", 50)
+    summary = f'<p class="note">{_esc(L["operon_summary"].format(n=stats.get("n_operons", len(operons)), m=stats.get("n_multi_gene", 0), k=stats.get("n_coordinated", 0)))}</p>'
+    coord = [o for o in operons if o.get("coordinated")][:cap]
+    if not coord:
+        body_html = f'<p>{_esc(L["no_degs"])}</p>'
+    else:
+        headers = [L["operon_genes"], L["operon_size"], L["n_sig"], L["operon_dir"], L["log2fc"]]
+        rows = []
+        for o in coord:
+            direction = L["up"] if o.get("n_up", 0) >= o.get("n_down", 0) else L["down"]
+            rows.append([
+                ", ".join(o.get("genes", "").split(";")), o.get("size"), o.get("n_deg"),
+                direction, f'{o["mean_log2fc"]:.2f}' if o.get("mean_log2fc") is not None else "—",
+            ])
+        body_html = _table(headers, rows)
+    legend = f'<p class="note">{L["operon_legend"].format(gap=gap)}</p>'
+    return (f'<section id="operon"><h2>{_esc(L["operon"])}</h2>'
+            f'{_intro("operon", L)}{summary}{body_html}{legend}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -940,8 +1010,25 @@ _AMR_METHODS: dict[str, str] = {
 }
 
 
+_OPERON_METHODS: dict[str, str] = {
+    "tr": (
+        "Operon yapısı, referans anotasyonundaki gen koordinatlarından tahmin edildi: aynı yönde bitişik "
+        "ve intergenik boşluğu en fazla {gap} bç olan genler tek bir operon (transkripsiyon birimi) sayıldı "
+        "(Moreno-Hagelsieb ve Collado-Vides 2002). Her operon için genlerinin diferansiyel ekspresyon yönü "
+        "değerlendirilerek koordineli değişen (birlikte-düzenlenen) operonlar belirlendi."
+    ),
+    "en": (
+        "Operon structure was predicted from gene coordinates in the reference annotation: genes on the same "
+        "strand with an intergenic gap of at most {gap} bp were taken as one operon (transcription unit) "
+        "(Moreno-Hagelsieb and Collado-Vides 2002). For each operon the differential-expression direction of "
+        "its genes was assessed to identify coordinately (co-regulated) changing operons."
+    ),
+}
+
+
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
-                    gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False) -> str:
+                    gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False,
+                    operon_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -969,6 +1056,9 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
         am = _AMR_METHODS[lang].format(amr_db=config.amr.amr_db, vir_db=config.amr.virulence_db,
                                        min_id=config.amr.min_identity, min_cov=config.amr.min_coverage)
         paras += f'<p>{_esc(am)}</p>'
+    if operon_ran:
+        op = _OPERON_METHODS[lang].format(gap=config.operon.max_gap)
+        paras += f'<p>{_esc(op)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -1041,6 +1131,13 @@ _AMR_REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1093/nar/gky1080"),
 ]
 
+# Operon kaynağı — yalnız m14 çalıştıysa (DOI doğrulandı).
+_OPERON_REFERENCES: list[tuple[str, str]] = [
+    ("Moreno-Hagelsieb G, Collado-Vides J. A powerful non-homology method for the prediction of operons "
+     "in prokaryotes. Bioinformatics. 2002;18(Suppl 1):S329–S336.",
+     "https://doi.org/10.1093/bioinformatics/18.suppl_1.S329"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
@@ -1048,12 +1145,13 @@ def _ref_link_label(url: str) -> str:
 
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                        gsea_ran: bool = False, semantic_ran: bool = False,
-                       amr_ran: bool = False) -> str:
+                       amr_ran: bool = False, operon_ran: bool = False) -> str:
     refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
             + (_GSEA_REFERENCES if gsea_ran else [])
             + (_SEMANTIC_REFERENCES if semantic_ran else [])
-            + (_AMR_REFERENCES if amr_ran else []))
+            + (_AMR_REFERENCES if amr_ran else [])
+            + (_OPERON_REFERENCES if operon_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -1101,6 +1199,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                        ("reduced_ora_up", "reduced_ora_down", "reduced_gsea_go"))
     amr_ran = (inputs.get("amr_genes") is not None
                or inputs.get("virulence_genes") is not None)
+    operon_ran = inputs.get("operons") is not None
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -1118,8 +1217,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_gsea(inputs, L, lang),
         section_semantic(inputs, L, lang),
         section_amr(inputs, L, lang),
-        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran),
-        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran),
+        section_operon(inputs, L, lang),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'

@@ -19,7 +19,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
-    "quantification", "enrichment", "amr",
+    "quantification", "enrichment", "amr", "operon",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -102,6 +102,12 @@ class AMR:
 
 
 @dataclass(frozen=True)
+class Operon:
+    # m14 operon tahmini: aynı yönde bitişik + intergenik gap ≤ max_gap (bp) genler aynı operon.
+    max_gap: int = 50
+
+
+@dataclass(frozen=True)
 class Report:
     language: str = "tr"
 
@@ -128,6 +134,7 @@ class Config:
     quantification: Quantification = field(default_factory=Quantification)
     enrichment: Enrichment = field(default_factory=Enrichment)
     amr: AMR = field(default_factory=AMR)
+    operon: Operon = field(default_factory=Operon)
 
 
 def _one_of(value, allowed, field: str):
@@ -219,6 +226,7 @@ def load_config(path: Path | str) -> Config:
     quantification_raw = _section(raw, "quantification")
     enrichment_raw = _section(raw, "enrichment")
     amr_raw = _section(raw, "amr")
+    operon_raw = _section(raw, "operon")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -282,4 +290,5 @@ def load_config(path: Path | str) -> Config:
             min_identity=_as_float(amr_raw.get("min_identity", 80.0), "amr.min_identity"),
             min_coverage=_as_float(amr_raw.get("min_coverage", 80.0), "amr.min_coverage"),
         ),
+        operon=Operon(max_gap=_as_int(operon_raw.get("max_gap", 50), "operon.max_gap")),
     )
