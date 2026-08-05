@@ -9,6 +9,22 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m10 KEGG PATHWAY ORA TAMAM ve `main`'de (2026-08-05, merge `b78c62a`, push). Dalga 1 #1.**
+  m09 motorunu (`enrichment.py`) **DEĞİŞTİRMEDEN** kullanır (jenerik gen→set). Yeni `rnaforge kegg`
+  subcommand; gate YOK, verdict m06'dan taşınır. **282 test yeşil.**
+  - **Annotation** (`kegg_annotation.py`): KEGG REST 3 dosyası (link/pathway, list/pathway, list/<org>)
+    → gen→pathway; join **KEGG b-number → gen sembolü → locus_tag** (TAM+BENZERSİZ, m09 `_symbol_to_locus`
+    yeniden; belirsiz ATILIR). Global/overview map'ler (01100 vb.) ORA'dan hariç. **Organizma-agnostik**
+    (`enrichment.kegg_organism` config'ten; eco/hsa/mmu → **ökaryota taşınır**).
+  - **Figür/rapor:** `enrichment.R` + manifest **parametrize** (title/basename prefix) — GO ve KEGG ortak;
+    m09 R yolu bozulmadı. Rapordaki "Fonksiyonel Zenginleştirme" bölümü **GO + KEGG alt-bölümleri** gösterir
+    (tolerant). Yöntemler'e KEGG paragrafı + Kaynaklar'a Kanehisa & Goto 2000 (yalnız kegg koştuysa).
+  - **Referans (gitignore'lu):** `references/kegg/eco/{pathway_links,pathway_names,gene_list}.tsv` (KEGG REST).
+  - **GSE300731 canlı:** 6 UP + 9 DOWN anlamlı yolak, 1557 gen KEGG-eşlemeli. **UP = peptidoglikan biyosentezi
+    (hücre duvarı stresi) + ekzopolisakkarit + siderofor/enterobaktin** (GO "kolanik asit/slime layer/
+    enterobaktin" ile birebir). **DOWN = oksidatif fosforilasyon (padj 1e-12)/glikoliz/nitrojen** (respirasyon —
+    GO ile birebir). Rapor 3.6 MB, 12 gömülü figür (8 DE + 2 GO + 2 KEGG). Verdict SUSPECT değişmedi.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m10-kegg*`.
 - **★ m09 GO FONKSİYONEL ZENGİNLEŞTİRME (ORA) TAMAM ve `main`'de (2026-08-05, merge `874068a`, push).**
   A yalın yol. Zincir: m06→m07→**m09**→m08. Yeni `rnaforge enrich` subcommand; **gate YOK**, verdict
   m06/m07'den değişmeden taşınır. **263 test yeşil** (37 yeni).
@@ -172,14 +188,23 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 12. ~~m08 = HTML rapor~~ ✅ BİTTİ (2026-08-04) — `main`'de (merge `3c96644`). **PROKARYOT MVP TAMAM.**
 13. ~~m09 = GO ENRICHMENT + rapora ekleme~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `874068a`).
     A yalın yol; GFF+GAF+obo; `rnaforge enrich`; GSE300731 canlı doğrulandı. **PROKARYOT MVP + GO TAMAM.**
-14. **★ SIRADAKİ — Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport/tx2gene) — MVP'nin ikinci kolu.
-    salmon 2.3.4 CLI/index davranışı m04-euk yazılmadan ÖNCE doğrulanmalı (körlemesine güvenme). Bellek
-    `reminder_rnaforge_eukaryote`. m06/m07/m08/m09 zaten organizma-agnostik; ayrım YALNIZ m04/m05'te.
-15. **SONRAKİ:**
-    b) GO agnostik genelleme (B: eggNOG-mapper ~40-100 GB → `/home/ali/eggnog_db/`) — herhangi organizma.
-    c) Opsiyonel cila: m07 PCA etiket kırpması (ggrepel), figür başlık dil-yerelleştirme;
-       m09 enrichment.R çift dilli başlık; m09 build_gene2go GFF'i iki kez parse ediyor (küçük verimlilik).
-    - m06/m07/m08/m09 = ORTAK (organizma-agnostik) adımlar; hiçbiri yeni FAIL üretmez (gate yok).
+14. ~~m10 = KEGG pathway ORA (Dalga 1 #1)~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `b78c62a`).
+    Motor yeniden kullanım; `rnaforge kegg`; GSE300731 canlı (peptidoglikan/respirasyon, GO ile uyumlu).
+
+### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
+Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
+- **Dalga 1 (m09 motoru + agnostik):** ~~KEGG ORA~~ ✅ → **★ SIRADAKİ: GSEA** (ranked liste, ORA'dan farklı;
+  fgsea/GSEApy; log2FC/stat bizde hazır; GO+KEGG gen setleri üstünde) → Semantic similarity + REVIGO
+  (obo bizde; GO çıktısını indirger; saf Python).
+- **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
+  Operon → PPI (STRING) + community detection.
+- **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
+- **Düşük değer (bakteride):** Reactome, WikiPathways — uyarlanır ama içi boş.
+- **Küçük:** Batch correction (ComBat/removeBatchEffect; DE'de `~batch+condition` zaten mümkün).
+15. **SONRAKİ (downstream sonrası):** Ökaryot yolu (m04-euk salmon 2.3.4 + m05-euk tximport) — MVP'nin
+    ikinci kolu. salmon 2.3.4 CLI/index ÖNCE doğrulanmalı. Bellek `reminder_rnaforge_eukaryote`.
+    m06–m10 zaten agnostik; ayrım YALNIZ m04/m05'te. Ayrıca GO agnostik (eggNOG B yolu).
+    - Cila: m07 PCA etiket kırpması; m09 build_gene2go GFF'i iki kez parse (küçük verimlilik).
 
 ## Kalite kapıları — Ali ile onaylanan kararlar (2026-07-20)
 Gerekçe: *"Yalancı sonuç asla istemem, müşteri güvenceli alsın"* + *"Sorun varsa sorun var
