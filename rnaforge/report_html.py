@@ -312,6 +312,9 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "ppi" / "communities.tsv").exists() else None,
         "ppi_stats": _read_json(stats / "ppi_statistics.json")
         if (stats / "ppi_statistics.json").exists() else None,
+        "ppi_manifest": json.loads((run_dir / "ppi" / "manifest.json").read_text())
+        if (run_dir / "ppi" / "manifest.json").exists() else None,
+        "ppi_dir": run_dir / "ppi",
     }
 
 
@@ -959,10 +962,11 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
             rows.append([c.get("community_id"), c.get("size"), direction,
                          ", ".join(c.get("genes", "").split(";"))])
         body_html = _table(headers, rows)
+    fig_html = _embed_first_figure(inputs.get("ppi_manifest"), inputs.get("ppi_dir", "."))
     score = stats.get("min_score", 700)
     legend = f'<p class="note">{L["ppi_legend"].format(score=score)}</p>'
     return (f'<section id="ppi"><h2>{_esc(L["ppi"])}</h2>'
-            f'{_intro("ppi", L)}{summary}{body_html}{legend}</section>')
+            f'{_intro("ppi", L)}{summary}{fig_html}{body_html}{legend}</section>')
 
 
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;

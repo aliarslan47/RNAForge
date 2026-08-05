@@ -9,8 +9,9 @@ from rnaforge.config import Config
 from rnaforge.enrichment import deg_sets
 from rnaforge.go_annotation import parse_gff_go
 from rnaforge.ppi import (
-    build_deg_network, detect_communities, parse_string_info, parse_string_links,
-    string_to_locus, summarize_communities,
+    build_deg_network, detect_communities, network_layout, parse_string_info,
+    parse_string_links, run_ppi_r, string_to_locus, summarize_communities,
+    write_network_tsv,
 )
 from rnaforge.state import RunState
 
@@ -89,10 +90,30 @@ def run_ppi(config: Config, metadata_path: Path, run_dir: Path, force: bool = Fa
         _write_communities_tsv(rows, out_dir / "communities.tsv")
         state.heartbeat()
 
+        # Ağ figürü best-effort: en büyük modüller alt-ağı (çekirdek tabloyu bozmasın; hata loglanır).
+        n_figures = 0
+        try:
+            nodes, edges = network_layout(g, comms, gene_symbol, de,
+                                          min_size=p.min_community_size)
+            if nodes:
+                write_network_tsv(nodes, edges, out_dir / "nodes.tsv", out_dir / "edges.tsv")
+                r_out = run_ppi_r(out_dir / "nodes.tsv", out_dir / "edges.tsv", out_dir)
+                if r_out:
+                    log_file.write(r_out if r_out.endswith("\n") else r_out + "\n")
+                if (out_dir / "ppi_network.png").exists():
+                    (out_dir / "manifest.json").write_text(json.dumps(
+                        {"figures": [{"id": "ppi_network", "title": "Protein etkileşim modülleri",
+                                      "png": "ppi_network.png",
+                                      "svg": "ppi_network.svg" if (out_dir / "ppi_network.svg").exists() else None}]},
+                        indent=2))
+                    n_figures = 1
+        except Exception as exc:  # noqa: BLE001 — figür opsiyonel; logla, koşuyu bozma
+            log_file.write(f"m15: ağ figürü üretilemedi (opsiyonel): {exc}\n")
+
         summary = {
             "n_deg": len(deg_ids), "n_deg_in_network": g.number_of_nodes(),
             "n_edges": g.number_of_edges(), "n_communities": len(rows),
-            "min_score": p.min_score, "taxid": p.taxid,
+            "min_score": p.min_score, "taxid": p.taxid, "n_figures": n_figures,
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         log_file.write(f"m15 ppi done: {summary}\n")
