@@ -9,6 +9,15 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ RAPOR YENİDEN YAPILANDIRMA TAMAM ve `main`'de (2026-08-05, merge `9b3bb27`, push).** Ali'nin standart
+  RNA-seq bileşen listesine göre: (1) **Bölüm sırası** = liste sırası (Kalite→DESeq2→Figürler→Top DEG→**GO**→
+  **KEGG**→GSEA→REVIGO→[AMR/Operon/PPI ek]→Yöntem/Kaynak). (2) **GO ve KEGG artık AYRI üst-bölümler**
+  (`section_go`+`section_kegg`; eski birleşik `section_enrichment` bölündü). (3) **Figürler numaralı**
+  (Şekil N / Figure N, belge sırasına göre post-pass regex). (4) **Her analiz bir sayfada** — bölüm-başı
+  `page-break-before` (print/PDF). Operon/PPI/Güvence Kartı **KORUNDU** (Ali "dur" dedi, silme iptal). N_SECTIONS=16.
+  - **★ SIFIRDAN TAM KOŞU doğrulandı** (`runs/20260805_160103_GSE300731_final`, ham FASTQ→rapor, 15 adım):
+    DE **1634 anlamlı (öncekiyle birebir → tekrarlanabilir)**, rapor 6.2 MB, 15 bölüm doğru sırada, 19 numaralı
+    figür, verdict SUSPECT (ctrl_rep3 GC WARN) değişmedi. **370 test yeşil.**
 - **★ m13b AMRFinderPlus (İKİNCİ AMR ARACI, YAN-YANA) TAMAM ve `main`'de (2026-08-05, merge `b04480b`, push).**
   Reviewer geri bildirimi (bağımsız DB-eşleşmeli AMR modülü) karşılandı — aslında m13 zaten CARD/VFDB'yi bağımsız
   modül olarak veriyordu; şimdi **AMRFinderPlus** ikinci araç olarak eklendi ve AMR tablosunda CARD ile **yan yana**
