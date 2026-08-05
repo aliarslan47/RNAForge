@@ -185,3 +185,29 @@ def test_typo_in_top_level_key_raises(tmp_path):
     path = _write(tmp_path, PROK_BODY + '\nrefernce:\n  genome_fasta: "x"\n')
     with pytest.raises(ConfigError, match="refernce"):
         load_config(path)
+
+
+def test_enrichment_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.enrichment.min_term_size == 3
+    assert cfg.enrichment.top_n == 15
+    assert cfg.enrichment.obo is None
+    assert cfg.enrichment.gaf is None
+
+
+def test_enrichment_parsed(tmp_path):
+    body = PROK_BODY + (
+        "\nenrichment:\n  min_term_size: 5\n  top_n: 10\n"
+        "  obo: \"references/go/go-basic.obo\"\n  gaf: \"references/ecoli/ecoli.gaf\"\n"
+    )
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.enrichment.min_term_size == 5
+    assert cfg.enrichment.top_n == 10
+    assert cfg.enrichment.obo.name == "go-basic.obo"
+    assert cfg.enrichment.gaf.name == "ecoli.gaf"
+
+
+def test_enrichment_bad_int_raises(tmp_path):
+    body = PROK_BODY + "\nenrichment:\n  min_term_size: \"three\"\n"
+    with pytest.raises(ConfigError, match="enrichment.min_term_size"):
+        load_config(_write(tmp_path, body))
