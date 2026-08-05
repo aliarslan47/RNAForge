@@ -177,6 +177,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m16 already completed in this run directory",
     )
 
+    alignqc = sub.add_parser("alignqc",
+                             help="insert-size + coverage + read-distribution QC (m17, diagnostik)")
+    alignqc.add_argument("--config", required=True, type=Path)
+    alignqc.add_argument("--metadata", required=True, type=Path)
+    alignqc.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    alignqc.add_argument("--run-id", default="run")
+    alignqc.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m17 already completed in this run directory",
+    )
+
+    multiqc = sub.add_parser("multiqc",
+                             help="MultiQC toplu görünüm — tüm araç çıktılarını birleştirir (m18)")
+    multiqc.add_argument("--config", required=True, type=Path)
+    multiqc.add_argument("--metadata", required=True, type=Path)
+    multiqc.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    multiqc.add_argument("--run-id", default="run")
+    multiqc.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m18 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -502,6 +524,34 @@ def _cmd_ppi(args) -> int:
     return 0
 
 
+def _cmd_alignqc(args) -> int:
+    from rnaforge.modules.m17_alignqc import run_alignqc
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_alignqc(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m17_alignqc already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    ins = (f"{summary['insert_size_mean']:.0f} bç" if summary.get("paired") else "yok (single-end)")
+    print(f"alignqc OK: insert-size {ins}, genome mean depth "
+          f"{summary.get('genome_mean_depth')}×, read-dist {summary.get('read_distribution')}")
+    print(f"run directory: {run_dir}")
+    return 0
+
+
+def _cmd_multiqc(args) -> int:
+    from rnaforge.modules.m18_multiqc import run_multiqc
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_multiqc(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m18_multiqc already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"multiqc OK: {summary.get('n_modules')} modül, rapor {summary.get('report_relpath')}")
+    print(f"run directory: {run_dir}")
+    return 0
+
+
 def _cmd_seqqc(args) -> int:
     from rnaforge.modules.m16_seqqc import run_seqqc
     config = load_config(args.config)
@@ -577,6 +627,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_ppi(args)
         if args.command == "seqqc":
             return _cmd_seqqc(args)
+        if args.command == "alignqc":
+            return _cmd_alignqc(args)
+        if args.command == "multiqc":
+            return _cmd_multiqc(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)

@@ -316,6 +316,12 @@ def load_report_inputs(run_dir: Path) -> dict:
         # m16 seqqc — opsiyonel: çalıştırılmadıysa None.
         "seqqc": _read_json(stats / "seqqc_statistics.json")
         if (stats / "seqqc_statistics.json").exists() else None,
+        # m17 hizalama-sonrası QC (insert-size/read-dist/coverage) — opsiyonel.
+        "alignqc": _read_json(stats / "alignqc_statistics.json")
+        if (stats / "alignqc_statistics.json").exists() else None,
+        # m18 MultiQC toplu görünüm — opsiyonel.
+        "multiqc": _read_json(stats / "multiqc_statistics.json")
+        if (stats / "multiqc_statistics.json").exists() else None,
         "ppi_manifest": json.loads((run_dir / "ppi" / "manifest.json").read_text())
         if (run_dir / "ppi" / "manifest.json").exists() else None,
         "ppi_dir": run_dir / "ppi",
@@ -332,6 +338,12 @@ LABELS: dict[str, dict[str, str]] = {
         "read_len": "Ort. okuma uzunluğu", "quality_col": "Ort. kalite",
         "alignment_rate": "Hizalama oranı", "assignment_rate": "Atama oranı",
         "rrna_pct": "rRNA %", "rrna_mean": "Ortalama rRNA", "strandedness": "Strandedness (çıkarılan)",
+        "dedup_pct": "Benzersiz % (dedup)", "rd_group": "Genomik bölge", "rd_pct": "Okuma %",
+        "cap_per_base": "Şekil — Per-base baz kompozisyonu (A/T/G/C, örnek ortalaması)",
+        "cap_insert_size": "Şekil — Insert-size (fragment uzunluğu) dağılımı",
+        "cap_coverage": "Şekil — Kontig başına ortalama okuma derinliği (coverage)",
+        "cap_read_dist": "Okumaların genomik özelliklere dağılımı (RSeQC read distribution)",
+        "multiqc_note": "Tüm araç çıktılarının toplu MultiQC görünümü:",
         "organism": "Organizma", "platform": "Platform", "design": "Tasarım",
         "gate": "Kapı", "status": "Durum", "measured": "Ölçülen", "threshold": "Eşik",
         "profile": "Profil", "contrast": "Kontrast", "n_genes": "Gen sayısı",
@@ -432,6 +444,12 @@ LABELS: dict[str, dict[str, str]] = {
         "read_len": "Mean read length", "quality_col": "Mean quality",
         "alignment_rate": "Alignment rate", "assignment_rate": "Assignment rate",
         "rrna_pct": "rRNA %", "rrna_mean": "Mean rRNA", "strandedness": "Strandedness (inferred)",
+        "dedup_pct": "Unique % (dedup)", "rd_group": "Genomic region", "rd_pct": "Read %",
+        "cap_per_base": "Figure — Per-base sequence composition (A/T/G/C, sample mean)",
+        "cap_insert_size": "Figure — Insert-size (fragment length) distribution",
+        "cap_coverage": "Figure — Mean read depth (coverage) per contig",
+        "cap_read_dist": "Read distribution across genomic features (RSeQC)",
+        "multiqc_note": "Aggregate MultiQC view of all tool outputs:",
         "organism": "Organism", "platform": "Platform", "design": "Design",
         "gate": "Gate", "status": "Status", "measured": "Measured", "threshold": "Threshold",
         "profile": "Profile", "contrast": "Contrast", "n_genes": "Genes",
@@ -683,17 +701,24 @@ def section_dataset(raw: dict, L: dict) -> str:
 
 
 def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict,
-                    seqqc: dict | None = None) -> str:
+                    seqqc: dict | None = None, qc: dict | None = None,
+                    figures_dir: Path | None = None, alignqc: dict | None = None,
+                    multiqc: dict | None = None) -> str:
     trim = (f'<p>{_esc(L["min_length"])}: {_esc(trimming_cfg.get("min_length"))} · '
             f'{_esc(L["aggressive"])}: {_esc(trimming_cfg.get("aggressive"))}</p>')
     asamp = align.get("samples", {})
     csamp = count.get("samples", {})
     seqqc = seqqc or {}
+    qc = qc or {}
     rrna = (seqqc.get("rrna_per_sample") or {})
+    dedup = (qc.get("deduplication") or {})
     rows = [[sid, _pct(asamp.get(sid, {}).get("alignment_rate")),
              _pct(csamp.get(sid, {}).get("assignment_rate")),
-             _pct(rrna[sid]) if sid in rrna else "—"] for sid in asamp]
-    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"], L["rrna_pct"]], rows, L["cap_quality"])
+             _pct(rrna[sid]) if sid in rrna else "—",
+             (f'{dedup[sid]:.1f}%' if isinstance(dedup.get(sid), (int, float)) else "—")]
+            for sid in asamp]
+    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"], L["rrna_pct"], L["dedup_pct"]],
+                 rows, L["cap_quality"])
     # rRNA% + strandedness özet satırı (m16 çalıştıysa)
     seq_line = ""
     if seqqc:
@@ -702,8 +727,57 @@ def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict,
         seq_line = (f'<p>{_esc(L["rrna_mean"])}: {_pct(seqqc.get("mean_rrna_fraction"))} · '
                     f'{_esc(L["strandedness"])}: {_esc(seqqc.get("inferred_strandedness"))} '
                     f'(≟ {_esc(seqqc.get("declared_strandedness"))} — {_esc(match)})</p>')
+    figs = _quality_figures(qc, figures_dir, alignqc, L)
+    rdist = _read_distribution_table(alignqc, L)
+    mqc = _multiqc_note(multiqc, L)
     return (f'<section id="quality"><h2>{_esc(L["quality"])}</h2>'
-            f'{_intro("quality", L)}{trim}{seq_line}{tbl}</section>')
+            f'{_intro("quality", L)}{trim}{seq_line}{tbl}{rdist}{figs}{mqc}</section>')
+
+
+def _fig_block(png: Path, title: str) -> str:
+    return (f'<figure><img src="{embed_png(png)}" alt="{_esc(title)}"/>'
+            f'<figcaption>{_esc(title)}</figcaption></figure>')
+
+
+def _quality_figures(qc: dict, figures_dir: Path | None,
+                     alignqc: dict | None, L: dict) -> str:
+    """Kalite bölümü QC figürleri: per-base kompozisyon (F1), insert-size (F2),
+    coverage (F4). Yalnız üretilmiş olanlar gömülür."""
+    if figures_dir is None:
+        return ""
+    figures_dir = Path(figures_dir)
+    blocks = []
+    alignqc = alignqc or {}
+    for name, title in (
+        (qc.get("per_base_composition_figure"), L["cap_per_base"]),
+        (alignqc.get("insert_size_figure"), L["cap_insert_size"]),
+        (alignqc.get("coverage_figure"), L["cap_coverage"]),
+    ):
+        if name:
+            png = figures_dir / name
+            if png.exists():
+                blocks.append(_fig_block(png, title))
+    return "".join(blocks)
+
+
+def _read_distribution_table(alignqc: dict | None, L: dict) -> str:
+    """RSeQC read-distribution (F3): okumaların genomik özelliklere yüzde dağılımı."""
+    alignqc = alignqc or {}
+    rd = alignqc.get("read_distribution")
+    if not rd:
+        return ""
+    rows = [[grp, f'{pct:.1f}%'] for grp, pct in rd.items()]
+    return _table([L["rd_group"], L["rd_pct"]], rows, L["cap_read_dist"])
+
+
+def _multiqc_note(multiqc: dict | None, L: dict) -> str:
+    """MultiQC toplu görünüm (F5) — göreli link + kısa not."""
+    multiqc = multiqc or {}
+    rel = multiqc.get("report_relpath")
+    if not rel:
+        return ""
+    return (f'<p class="note">{_esc(L["multiqc_note"])} '
+            f'<a href="{_esc(rel)}">{_esc(rel)}</a></p>')
 
 
 def section_de(de: dict, L: dict) -> str:
@@ -1472,7 +1546,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         header,
         section_confidence(inputs["confidence"], L),
         section_dataset(raw, L),
-        section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L, inputs.get("seqqc")),
+        section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L, inputs.get("seqqc"),
+                        inputs.get("qc"), inputs.get("figures_dir"),
+                        inputs.get("alignqc"), inputs.get("multiqc")),
         section_de(inputs["de"], L),
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],

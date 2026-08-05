@@ -86,6 +86,11 @@ rnaforge counts   --config config/config.yaml --metadata samples.tsv --run-id de
 rnaforge de       --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge figures  --config config/config.yaml --metadata samples.tsv --run-id demo
 
+# opsiyonel QC / tanısal (m04 gerekir; tanısal figür/tablo üretir, asla FAIL vermez)
+rnaforge seqqc    --config config/config.yaml --metadata samples.tsv --run-id demo  # rRNA% + strandedness (m16)
+rnaforge alignqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # insert-size + coverage + read-distribution (m17)
+rnaforge multiqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # toplu MultiQC görünümü (m18, en son)
+
 # opsiyonel fonksiyonel analizler (herhangi alt-küme; her biri referans verisi ister — aşağıya bak)
 rnaforge enrich   --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge kegg     --config config/config.yaml --metadata samples.tsv --run-id demo

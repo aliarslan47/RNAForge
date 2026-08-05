@@ -178,4 +178,6 @@ dependencies:
   - zipp=4.1.0
   - zlib-ng=2.3.3
   - zstd=1.5.7
+  - pip:
+      - multiqc==1.35          # m18 toplu QC görünümü (pip; conda paketi değil)
 prefix: /home/ali/miniconda3/envs/rnaforge-seqqc

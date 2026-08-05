@@ -172,3 +172,45 @@ def test_cli_qc_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
     assert main(["qc", *common]) == 0
     out = capsys.readouterr().out
     assert "quality verdict" in out
+
+
+# --- F1: dedup kapısı + per-base kompozisyon ---
+from rnaforge.modules.m02_qc import build_dedup_gate, mean_per_base_composition  # noqa: E402
+from rnaforge.quality import load_profile  # noqa: E402
+
+
+def test_build_dedup_gate_warns_below_threshold():
+    prof = load_profile("prokaryote")  # dedup_fraction=0.20
+    gate = build_dedup_gate({"s1": 10.0, "s2": 12.0}, prof)  # %10-12 benzersiz -> düşük
+    assert gate.status == WARN
+    assert gate.name == "dedup_fraction"
+    assert "s1" in gate.samples and "s2" in gate.samples
+
+
+def test_build_dedup_gate_passes_above_threshold():
+    prof = load_profile("prokaryote")
+    gate = build_dedup_gate({"s1": 80.0, "s2": 60.0}, prof)
+    assert gate.status == PASS
+    assert gate.samples == ()
+
+
+def test_build_dedup_gate_never_fail():
+    prof = load_profile("prokaryote")
+    gate = build_dedup_gate({"s1": 1.0}, prof)
+    assert gate.status != FAIL  # m02 sözleşmesi
+
+
+def test_mean_per_base_composition_averages_positions():
+    r1 = FastQCReport(modules={}, basic_stats={},
+                      per_base_content=(("1", {"A": 20.0, "T": 30.0, "G": 25.0, "C": 25.0}),))
+    r2 = FastQCReport(modules={}, basic_stats={},
+                      per_base_content=(("1", {"A": 30.0, "T": 30.0, "G": 20.0, "C": 20.0}),))
+    labels, comp = mean_per_base_composition({"s1": r1, "s2": r2})
+    assert labels == ["1"]
+    assert comp["A"] == [25.0]
+    assert comp["G"] == [22.5]
+
+
+def test_mean_per_base_composition_empty_when_no_data():
+    r = FastQCReport(modules={}, basic_stats={})
+    assert mean_per_base_composition({"s1": r}) == ([], {})
