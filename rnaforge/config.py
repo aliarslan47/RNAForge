@@ -99,6 +99,9 @@ class AMR:
     env: str = "rnaforge-amr"
     min_identity: float = 80.0
     min_coverage: float = 80.0
+    # İkinci AMR aracı AMRFinderPlus (yan-yana konkordans). organism verilirse koşar (ör. "Escherichia").
+    amrfinder_organism: str | None = None
+    amrfinder_env: str = "ali-amrfinder"
 
 
 @dataclass(frozen=True)
@@ -301,6 +304,9 @@ def load_config(path: Path | str) -> Config:
             env=str(amr_raw.get("env", "rnaforge-amr")),
             min_identity=_as_float(amr_raw.get("min_identity", 80.0), "amr.min_identity"),
             min_coverage=_as_float(amr_raw.get("min_coverage", 80.0), "amr.min_coverage"),
+            amrfinder_organism=(str(amr_raw["amrfinder_organism"])
+                                if amr_raw.get("amrfinder_organism") else None),
+            amrfinder_env=str(amr_raw.get("amrfinder_env", "ali-amrfinder")),
         ),
         operon=Operon(max_gap=_as_int(operon_raw.get("max_gap", 50), "operon.max_gap")),
         ppi=PPI(

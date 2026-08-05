@@ -47,6 +47,50 @@ def parse_abricate(tsv: Path, min_identity: float = 80.0, min_coverage: float = 
     return hits
 
 
+def run_amrfinder(genome_fa: Path, out_tsv: Path, organism: str,
+                  env: str = "ali-amrfinder") -> str:
+    """AMRFinderPlus (--nucleotide --plus). --plus: küratörlü ek AMR/stres (K-12'de core=0).
+    stdout out_tsv'ye. stderr döndür, hatada gürültülü yüksel."""
+    out_tsv = Path(out_tsv)
+    out_tsv.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["conda", "run", "-n", env, "amrfinder", "--nucleotide", str(genome_fa),
+           "--organism", organism, "--plus", "--quiet"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"amrfinder failed (exit {r.returncode}):\n{r.stderr}")
+    out_tsv.write_text(r.stdout)
+    return r.stderr or ""
+
+
+def parse_amrfinder(tsv: Path, min_identity: float = 80.0, min_coverage: float = 80.0) -> list[dict]:
+    """AMRFinderPlus TSV -> hit'ler (abricate ile aynı dict şekli). Type ∈ {AMR, STRESS} tutulur."""
+    tsv = Path(tsv)
+    if not tsv.exists():
+        return []
+    hits = []
+    with tsv.open() as f:
+        for row in csv.DictReader(f, delimiter="\t"):
+            if row.get("Type") not in ("AMR", "STRESS"):
+                continue
+            try:
+                pct_id = float(row.get("% Identity to reference", ""))
+                pct_cov = float(row.get("% Coverage of reference", ""))
+                start, end = int(row["Start"]), int(row["Stop"])
+            except (ValueError, KeyError, TypeError):
+                continue
+            if pct_id < min_identity or pct_cov < min_coverage:
+                continue
+            if end < start:
+                start, end = end, start
+            hits.append({
+                "contig": row.get("Contig id", ""), "start": start, "end": end,
+                "gene": row.get("Element symbol", ""), "pct_id": pct_id, "pct_cov": pct_cov,
+                "db": "amrfinderplus", "product": row.get("Element name", ""),
+                "resistance": row.get("Class", ""),
+            })
+    return hits
+
+
 def gene_coords(gff: Path) -> list[dict]:
     """GFF `gene` feature'larından {contig, start, end, locus_tag, symbol}."""
     out = []
