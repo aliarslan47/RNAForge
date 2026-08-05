@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 11
+N_SECTIONS = 12
 
 
 def _num(v):
@@ -65,6 +65,21 @@ def parse_gsea_tsv(path: Path) -> list[dict]:
             row["size"] = int(row["size"]) if row.get("size") not in (None, "") else None
             for k in ("ES", "NES", "pval", "padj"):
                 row[k] = _num(row.get(k))
+            rows.append(row)
+    return rows
+
+
+def parse_reduced_tsv(path: Path) -> list[dict]:
+    """m12 reduced_*.tsv -> tipli satırlar (go_id, namespace, term, padj, n_collapsed, members)."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            row["padj"] = _num(row.get("padj"))
+            row["n_collapsed"] = int(row["n_collapsed"]) if row.get("n_collapsed") else 1
             rows.append(row)
     return rows
 
@@ -220,6 +235,13 @@ def load_report_inputs(run_dir: Path) -> dict:
         "gsea_manifest": json.loads((run_dir / "gsea" / "manifest.json").read_text())
         if (run_dir / "gsea" / "manifest.json").exists() else None,
         "gsea_dir": run_dir / "gsea",
+        # m12 REVIGO — opsiyonel: çalıştırılmadıysa None.
+        "reduced_ora_up": parse_reduced_tsv(run_dir / "semantic" / "reduced_ora_up.tsv")
+        if (run_dir / "semantic" / "reduced_ora_up.tsv").exists() else None,
+        "reduced_ora_down": parse_reduced_tsv(run_dir / "semantic" / "reduced_ora_down.tsv")
+        if (run_dir / "semantic" / "reduced_ora_down.tsv").exists() else None,
+        "reduced_gsea_go": parse_reduced_tsv(run_dir / "semantic" / "reduced_gsea_go.tsv")
+        if (run_dir / "semantic" / "reduced_gsea_go.tsv").exists() else None,
     }
 
 
@@ -271,6 +293,16 @@ LABELS: dict[str, dict[str, str]] = {
             "yoğunlaştığını ölçer. <b>NES</b> = normalize zenginleşme skoru: pozitif → set artan (yüksek) "
             "genlerde, negatif → azalan genlerde zenginleşmiş. <b>Öncü genler</b> = skora en çok katkı veren "
             "çekirdek genler. Yalnız padj &lt; 0,05 gösterilir; tam liste gsea/ TSV dosyalarındadır."),
+        "semantic": "Anlamsal İndirgeme (REVIGO)", "n_collapsed": "Temsil ettiği terim",
+        "sem_ora_up": "Artan GO terimleri (temsilciler)", "sem_ora_down": "Azalan GO terimleri (temsilciler)",
+        "sem_gsea_go": "GSEA GO terimleri (temsilciler)",
+        "sem_summary": "{n} anlamlı terim → {m} temsilci",
+        "semantic_not_run": "Anlamsal indirgeme bu koşuda çalıştırılmadı (rnaforge semantic ile üretilir).",
+        "semantic_legend": (
+            "Fazlalık GO terimleri (parent/child, benzer süreçler) Lin semantik benzerliğiyle kümelenip "
+            "her kümeden en iyi padj'li <b>temsilci</b> tutulur (REVIGO fikri). <b>Temsil ettiği terim</b> = "
+            "o temsilcinin altında toplanan terim sayısı. Namespace (BP/MF/CC) ayrı işlenir; tam üye "
+            "listesi semantic/ TSV dosyalarındadır."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -318,6 +350,16 @@ LABELS: dict[str, dict[str, str]] = {
             "that ranking. <b>NES</b> = normalized enrichment score: positive → the set is enriched among "
             "up-regulated (high) genes, negative → among down-regulated genes. <b>Leading edge</b> = the "
             "core genes driving the score. Only padj &lt; 0.05 shown; full lists in the gsea/ TSV files."),
+        "semantic": "Semantic Reduction (REVIGO)", "n_collapsed": "Terms represented",
+        "sem_ora_up": "Up GO terms (representatives)", "sem_ora_down": "Down GO terms (representatives)",
+        "sem_gsea_go": "GSEA GO terms (representatives)",
+        "sem_summary": "{n} significant terms → {m} representatives",
+        "semantic_not_run": "Semantic reduction was not run for this run (produced by rnaforge semantic).",
+        "semantic_legend": (
+            "Redundant GO terms (parent/child, similar processes) are clustered by Lin semantic similarity "
+            "and the best-padj <b>representative</b> is kept per cluster (the REVIGO idea). <b>Terms "
+            "represented</b> = how many terms collapsed into that representative. Namespaces (BP/MF/CC) are "
+            "processed separately; full member lists are in the semantic/ TSV files."),
     },
 }
 
@@ -376,6 +418,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                       "Anlamlı terimler (padj<0.05) hangi biyolojik süreçlerin değiştiğini özetler.",
         "gsea": "Tüm genlerin sıralı listesinde koordineli değişen gen setleri (GSEA, fgsea). "
                 "ORA'nın kaçırabildiği zayıf ama tutarlı sinyalleri yakalar.",
+        "semantic": "Zenginleşen GO terimlerinin fazlalığı, semantik benzerlikle temsilcilere indirgenmiş "
+                    "öz görünümü. Uzun listeleri okunur kılar.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -390,6 +434,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                       "Significant terms (padj<0.05) summarise which biological processes changed.",
         "gsea": "Gene sets that change coordinately across the full ranked gene list (GSEA, fgsea). "
                 "Captures weak but consistent signals that ORA can miss.",
+        "semantic": "A concise view of the enriched GO terms, reduced to representatives by semantic "
+                    "similarity. Makes long lists readable.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -646,6 +692,41 @@ def section_gsea(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("gsea", L)}{"".join(blocks)}</section>')
 
 
+def _reduced_table(rows: list[dict], L: dict) -> str:
+    """Temsilci GO terimleri: term, namespace, padj, temsil ettiği terim sayısı."""
+    if not rows:
+        return f'<p>{_esc(L["no_enrichment"])}</p>'
+    n_terms = sum(r.get("n_collapsed", 1) for r in rows)
+    summary = f'<p class="note">{_esc(L["sem_summary"].format(n=n_terms, m=len(rows)))}</p>'
+    headers = [L["go_term"], L["namespace"], L["padj"], L["n_collapsed"]]
+    body = []
+    for r in sorted(rows, key=lambda x: -(x.get("n_collapsed") or 1)):
+        body.append([
+            r.get("term") or r.get("go_id"), r.get("namespace"),
+            f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
+            r.get("n_collapsed"),
+        ])
+    return summary + _table(headers, body)
+
+
+def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
+    sources = [("sem_ora_up", inputs.get("reduced_ora_up")),
+               ("sem_ora_down", inputs.get("reduced_ora_down")),
+               ("sem_gsea_go", inputs.get("reduced_gsea_go"))]
+    if all(rows is None for _, rows in sources):
+        return (f'<section id="semantic"><h2>{_esc(L["semantic"])}</h2>'
+                f'<p class="note">{_esc(L["semantic_not_run"])}</p></section>')
+    blocks = []
+    for label, rows in sources:
+        if rows is None:
+            continue
+        blocks.append(f'<h3>{_esc(L[label])}</h3>')
+        blocks.append(_reduced_table(rows, L))
+    blocks.append(f'<p class="note">{L["semantic_legend"]}</p>')
+    return (f'<section id="semantic"><h2>{_esc(L["semantic"])}</h2>'
+            f'{_intro("semantic", L)}{"".join(blocks)}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -743,8 +824,23 @@ _GSEA_METHODS: dict[str, str] = {
 }
 
 
+_SEMANTIC_METHODS: dict[str, str] = {
+    "tr": (
+        "Zenginleşen GO terimlerinin fazlalığı, terim çiftleri arasındaki Lin semantik benzerliğiyle "
+        "(bilgi içeriği arka plan anotasyonundan türetildi) azaltıldı: benzerliği {thr} eşiğini aşan "
+        "terimler, her namespace içinde en iyi düzeltilmiş p-değerli temsilci altında toplandı (REVIGO yaklaşımı)."
+    ),
+    "en": (
+        "Redundancy among enriched GO terms was reduced using Lin semantic similarity between term pairs "
+        "(information content derived from the background annotation): terms exceeding a similarity of "
+        "{thr} were collapsed, within each namespace, under the representative with the best adjusted "
+        "p-value (the REVIGO approach)."
+    ),
+}
+
+
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
-                    gsea_ran: bool = False) -> str:
+                    gsea_ran: bool = False, semantic_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -765,6 +861,9 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
         g = _GSEA_METHODS[lang].format(min_size=config.enrichment.gsea_min_size,
                                        max_size=config.enrichment.gsea_max_size)
         paras += f'<p>{_esc(g)}</p>'
+    if semantic_ran:
+        s = _SEMANTIC_METHODS[lang].format(thr=config.enrichment.revigo_similarity)
+        paras += f'<p>{_esc(s)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -817,16 +916,25 @@ _GSEA_REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1101/060012"),
 ]
 
+# Semantic reduction kaynakları — yalnız m12 çalıştıysa (DOI doğrulandı).
+_SEMANTIC_REFERENCES: list[tuple[str, str]] = [
+    ("Lin D. An information-theoretic definition of similarity. Proc 15th Int Conf Machine Learning "
+     "(ICML). 1998:296–304.", "https://dl.acm.org/doi/10.5555/645527.657297"),
+    ("Supek F, Bošnjak M, Škunca N, Šmuc T. REVIGO summarizes and visualizes long lists of gene "
+     "ontology terms. PLoS One. 2011;6(7):e21800.", "https://doi.org/10.1371/journal.pone.0021800"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
 
 
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
-                       gsea_ran: bool = False) -> str:
+                       gsea_ran: bool = False, semantic_ran: bool = False) -> str:
     refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
-            + (_GSEA_REFERENCES if gsea_ran else []))
+            + (_GSEA_REFERENCES if gsea_ran else [])
+            + (_SEMANTIC_REFERENCES if semantic_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -870,6 +978,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                 or inputs.get("kegg_down") is not None)
     gsea_ran = (inputs.get("gsea_go") is not None
                 or inputs.get("gsea_kegg") is not None)
+    semantic_ran = any(inputs.get(k) is not None for k in
+                       ("reduced_ora_up", "reduced_ora_down", "reduced_gsea_go"))
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -885,8 +995,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_enrichment(inputs, L, lang),
         section_gsea(inputs, L, lang),
-        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran),
-        section_references(L, enrichment_ran, kegg_ran, gsea_ran),
+        section_semantic(inputs, L, lang),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'

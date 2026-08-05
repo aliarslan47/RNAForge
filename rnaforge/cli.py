@@ -127,6 +127,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m11 already completed in this run directory",
     )
 
+    semantic = sub.add_parser("semantic", help="REVIGO-like semantic reduction of GO terms (m12)")
+    semantic.add_argument("--config", required=True, type=Path)
+    semantic.add_argument("--metadata", required=True, type=Path)
+    semantic.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    semantic.add_argument("--run-id", default="run")
+    semantic.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m12 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -365,6 +375,28 @@ def _cmd_gsea(args) -> int:
     return 0
 
 
+def _cmd_semantic(args) -> int:
+    from rnaforge.modules.m12_semantic import run_semantic
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_semantic(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m12_semantic already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    colls = ", ".join(f"{k}: {v['n_terms']}→{v['n_representatives']}"
+                      for k, v in summary["collections"].items())
+    print(f"semantic OK: GO terms reduced ({colls})")
+    print(f"run directory: {run_dir}")
+    # GATE YOK: güvence kartı yalnız m06/m07 verdict'ini taşır.
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -408,6 +440,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_kegg(args)
         if args.command == "gsea":
             return _cmd_gsea(args)
+        if args.command == "semantic":
+            return _cmd_semantic(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)

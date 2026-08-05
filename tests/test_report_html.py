@@ -478,3 +478,44 @@ def test_methods_refs_gsea_when_ran():
     assert "10.1073/pnas.0506580102" in refs         # Subramanian 2005
     refs_no = section_references(LABELS["en"], gsea_ran=False)
     assert "10.1073/pnas.0506580102" not in refs_no
+
+
+from rnaforge.report_html import parse_reduced_tsv, section_semantic
+
+
+def _reduced_tsv(tmp_path):
+    p = tmp_path / "reduced_ora_up.tsv"
+    p.write_text(
+        "go_id\tnamespace\tterm\tpadj\tn_collapsed\tmembers\n"
+        "GO:0000271\tBP\tpolysaccharide biosynthetic process\t1.0e-06\t7\tGO:0000271;GO:0009250;GO:0045226\n"
+        "GO:0016020\tCC\tmembrane\t2.0e-04\t3\tGO:0016020;GO:0005886\n"
+    )
+    return parse_reduced_tsv(p)
+
+
+def test_parse_reduced_tsv_types(tmp_path):
+    rows = _reduced_tsv(tmp_path)
+    assert rows[0]["n_collapsed"] == 7 and rows[0]["padj"] == 1.0e-06
+
+
+def test_section_semantic_present(tmp_path):
+    inputs = {"reduced_ora_up": _reduced_tsv(tmp_path), "reduced_ora_down": None,
+              "reduced_gsea_go": None}
+    html = section_semantic(inputs, LABELS["tr"], "tr")
+    assert "REVIGO" in html
+    assert "polysaccharide biosynthetic process" in html
+    assert "10 anlamlı terim → 2 temsilci" in html      # 7+3 üye -> 2 temsilci
+
+
+def test_section_semantic_absent_note():
+    html = section_semantic({"reduced_ora_up": None, "reduced_ora_down": None,
+                             "reduced_gsea_go": None}, LABELS["en"], "en")
+    assert "was not run" in html
+
+
+def test_methods_refs_semantic_when_ran():
+    withs = section_methods(_cfg("tr"), LABELS["tr"], semantic_ran=True)
+    assert "REVIGO" in withs and "Lin" in withs
+    refs = section_references(LABELS["en"], semantic_ran=True)
+    assert "10.1371/journal.pone.0021800" in refs        # Supek 2011 (REVIGO)
+    assert "10.1371/journal.pone.0021800" not in section_references(LABELS["en"], semantic_ran=False)

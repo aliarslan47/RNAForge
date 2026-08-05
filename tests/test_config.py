@@ -234,3 +234,12 @@ def test_enrichment_gsea_sizes(tmp_path):
 def test_enrichment_gsea_defaults(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY))
     assert cfg.enrichment.gsea_min_size == 15 and cfg.enrichment.gsea_max_size == 500
+
+
+def test_enrichment_revigo_similarity(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\nenrichment:\n  revigo_similarity: 0.5\n"))
+    assert cfg.enrichment.revigo_similarity == 0.5
+
+
+def test_enrichment_revigo_default(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).enrichment.revigo_similarity == 0.7
