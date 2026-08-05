@@ -19,7 +19,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
-    "quantification",
+    "quantification", "enrichment",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -71,6 +71,17 @@ class Quantification:
 
 
 @dataclass(frozen=True)
+class Enrichment:
+    # m09 GO ORA. min_term_size: gürültü filtresi (arka planda < bu kadar genli terim atlanır).
+    # top_n: figürde gösterilen zenginleşmiş terim sayısı. obo/gaf: referans yolları (yoksa
+    # modül yüksek sesle hata; gaf None ise GAF doldurma atlanır — GFF+propagation yeterli).
+    min_term_size: int = 3
+    top_n: int = 15
+    obo: Path | None = None
+    gaf: Path | None = None
+
+
+@dataclass(frozen=True)
 class Report:
     language: str = "tr"
 
@@ -95,6 +106,7 @@ class Config:
     paired: bool | None = None
     quality: dict = field(default_factory=dict)
     quantification: Quantification = field(default_factory=Quantification)
+    enrichment: Enrichment = field(default_factory=Enrichment)
 
 
 def _one_of(value, allowed, field: str):
@@ -184,6 +196,7 @@ def load_config(path: Path | str) -> Config:
     report_raw = _section(raw, "report")
     resources_raw = _section(raw, "resources")
     quantification_raw = _section(raw, "quantification")
+    enrichment_raw = _section(raw, "enrichment")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -226,5 +239,11 @@ def load_config(path: Path | str) -> Config:
         quantification=Quantification(
             feature_type=str(quantification_raw.get("feature_type", "exon")),
             attribute=str(quantification_raw.get("attribute", "gene_id")),
+        ),
+        enrichment=Enrichment(
+            min_term_size=_as_int(enrichment_raw.get("min_term_size", 3), "enrichment.min_term_size"),
+            top_n=_as_int(enrichment_raw.get("top_n", 15), "enrichment.top_n"),
+            obo=(Path(enrichment_raw["obo"]) if enrichment_raw.get("obo") else None),
+            gaf=(Path(enrichment_raw["gaf"]) if enrichment_raw.get("gaf") else None),
         ),
     )

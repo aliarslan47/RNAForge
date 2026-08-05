@@ -304,3 +304,51 @@ def test_section_figures_shows_caption(tmp_path):
 def test_render_report_has_section_intro(tmp_path):
     doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
     assert 'class="intro"' in doc and SECTION_INTRO["tr"]["confidence"][:12] in doc
+
+
+from rnaforge.report_html import parse_enrichment_tsv, section_enrichment, LABELS
+
+
+def _enrich_rows_tsv(tmp_path):
+    p = tmp_path / "enrichment_up.tsv"
+    p.write_text(
+        "go_id\tnamespace\tterm\tstudy_count\tstudy_n\tbg_count\tbg_n\texpected\t"
+        "fold_enrichment\tp_value\tp_adj\tgenes\n"
+        "GO:0009279\tCC\touter membrane\t8\t40\t20\t400\t2.0\t4.0\t1.0e-05\t2.0e-04\tpspA;ompC\n"
+        "GO:0006979\tBP\tresponse to oxidative stress\t5\t40\t15\t400\t1.5\t3.3\t1.0e-03\t8.0e-01\tkatE\n"
+    )
+    return parse_enrichment_tsv(p)
+
+
+def test_parse_enrichment_tsv_types(tmp_path):
+    rows = _enrich_rows_tsv(tmp_path)
+    assert rows[0]["go_id"] == "GO:0009279"
+    assert rows[0]["study_count"] == 8 and rows[0]["bg_count"] == 20
+    assert rows[0]["fold_enrichment"] == 4.0 and rows[0]["p_adj"] == 2.0e-04
+
+
+def test_parse_enrichment_tsv_missing_empty(tmp_path):
+    assert parse_enrichment_tsv(tmp_path / "nope.tsv") == []
+
+
+def test_section_enrichment_present(tmp_path):
+    up = _enrich_rows_tsv(tmp_path)
+    inputs = {"enrichment_up": up, "enrichment_down": [], "enrichment_manifest": None,
+              "enrichment_dir": tmp_path}
+    html = section_enrichment(inputs, LABELS["tr"], "tr")
+    assert "Fonksiyonel Zenginleştirme" in html
+    assert "outer membrane" in html                      # anlamlı terim (padj<0.05) tabloda
+    assert "response to oxidative stress" not in html     # padj=0.8 -> anlamlı değil, elenmiş
+    assert "bulunamadı" in html                           # down boş -> "no enrichment" notu
+
+
+def test_section_enrichment_not_run(tmp_path):
+    inputs = {"enrichment_up": None, "enrichment_down": None}
+    html = section_enrichment(inputs, LABELS["en"], "en")
+    assert "was not run" in html                          # dürüst not, kırılmaz
+
+
+def test_render_report_go_section_absent_note(tmp_path):
+    # _full_inputs enrichment içermez -> render_report "not run" bölümü basar, kırılmaz.
+    doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
+    assert 'id="enrichment"' in doc and "çalıştırılmadı" in doc

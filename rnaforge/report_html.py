@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 9
+N_SECTIONS = 10
 
 
 def _num(v):
@@ -32,6 +32,23 @@ def parse_de_results(path: Path) -> list[dict]:
             for k in ("baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj"):
                 if k in row:
                     row[k] = _num(row[k])
+            rows.append(row)
+    return rows
+
+
+def parse_enrichment_tsv(path: Path) -> list[dict]:
+    """m09 enrichment_{up,down}.tsv -> tipli satırlar. Yoksa/başlık-only -> boş liste."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            for k in ("study_count", "study_n", "bg_count", "bg_n"):
+                row[k] = int(row[k]) if row.get(k) not in (None, "") else None
+            for k in ("expected", "fold_enrichment", "p_value", "p_adj"):
+                row[k] = _num(row[k])
             rows.append(row)
     return rows
 
@@ -145,6 +162,8 @@ def load_report_inputs(run_dir: Path) -> dict:
     if not de_tsv.exists():
         raise FileNotFoundError(f"m08 report input missing: {de_tsv}")
     figures_dir = run_dir / "figures"
+    enrich_dir = run_dir / "enrichment"
+    enrich_manifest = enrich_dir / "manifest.json"
     return {
         "norm_counts": parse_normalized_counts(de_dir / "normalized_counts.tsv"),
         "coldata": parse_coldata(de_dir / "coldata.tsv"),
@@ -159,6 +178,14 @@ def load_report_inputs(run_dir: Path) -> dict:
         "de_results": parse_de_results(de_tsv),
         "gene_map": load_gene_map(figures_dir / "gene_map.tsv"),
         "figures_dir": figures_dir,
+        # m09 zenginleştirme — opsiyonel: çalıştırılmadıysa None (rapor dürüstçe not düşer, kırılmaz).
+        "enrichment_up": parse_enrichment_tsv(enrich_dir / "enrichment_up.tsv")
+        if (enrich_dir / "enrichment_up.tsv").exists() else None,
+        "enrichment_down": parse_enrichment_tsv(enrich_dir / "enrichment_down.tsv")
+        if (enrich_dir / "enrichment_down.tsv").exists() else None,
+        "enrichment_manifest": json.loads(enrich_manifest.read_text())
+        if enrich_manifest.exists() else None,
+        "enrichment_dir": enrich_dir,
     }
 
 
@@ -181,6 +208,14 @@ LABELS: dict[str, dict[str, str]] = {
         "summary": "Özet",
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
         "mean_suffix": "ort.",
+        "enrichment": "Fonksiyonel Zenginleştirme (GO)",
+        "go_term": "GO terimi", "go_id": "GO id", "namespace": "Kategori",
+        "fold": "Kat-zenginleşme", "study_bg": "Set / arka plan",
+        "enrichment_up": "Artan genlerde zenginleşen GO terimleri",
+        "enrichment_down": "Azalan genlerde zenginleşen GO terimleri",
+        "no_enrichment": "Bu yönde anlamlı zenginleşen GO terimi bulunamadı.",
+        "enrichment_not_run": "GO zenginleştirme bu koşuda çalıştırılmadı "
+                              "(rnaforge enrich ile aynı --run-id üzerinde üretilir).",
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -200,6 +235,14 @@ LABELS: dict[str, dict[str, str]] = {
         "summary": "Summary",
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
         "mean_suffix": "mean",
+        "enrichment": "Functional Enrichment (GO)",
+        "go_term": "GO term", "go_id": "GO id", "namespace": "Category",
+        "fold": "Fold enrichment", "study_bg": "Study / background",
+        "enrichment_up": "GO terms enriched among up-regulated genes",
+        "enrichment_down": "GO terms enriched among down-regulated genes",
+        "no_enrichment": "No significantly enriched GO terms in this direction.",
+        "enrichment_not_run": "GO enrichment was not run for this run "
+                              "(produced by rnaforge enrich on the same --run-id).",
     },
 }
 
@@ -223,8 +266,14 @@ FIGURE_CAPTIONS: dict[str, dict[str, str]] = {
         "volcano": "log2 fold change vs -log10 padj. Top-right = significant up, top-left = significant down genes.",
         "ma": "Mean expression vs log2 fold change. Significant genes coloured; spread widens at low counts.",
         "heatmap": "Per-sample z-scores of the top 40 DEGs. Contrasting colour blocks between conditions are expected.",
+        "enrichment_up": "GO terms enriched among up-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
+        "enrichment_down": "GO terms enriched among down-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
     },
 }
+FIGURE_CAPTIONS["tr"].update({
+    "enrichment_up": "Artan genlerde zenginleşen GO terimleri; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
+    "enrichment_down": "Azalan genlerde zenginleşen GO terimleri; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
+})
 
 SECTION_INTRO: dict[str, dict[str, str]] = {
     "tr": {
@@ -234,6 +283,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "de": "Koşullar arası diferansiyel ekspresyon özeti (DESeq2).",
         "figures": "Kalite, model tanısı ve sonuç görselleri. Her figürün altında nasıl okunacağı açıklanmıştır.",
         "table": "İstatistiksel eşiği geçen en güçlü artan ve azalan genler.",
+        "enrichment": "Artan ve azalan DEG'lerde aşırı temsil edilen GO terimleri (hipergeometrik ORA, BH-FDR). "
+                      "Anlamlı terimler (padj<0.05) hangi biyolojik süreçlerin değiştiğini özetler.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -244,6 +295,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "de": "Summary of differential expression between conditions (DESeq2).",
         "figures": "Quality, model-diagnostic and result figures. Each figure includes how to read it.",
         "table": "The strongest up- and down-regulated genes passing the statistical threshold.",
+        "enrichment": "GO terms over-represented among up- and down-regulated DEGs (hypergeometric ORA, BH-FDR). "
+                      "Significant terms (padj<0.05) summarise which biological processes changed.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -382,6 +435,52 @@ def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: d
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
 
 
+_NS_ORDER = ["BP", "MF", "CC"]
+
+
+def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
+    """Anlamlı (padj<0.05) terimleri namespace başına top_n ile tablola. Boşsa not."""
+    sig = [r for r in rows if (r.get("p_adj") is not None and r["p_adj"] < 0.05)]
+    if not sig:
+        return f'<p>{_esc(L["no_enrichment"])}</p>'
+    headers = [L["go_id"], L["go_term"], L["namespace"], L["study_bg"], L["fold"], L["padj"]]
+    body: list[list] = []
+    for ns in _NS_ORDER:
+        grp = [r for r in sig if r.get("namespace") == ns][:top_n]
+        for r in grp:
+            body.append([
+                r["go_id"], r["term"], r["namespace"],
+                f'{r["study_count"]}/{r["bg_count"]}',
+                f'{r["fold_enrichment"]:.1f}' if r["fold_enrichment"] is not None else "—",
+                f'{r["p_adj"]:.2e}' if r["p_adj"] is not None else "—",
+            ])
+    return _table(headers, body)
+
+
+def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
+    up, down = inputs.get("enrichment_up"), inputs.get("enrichment_down")
+    if up is None and down is None:      # m09 çalıştırılmadı — dürüst not, kırılmaz
+        return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
+                f'<p class="note">{_esc(L["enrichment_not_run"])}</p></section>')
+    caps = FIGURE_CAPTIONS.get(lang, FIGURE_CAPTIONS["tr"])
+    figs_dir = Path(inputs.get("enrichment_dir", "."))
+    fig_by_id = {f["id"]: f for f in (inputs.get("enrichment_manifest") or {}).get("figures", [])}
+    blocks = []
+    for direction, rows, fid in (("up", up or [], "enrichment_up"),
+                                 ("down", down or [], "enrichment_down")):
+        blocks.append(f'<h3>{_esc(L["enrichment_" + direction])}</h3>')
+        blocks.append(_enrichment_dir_table(rows, L))
+        fig = fig_by_id.get(fid)
+        if fig and (figs_dir / fig["png"]).exists():
+            cap = caps.get(fid, "")
+            blocks.append(
+                f'<figure><img src="{embed_png(figs_dir / fig["png"])}" '
+                f'alt="{_esc(fig.get("title"))}"/>'
+                f'<figcaption>{_esc(cap)}</figcaption></figure>')
+    return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
+            f'{_intro("enrichment", L)}{"".join(blocks)}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -509,6 +608,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
+        section_enrichment(inputs, L, lang),
         section_methods(config, L),
         section_references(L),
     ])
