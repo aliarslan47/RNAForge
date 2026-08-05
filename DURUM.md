@@ -9,6 +9,18 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m15 PPI + COMMUNITY DETECTION TAMAM ve `main`'de (2026-08-05, merge `2163e86`, push). Dalga 2 #C (son).
+  DOWNSTREAM DALGA 2 TAMAMEN BİTTİ (AMR/Operon/PPI).** STRING PPI alt-ağı + Louvain (networkx, rnaforge-core'a
+  pip). Yeni `rnaforge ppi`; gate YOK. **366 test.**
+  - **Kod:** `ppi.py` (STRING parser + sembol-join + `build_deg_network` + `louvain_communities` seed=42);
+    `modules/m15_ppi.py`. `config.ppi` (PPIConfig: taxid/string_dir/min_score=700/min_community_size=3).
+    Referans gitignore'lu `references/string/<taxid>/` (STRING v12, prep'te indirilir). Rapor "Protein
+    Etkileşim Modülleri" bölümü + kanıt-skoru dürüst notu + STRING2023/Louvain2008 kaynak.
+  - **GSE300731 canlı (kapstone):** 1226/1634 DEG ağda, 4072 kenar, 37 modül. Modüller tüm hikâyeyi
+    protein-kompleks düzeyinde topladı: zarf-stres/kapsül (arn/cps/cpx/basR), efflux (acrABDE/emrABK),
+    hücre-duvarı (fts/dac/lpoB), ABC transporter UP; karbon/yağ asidi/respirasyon DOWN. GO/KEGG/GSEA/AMR/
+    operon ile birebir. Verdict SUSPECT değişmedi. Rapor 4.4 MB, **14 bölüm**.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m15-ppi*`.
 - **★ m14 OPERON ANALİZİ TAMAM ve `main`'de (2026-08-05, merge `90112ef`, push). Dalga 2 #B.**
   İntergenik-mesafe sezgiseli (saf Python, GFF'ten; Ali harici araçtan yalın yerele döndü — Operon-mapper
   web/veri-dışarı, Rockhopper ağır). Yeni `rnaforge operon`; gate YOK; operonlar TAHMİN (dürüst not). **347 test.**
@@ -247,9 +259,10 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 ### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
 - **Dalga 1 ✅ TAMAM:** ~~KEGG ORA~~ (m10) → ~~GSEA~~ (m11, fgsea) → ~~Semantic/REVIGO~~ (m12, Lin). Hepsi agnostik.
-- **Dalga 2 (bakteri overlay):** ~~#A AMR+Virülans~~ ✅ (m13) → ~~#B Operon~~ ✅ (m14) → **★ SIRADAKİ #C:
-  PPI (STRING) + community detection** (protein etkileşim ağı + modül tespiti; STRING per-organism).
-  **DİĞER SEÇENEKLER:** Ökaryot yolu (m04-euk salmon + m05-euk tximport); küçük cila (REVIGO MDS, m07 PCA etiket).
+- **Dalga 2 (bakteri overlay) ✅ TAMAM:** ~~#A AMR~~ (m13) · ~~#B Operon~~ (m14) · ~~#C PPI+community~~ (m15).
+  **★ SIRADAKİ SEÇENEKLER (Ali seçecek):** (a) **Ökaryot yolu** (m04-euk salmon 2.3.4 + m05-euk tximport) —
+  MVP'nin ikinci kolu, `reminder_rnaforge_eukaryote`. (b) **Cila:** PPI/operon ağ figürü, REVIGO MDS scatter,
+  m07 PCA etiket kırpması. (c) GO agnostik (eggNOG). (d) Regulon/Sigma (E.coli-özel, agnostik-kırar — en sona).
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
 - **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
