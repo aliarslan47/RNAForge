@@ -164,6 +164,8 @@ def load_report_inputs(run_dir: Path) -> dict:
     figures_dir = run_dir / "figures"
     enrich_dir = run_dir / "enrichment"
     enrich_manifest = enrich_dir / "manifest.json"
+    kegg_dir = run_dir / "kegg"
+    kegg_manifest = kegg_dir / "manifest.json"
     return {
         "norm_counts": parse_normalized_counts(de_dir / "normalized_counts.tsv"),
         "coldata": parse_coldata(de_dir / "coldata.tsv"),
@@ -186,6 +188,14 @@ def load_report_inputs(run_dir: Path) -> dict:
         "enrichment_manifest": json.loads(enrich_manifest.read_text())
         if enrich_manifest.exists() else None,
         "enrichment_dir": enrich_dir,
+        # m10 KEGG — opsiyonel: çalıştırılmadıysa None.
+        "kegg_up": parse_enrichment_tsv(kegg_dir / "kegg_up.tsv")
+        if (kegg_dir / "kegg_up.tsv").exists() else None,
+        "kegg_down": parse_enrichment_tsv(kegg_dir / "kegg_down.tsv")
+        if (kegg_dir / "kegg_down.tsv").exists() else None,
+        "kegg_manifest": json.loads(kegg_manifest.read_text())
+        if kegg_manifest.exists() else None,
+        "kegg_dir": kegg_dir,
     }
 
 
@@ -213,7 +223,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fold": "Kat-zenginleşme", "study_bg": "Set / arka plan",
         "enrichment_up": "Artan genlerde zenginleşen GO terimleri",
         "enrichment_down": "Azalan genlerde zenginleşen GO terimleri",
-        "no_enrichment": "Bu yönde anlamlı zenginleşen GO terimi bulunamadı.",
+        "go_heading": "Gene Ontology (GO)", "kegg_heading": "KEGG Yolakları",
+        "kegg_up": "Artan genlerde zenginleşen KEGG yolakları",
+        "kegg_down": "Azalan genlerde zenginleşen KEGG yolakları",
+        "no_enrichment": "Bu yönde anlamlı zenginleşen terim bulunamadı.",
         "enrichment_not_run": "GO zenginleştirme bu koşuda çalıştırılmadı "
                               "(rnaforge enrich ile aynı --run-id üzerinde üretilir).",
         "enrichment_legend": (
@@ -223,7 +236,8 @@ LABELS: dict[str, dict[str, str]] = {
             "arka plandaki (test edilen, anotasyonlu) gen sayısı · <b>Kat-zenginleşme</b>: "
             "gözlenen oranın beklenene oranı (>1 = zenginleşme) · <b>padj</b>: Benjamini–Hochberg ile "
             "çoklu-test düzeltilmiş p-değeri. Yalnız anlamlı terimler (padj &lt; 0,05), kategori başına "
-            "en güçlü ilk 10 gösterilir; tam liste enrichment/enrichment_{up,down}.tsv dosyalarındadır."),
+            "en güçlü ilk 10 gösterilir; tam liste enrichment/ ve kegg/ TSV dosyalarındadır. "
+            "KEGG bölümünde Kategori sütunu 'KEGG' (yolak) anlamına gelir."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -248,7 +262,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fold": "Fold enrichment", "study_bg": "Study / background",
         "enrichment_up": "GO terms enriched among up-regulated genes",
         "enrichment_down": "GO terms enriched among down-regulated genes",
-        "no_enrichment": "No significantly enriched GO terms in this direction.",
+        "go_heading": "Gene Ontology (GO)", "kegg_heading": "KEGG Pathways",
+        "kegg_up": "KEGG pathways enriched among up-regulated genes",
+        "kegg_down": "KEGG pathways enriched among down-regulated genes",
+        "no_enrichment": "No significantly enriched terms in this direction.",
         "enrichment_not_run": "GO enrichment was not run for this run "
                               "(produced by rnaforge enrich on the same --run-id).",
         "enrichment_legend": (
@@ -257,8 +274,8 @@ LABELS: dict[str, dict[str, str]] = {
             "<b>CC</b> = Cellular Component) · <b>Study / background</b>: DEGs in the term / genes in the "
             "background (tested, annotated) · <b>Fold enrichment</b>: observed-to-expected ratio "
             "(>1 = enriched) · <b>padj</b>: Benjamini–Hochberg multiple-testing adjusted p-value. "
-            "Only significant terms (padj &lt; 0.05), top 10 per category, are shown; the full list is in "
-            "enrichment/enrichment_{up,down}.tsv."),
+            "Only significant terms (padj &lt; 0.05), top 10 per category, are shown; the full lists are in "
+            "the enrichment/ and kegg/ TSV files. In the KEGG section the Category column reads 'KEGG' (pathway)."),
     },
 }
 
@@ -289,6 +306,12 @@ FIGURE_CAPTIONS: dict[str, dict[str, str]] = {
 FIGURE_CAPTIONS["tr"].update({
     "enrichment_up": "Artan genlerde zenginleşen GO terimleri; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
     "enrichment_down": "Azalan genlerde zenginleşen GO terimleri; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
+    "kegg_up": "Artan genlerde zenginleşen KEGG yolakları; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
+    "kegg_down": "Azalan genlerde zenginleşen KEGG yolakları; x = kat-zenginleşme, nokta boyutu = gen sayısı, renk = padj.",
+})
+FIGURE_CAPTIONS["en"].update({
+    "kegg_up": "KEGG pathways enriched among up-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
+    "kegg_down": "KEGG pathways enriched among down-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
 })
 
 SECTION_INTRO: dict[str, dict[str, str]] = {
@@ -455,15 +478,18 @@ _NS_ORDER = ["BP", "MF", "CC"]
 
 
 def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
-    """Anlamlı (padj<0.05) terimleri namespace başına top_n ile tablola. Boşsa not."""
+    """Anlamlı (padj<0.05) terimleri namespace başına top_n ile tablola. Boşsa not.
+    Namespace GO (BP/MF/CC) veya KEGG olabilir — bilinen sıra önce, gerisi alfabetik."""
     sig = [r for r in rows if (r.get("p_adj") is not None and r["p_adj"] < 0.05)]
     if not sig:
         return f'<p>{_esc(L["no_enrichment"])}</p>'
+    present = list(dict.fromkeys(r.get("namespace") for r in sig))
+    ordered = [ns for ns in _NS_ORDER if ns in present] + sorted(
+        ns for ns in present if ns not in _NS_ORDER)
     headers = [L["go_id"], L["go_term"], L["namespace"], L["study_bg"], L["fold"], L["padj"]]
     body: list[list] = []
-    for ns in _NS_ORDER:
-        grp = [r for r in sig if r.get("namespace") == ns][:top_n]
-        for r in grp:
+    for ns in ordered:
+        for r in [x for x in sig if x.get("namespace") == ns][:top_n]:
             body.append([
                 r["go_id"], r["term"], r["namespace"],
                 f'{r["study_count"]}/{r["bg_count"]}',
@@ -473,27 +499,45 @@ def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
     return _table(headers, body)
 
 
-def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
-    up, down = inputs.get("enrichment_up"), inputs.get("enrichment_down")
-    if up is None and down is None:      # m09 çalıştırılmadı — dürüst not, kırılmaz
-        return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
-                f'<p class="note">{_esc(L["enrichment_not_run"])}</p></section>')
+def _enrichment_collection(up, down, manifest, figs_dir: Path, L: dict, lang: str,
+                           up_label: str, down_label: str, cap_ids: tuple[str, str]) -> str:
+    """Bir zenginleştirme koleksiyonunu (GO veya KEGG) artan/azalan tablo + figürlerle basar."""
     caps = FIGURE_CAPTIONS.get(lang, FIGURE_CAPTIONS["tr"])
-    figs_dir = Path(inputs.get("enrichment_dir", "."))
-    fig_by_id = {f["id"]: f for f in (inputs.get("enrichment_manifest") or {}).get("figures", [])}
+    fig_by_id = {f["id"]: f for f in (manifest or {}).get("figures", [])}
     blocks = []
-    for direction, rows, fid in (("up", up or [], "enrichment_up"),
-                                 ("down", down or [], "enrichment_down")):
-        blocks.append(f'<h3>{_esc(L["enrichment_" + direction])}</h3>')
+    for rows, lab, fid in ((up or [], up_label, cap_ids[0]),
+                           (down or [], down_label, cap_ids[1])):
+        blocks.append(f'<h4>{_esc(L[lab])}</h4>')
         blocks.append(_enrichment_dir_table(rows, L))
         fig = fig_by_id.get(fid)
-        if fig and (figs_dir / fig["png"]).exists():
+        if fig and (Path(figs_dir) / fig["png"]).exists():
             cap = caps.get(fid, "")
             blocks.append(
-                f'<figure><img src="{embed_png(figs_dir / fig["png"])}" '
-                f'alt="{_esc(fig.get("title"))}"/>'
-                f'<figcaption>{_esc(cap)}</figcaption></figure>')
-    # Tabloların/figürlerin altına sütun + kısaltma (BP/MF/CC) açıklaması. Sabit, kontrollü HTML.
+                f'<figure><img src="{embed_png(Path(figs_dir) / fig["png"])}" '
+                f'alt="{_esc(fig.get("title"))}"/><figcaption>{_esc(cap)}</figcaption></figure>')
+    return "".join(blocks)
+
+
+def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
+    go_up, go_down = inputs.get("enrichment_up"), inputs.get("enrichment_down")
+    kegg_up, kegg_down = inputs.get("kegg_up"), inputs.get("kegg_down")
+    go_ran = go_up is not None or go_down is not None
+    kegg_ran = kegg_up is not None or kegg_down is not None
+    if not go_ran and not kegg_ran:      # m09/m10 çalıştırılmadı — dürüst not, kırılmaz
+        return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
+                f'<p class="note">{_esc(L["enrichment_not_run"])}</p></section>')
+    blocks = []
+    if go_ran:
+        blocks.append(f'<h3>{_esc(L["go_heading"])}</h3>')
+        blocks.append(_enrichment_collection(
+            go_up, go_down, inputs.get("enrichment_manifest"), inputs.get("enrichment_dir", "."),
+            L, lang, "enrichment_up", "enrichment_down", ("enrichment_up", "enrichment_down")))
+    if kegg_ran:
+        blocks.append(f'<h3>{_esc(L["kegg_heading"])}</h3>')
+        blocks.append(_enrichment_collection(
+            kegg_up, kegg_down, inputs.get("kegg_manifest"), inputs.get("kegg_dir", "."),
+            L, lang, "kegg_up", "kegg_down", ("kegg_up", "kegg_down")))
+    # Tabloların altına sütun + kısaltma (BP/MF/CC, KEGG) açıklaması. Sabit, kontrollü HTML.
     blocks.append(f'<p class="note">{L["enrichment_legend"]}</p>')
     return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
             f'{_intro("enrichment", L)}{"".join(blocks)}</section>')
@@ -564,7 +608,23 @@ _ENRICHMENT_METHODS: dict[str, str] = {
 }
 
 
-def section_methods(config, L: dict, enrichment_ran: bool = False) -> str:
+_KEGG_METHODS: dict[str, str] = {
+    "tr": (
+        "Aynı over-representation çerçevesi KEGG yolakları için de uygulandı: gen→yolak eşlemesi KEGG "
+        "veritabanından (organizma {org}) alındı ve gen sembolü ile referans genoma eşlendi; çok geniş "
+        "genel/özet haritalar dışlandı. Zenginleşme hipergeometrik testle hesaplanıp Benjamini–Hochberg "
+        "ile düzeltildi (padj < 0,05)."
+    ),
+    "en": (
+        "The same over-representation framework was applied to KEGG pathways: gene-to-pathway mapping "
+        "was taken from the KEGG database (organism {org}) and matched to the reference genome by gene "
+        "symbol; broad global/overview maps were excluded. Enrichment was computed with the hypergeometric "
+        "test and adjusted by Benjamini–Hochberg (padj < 0.05)."
+    ),
+}
+
+
+def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -578,6 +638,9 @@ def section_methods(config, L: dict, enrichment_ran: bool = False) -> str:
     if enrichment_ran:
         go = _ENRICHMENT_METHODS[lang].format(min_term=config.enrichment.min_term_size)
         paras += f'<p>{_esc(go)}</p>'
+    if kegg_ran:
+        kegg = _KEGG_METHODS[lang].format(org=config.enrichment.kegg_organism or "—")
+        paras += f'<p>{_esc(kegg)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -615,13 +678,20 @@ _ENRICHMENT_REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"),
 ]
 
+# KEGG kaynağı — yalnız m10 çalıştıysa (DOI doğrulandı).
+_KEGG_REFERENCES: list[tuple[str, str]] = [
+    ("Kanehisa M, Goto S. KEGG: Kyoto Encyclopedia of Genes and Genomes. "
+     "Nucleic Acids Res. 2000;28(1):27–30.", "https://doi.org/10.1093/nar/28.1.27"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
 
 
-def section_references(L: dict, enrichment_ran: bool = False) -> str:
-    refs = _REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
+def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False) -> str:
+    refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
+            + (_KEGG_REFERENCES if kegg_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -661,6 +731,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                 "order": cond_order, "samples": cond_samples}
     enrichment_ran = (inputs.get("enrichment_up") is not None
                       or inputs.get("enrichment_down") is not None)
+    kegg_ran = (inputs.get("kegg_up") is not None
+                or inputs.get("kegg_down") is not None)
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -675,8 +747,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_enrichment(inputs, L, lang),
-        section_methods(config, L, enrichment_ran),
-        section_references(L, enrichment_ran),
+        section_methods(config, L, enrichment_ran, kegg_ran),
+        section_references(L, enrichment_ran, kegg_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'

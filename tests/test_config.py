@@ -211,3 +211,15 @@ def test_enrichment_bad_int_raises(tmp_path):
     body = PROK_BODY + "\nenrichment:\n  min_term_size: \"three\"\n"
     with pytest.raises(ConfigError, match="enrichment.min_term_size"):
         load_config(_write(tmp_path, body))
+
+
+def test_enrichment_kegg_fields(tmp_path):
+    body = PROK_BODY + "\nenrichment:\n  kegg_organism: eco\n  kegg_dir: references/kegg/eco\n"
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.enrichment.kegg_organism == "eco"
+    assert cfg.enrichment.kegg_dir.name == "eco"
+
+
+def test_enrichment_kegg_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.enrichment.kegg_organism is None and cfg.enrichment.kegg_dir is None

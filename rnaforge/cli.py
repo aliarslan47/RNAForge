@@ -107,6 +107,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m09 already completed in this run directory",
     )
 
+    kegg = sub.add_parser("kegg", help="KEGG pathway over-representation on DEGs (m10)")
+    kegg.add_argument("--config", required=True, type=Path)
+    kegg.add_argument("--metadata", required=True, type=Path)
+    kegg.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    kegg.add_argument("--run-id", default="run")
+    kegg.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m10 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -301,6 +311,28 @@ def _cmd_enrich(args) -> int:
     return 0
 
 
+def _cmd_kegg(args) -> int:
+    from rnaforge.modules.m10_kegg import run_kegg
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_kegg(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m10_kegg already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"KEGG OK: {summary['n_sig_up']} up + {summary['n_sig_down']} down "
+          f"significant pathway(s); background={summary['background_size']} "
+          f"(annotated={summary['n_annotated']}, org={summary['organism']})")
+    print(f"run directory: {run_dir}")
+    # GATE YOK: güvence kartı yalnız m06/m07 verdict'ini taşır.
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -340,6 +372,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_figures(args)
         if args.command == "enrich":
             return _cmd_enrich(args)
+        if args.command == "kegg":
+            return _cmd_kegg(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)
