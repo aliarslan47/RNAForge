@@ -19,6 +19,7 @@ class FeatureCountsResult:
     gene_ids: list[str]
     counts: dict[str, list[int]]           # sütun (BAM) -> sayımlar
     assignment_rates: dict[str, float]     # sütun (BAM) -> atama oranı
+    lengths: dict[str, int] | None = None  # gen -> uzunluk (bç), TPM/FPKM için
 
 
 def parse_counts(counts_text: str) -> tuple[list[str], dict[str, list[int]]]:
@@ -45,6 +46,48 @@ def parse_counts(counts_text: str) -> tuple[list[str], dict[str, list[int]]]:
     if header is None:
         raise FeatureCountsParseError("featureCounts counts file has no 'Geneid' header line")
     return gene_ids, counts
+
+
+def parse_lengths(counts_text: str) -> dict[str, int]:
+    """featureCounts çıktısından gen -> Length (bç). Length 6. sütun (index 5)."""
+    lengths: dict[str, int] = {}
+    header_seen = False
+    for line in counts_text.splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        fields = line.split("\t")
+        if not header_seen:
+            if fields[0] != "Geneid":
+                raise FeatureCountsParseError("featureCounts counts file has no 'Geneid' header")
+            header_seen = True
+            continue
+        if len(fields) > 5:
+            lengths[fields[0]] = int(fields[5])
+    return lengths
+
+
+def tpm_fpkm(gene_ids: list[str], counts: dict[str, list[int]], lengths: dict[str, int]):
+    """Gen uzunluğuyla normalize TPM + FPKM matrisleri. Returns: (columns, tpm, fpkm)."""
+    kb = [max(lengths.get(g, 0), 1) / 1000.0 for g in gene_ids]     # gen uzunluğu (kb), 0-koruması
+    columns = list(counts)
+    tpm: dict[str, list[float]] = {}
+    fpkm: dict[str, list[float]] = {}
+    for col in columns:
+        c = counts[col]
+        total = sum(c)                                              # kütüphane büyüklüğü (atanmış okuma)
+        rpk = [c[i] / kb[i] for i in range(len(gene_ids))]          # reads per kilobase
+        scale = sum(rpk) / 1e6
+        tpm[col] = [round(r / scale, 4) if scale > 0 else 0.0 for r in rpk]
+        fpkm[col] = [round(c[i] / (kb[i] * (total / 1e6)), 4) if total > 0 else 0.0
+                     for i in range(len(gene_ids))]
+    return columns, tpm, fpkm
+
+
+def compute_tpm_fpkm(counts_text: str):
+    """featureCounts ham çıktı METNİNDEN TPM/FPKM. Returns: (gene_ids, columns, tpm, fpkm)."""
+    gene_ids, counts = parse_counts(counts_text)
+    columns, tpm, fpkm = tpm_fpkm(gene_ids, counts, parse_lengths(counts_text))
+    return gene_ids, columns, tpm, fpkm
 
 
 def parse_summary(summary_text: str) -> dict[str, float]:
@@ -88,6 +131,8 @@ def run_featurecounts(bams: list[Path], gff: Path, out_dir: Path, feature_type: 
         raise FeatureCountsRunError(
             f"featureCounts reported success but output missing at {counts_path}"
         )
-    gene_ids, counts = parse_counts(counts_path.read_text())
+    counts_text = counts_path.read_text()
+    gene_ids, counts = parse_counts(counts_text)
     rates = parse_summary(summary_path.read_text())
-    return FeatureCountsResult(gene_ids=gene_ids, counts=counts, assignment_rates=rates)
+    return FeatureCountsResult(gene_ids=gene_ids, counts=counts, assignment_rates=rates,
+                               lengths=parse_lengths(counts_text))

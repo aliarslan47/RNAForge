@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 
 from rnaforge.config import Config
-from rnaforge.featurecounts import run_featurecounts
+from rnaforge.featurecounts import run_featurecounts, tpm_fpkm
 from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile
@@ -111,11 +111,23 @@ def run_counts(config: Config, metadata_path: Path, run_dir: Path,
                 fh.write(gene + "\t" + "\t".join(row) + "\n")
         log(f"count matrix written: {matrix_path} ({len(result.gene_ids)} genes)")
 
+        # TPM / FPKM ekspresyon değerleri (gen uzunluğuyla normalize) — deliverable.
+        # Uzunluk yoksa (ör. mock) atla; gerçek featureCounts her zaman uzunluk verir.
+        if result.lengths:
+            _cols, tpm, fpkm = tpm_fpkm(result.gene_ids, result.counts, result.lengths)
+            for name, mat in (("tpm.tsv", tpm), ("fpkm.tsv", fpkm)):
+                with (quant_dir / name).open("w") as fh:
+                    fh.write("gene\t" + "\t".join(sample_ids) + "\n")
+                    for i, gene in enumerate(result.gene_ids):
+                        fh.write(gene + "\t" + "\t".join(f'{mat[c][i]:g}' for c in _cols) + "\n")
+            log("expression matrices written: tpm.tsv, fpkm.tsv")
+
         gates = build_count_gates(assignment_by_sample, profile)
         summary = {
             "n_samples": len(samples), "n_genes": len(result.gene_ids),
             "samples": {sid: {"assignment_rate": assignment_by_sample[sid]} for sid in sample_ids},
             "gate_counts": dict(Counter(g.status for g in gates)),
+            "expression_values": ["tpm.tsv", "fpkm.tsv"],
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         write_gate_results(run_dir, gates)

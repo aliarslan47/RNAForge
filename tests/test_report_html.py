@@ -663,3 +663,29 @@ def test_section_quality_without_seqqc():
     html = section_quality(align, count, {"min_length": 36, "aggressive": False}, LABELS["en"])
     assert "rRNA" in html            # sütun başlığı var, değer "—"
     assert "Strandedness (inferred)" not in html or "inferred" in html  # özet satırı yok
+
+
+from rnaforge.report_html import section_software
+
+
+def test_section_software_core_and_optional(tmp_path):
+    cfg = _cfg("tr")
+    flags = {"gsea": True, "amr": True, "ppi": True, "seqqc": True, "enrichment": True, "kegg": True, "operon": True}
+    html = section_software(cfg, LABELS["tr"], {"seqqc": {"mean_rrna_fraction": 0.01}}, flags)
+    assert "Yazılım ve Veritabanları" in html
+    assert "DESeq2" in html and "fgsea" in html and "AMRFinderPlus" in html and "SortMeRNA" in html
+    assert "CARD" in html and "STRING" in html and "1.50.2" in html   # sürümler + veritabanları
+
+
+def test_section_software_hides_unrun_tools():
+    cfg = _cfg("en")
+    flags = {"gsea": False, "amr": False, "ppi": False, "seqqc": False, "enrichment": False, "kegg": False}
+    html = section_software(cfg, LABELS["en"], {}, flags)
+    assert "DESeq2" in html            # çekirdek her zaman
+    assert "AMRFinderPlus" not in html and "SortMeRNA" not in html   # koşmadı -> gizli
+
+
+def test_general_references_always_present(tmp_path):
+    refs = section_references(LABELS["en"])
+    assert "10.3389/fgene.2025.1697922" in refs   # Dawadi 2025 (genel kaynak, koşulsuz)
+    assert "10.1002/cpz1.1054" in refs            # Pola-Sánchez 2024

@@ -87,3 +87,35 @@ def test_run_featurecounts_counts_genes(tmp_path):
     col = list(result.counts.keys())[0]
     assert sum(result.counts[col]) > 0
     assert result.assignment_rates[col] > 0.9
+
+
+from rnaforge.featurecounts import compute_tpm_fpkm, parse_lengths
+
+_FC = (
+    "# Program:featureCounts\n"
+    "Geneid\tChr\tStart\tEnd\tStrand\tLength\ts1.bam\ts2.bam\n"
+    "gA\tc1\t1\t1000\t+\t1000\t100\t0\n"
+    "gB\tc1\t2000\t2999\t+\t1000\t300\t50\n"
+    "gC\tc1\t4000\t4999\t+\t2000\t200\t50\n"
+)
+
+
+def test_parse_lengths():
+    assert parse_lengths(_FC) == {"gA": 1000, "gB": 1000, "gC": 2000}
+
+
+def test_compute_tpm_fpkm_shapes_and_values():
+    genes, cols, tpm, fpkm = compute_tpm_fpkm(_FC)
+    assert genes == ["gA", "gB", "gC"] and cols == ["s1.bam", "s2.bam"]
+    # s1: RPK = 100/1, 300/1, 200/2 = 100,300,100 -> toplam 500; TPM = /500*1e6
+    assert tpm["s1.bam"][0] == 200000.0 and tpm["s1.bam"][1] == 600000.0
+    # TPM sütun toplamı ~1e6
+    assert abs(sum(tpm["s1.bam"]) - 1_000_000) < 1
+    # FPKM: gA s1 = 100/(1 * (600/1e6)) çünkü s1 toplam=600
+    assert abs(fpkm["s1.bam"][0] - 100 / (1.0 * (600/1e6))) < 1
+
+
+def test_compute_tpm_empty_column():
+    fc = _FC.replace("100\t0", "0\t0").replace("300\t50", "0\t0").replace("200\t50", "0\t0")
+    _, _, tpm, _ = compute_tpm_fpkm(fc)
+    assert all(v == 0.0 for v in tpm["s1.bam"])   # sıfır sayım -> 0, çökme yok
