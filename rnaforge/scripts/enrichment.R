@@ -1,10 +1,13 @@
 # rnaforge/scripts/enrichment.R
-# Argümanlar: enrichment_up.tsv enrichment_down.tsv out_dir top_n
-# Her set için namespace başına top-N zenginleşmiş GO terim dot-plot'u. Boş -> boş-durum paneli.
+# Argümanlar: up.tsv down.tsv out_dir top_n [title_prefix] [basename_prefix]
+# Her set için namespace başına top-N zenginleşmiş terim dot-plot'u (GO veya KEGG). Boş -> boş-durum paneli.
 # Layout: uzun terim etiketleri sarılır, panel geniş, yükseklik satır sayısına göre dinamik.
 suppressMessages({library(ggplot2)})
 a <- commandArgs(trailingOnly = TRUE)
 up_p<-a[1]; down_p<-a[2]; out<-a[3]; top_n<-as.integer(a[4])
+# Opsiyonel (m09 varsayılanı korunur; m10 KEGG farklı geçer)
+title_prefix <- ifelse(length(a)>=5 && nzchar(a[5]), a[5], "GO zenginleştirme")
+base_prefix  <- ifelse(length(a)>=6 && nzchar(a[6]), a[6], "enrichment")
 dir.create(out, showWarnings=FALSE, recursive=TRUE)
 
 # Uzun etiketleri satırlara böl (base R; stringr bağımlılığı yok).
@@ -53,6 +56,6 @@ render_set <- function(path, title, base){
   sav(p, base, 10, h)
 }
 
-render_set(up_p,   "GO zenginleştirme — Artan (Up)",   "enrichment_up")
-render_set(down_p, "GO zenginleştirme — Azalan (Down)", "enrichment_down")
+render_set(up_p,   paste0(title_prefix, " — Artan (Up)"),   paste0(base_prefix, "_up"))
+render_set(down_p, paste0(title_prefix, " — Azalan (Down)"), paste0(base_prefix, "_down"))
 cat("enrichment.R done\n")

@@ -10,12 +10,6 @@ import subprocess
 from math import comb
 from pathlib import Path
 
-# m09 figür manifesti — id, basename, başlık (m07 build_manifest deseni).
-ENRICHMENT_FIGURE_SPECS: list[tuple[str, str, str]] = [
-    ("enrichment_up", "enrichment_up", "GO zenginleştirme — Artan"),
-    ("enrichment_down", "enrichment_down", "GO zenginleştirme — Azalan"),
-]
-
 _SCRIPT = Path(__file__).parent / "scripts" / "enrichment.R"
 
 _TSV_HEADER = [
@@ -160,33 +154,39 @@ def write_ora_tsv(rows: list[dict], path: Path) -> None:
 
 
 def run_enrichment_r(up_tsv: Path, down_tsv: Path, out_dir: Path, top_n: int,
-                     env: str = "rnaforge-de") -> str:
-    """enrichment.R'i çalıştır (dot-plot PNG+SVG). stdout/stderr döndür, hatada gürültülü yüksel."""
+                     title_prefix: str = "GO zenginleştirme",
+                     basename_prefix: str = "enrichment", env: str = "rnaforge-de") -> str:
+    """enrichment.R'i çalıştır (dot-plot PNG+SVG). GO (varsayılan) ve KEGG (prefix'li) ortak kullanır.
+    stdout/stderr döndür, hatada gürültülü yüksel."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
-           str(up_tsv), str(down_tsv), str(out_dir), str(top_n)]
+           str(up_tsv), str(down_tsv), str(out_dir), str(top_n),
+           title_prefix, basename_prefix]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"enrichment.R failed (exit {r.returncode}):\n{r.stderr}")
     return (r.stdout or "") + (r.stderr or "")
 
 
-def build_enrichment_manifest(fig_dir: Path) -> dict:
+def build_enrichment_manifest(fig_dir: Path, basename_prefix: str = "enrichment") -> dict:
     """Var olan enrichment figürlerini manifest'e topla. Boş-durumda eksik PNG olmaz
-    (R her zaman panel üretir), ama m07'nin aksine eksikte yükselmez — dürüst boş liste."""
+    (R her zaman panel üretir), ama m07'nin aksine eksikte yükselmez — dürüst boş liste.
+    basename_prefix ile GO (enrichment) ve KEGG (kegg) için yeniden kullanılır."""
     fig_dir = Path(fig_dir)
+    titles = {"up": "Artan", "down": "Azalan"}
     figures = []
-    for _id, base, title in ENRICHMENT_FIGURE_SPECS:
+    for direction, title in titles.items():
+        base = f"{basename_prefix}_{direction}"
         png, svg = fig_dir / f"{base}.png", fig_dir / f"{base}.svg"
         if not png.exists():
             continue
-        figures.append({"id": _id, "title": title, "png": png.name,
+        figures.append({"id": base, "title": title, "png": png.name,
                         "svg": svg.name if svg.exists() else None})
     return {"figures": figures}
 
 
-def write_enrichment_manifest(fig_dir: Path) -> Path:
+def write_enrichment_manifest(fig_dir: Path, basename_prefix: str = "enrichment") -> Path:
     p = Path(fig_dir) / "manifest.json"
-    p.write_text(json.dumps(build_enrichment_manifest(fig_dir), indent=2))
+    p.write_text(json.dumps(build_enrichment_manifest(fig_dir, basename_prefix), indent=2))
     return p

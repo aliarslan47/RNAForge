@@ -149,3 +149,10 @@ def test_enrichment_r_renders(tmp_path):
     run_enrichment_r(up, down, tmp_path, top_n=15)
     assert (tmp_path / "enrichment_up.png").exists()
     assert (tmp_path / "enrichment_down.png").exists()   # boş bile olsa panel var
+
+
+def test_build_manifest_kegg_basename(tmp_path):
+    (tmp_path / "kegg_up.png").write_bytes(b"x")
+    (tmp_path / "kegg_up.svg").write_bytes(b"x")
+    m = build_enrichment_manifest(tmp_path, basename_prefix="kegg")
+    assert [f["id"] for f in m["figures"]] == ["kegg_up"]
