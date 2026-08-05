@@ -81,6 +81,15 @@ def deg_sets(deseq_tsv: Path, fdr: float, lfc: float) -> tuple[list[str], list[s
     return up, down
 
 
+def all_tested_genes(deseq_tsv: Path) -> list[str]:
+    """deseq2_results.tsv'deki tüm gen id'leri (ORA arka plan evreni)."""
+    lines = Path(deseq_tsv).read_text().splitlines()
+    if not lines:
+        return []
+    gi = lines[0].split("\t").index("gene")
+    return [c.split("\t")[gi] for c in lines[1:] if c.split("\t")[gi:gi + 1]]
+
+
 def run_ora(gene_set: list[str], background: list[str], gene2go: dict[str, set[str]],
             go_meta: dict[str, tuple[str, str]], gene_symbol: dict[str, str],
             min_term_size: int = 3) -> list[dict]:
