@@ -352,3 +352,43 @@ def test_render_report_go_section_absent_note(tmp_path):
     # _full_inputs enrichment içermez -> render_report "not run" bölümü basar, kırılmaz.
     doc = render_report(_full_inputs(tmp_path), _cfg("tr"), version="0.1.0")
     assert 'id="enrichment"' in doc and "çalıştırılmadı" in doc
+
+
+from rnaforge.report_html import section_methods, section_references
+
+
+def test_section_enrichment_has_legend(tmp_path):
+    up = _enrich_rows_tsv(tmp_path)
+    inputs = {"enrichment_up": up, "enrichment_down": [], "enrichment_manifest": None,
+              "enrichment_dir": tmp_path}
+    html = section_enrichment(inputs, LABELS["tr"], "tr")
+    assert "Biyolojik Süreç" in html and "Moleküler İşlev" in html and "Hücresel Bileşen" in html
+    assert "Kat-zenginleşme" in html
+    assert "<b>GO id</b>" in html          # açıklama ham HTML olarak render edilir (escape değil)
+
+
+def test_methods_includes_go_only_when_enrichment_ran():
+    cfg = _cfg("tr")
+    without = section_methods(cfg, LABELS["tr"], enrichment_ran=False)
+    withgo = section_methods(cfg, LABELS["tr"], enrichment_ran=True)
+    assert "hipergeometrik" not in without
+    assert "hipergeometrik" in withgo and "Benjamini" in withgo
+
+
+def test_references_includes_go_only_when_enrichment_ran():
+    base = section_references(LABELS["en"], enrichment_ran=False)
+    withgo = section_references(LABELS["en"], enrichment_ran=True)
+    assert "10.1038/75556" not in base                    # GO founding paper
+    assert "10.1038/75556" in withgo and "tb02031.x" in withgo  # GO + Benjamini-Hochberg
+
+
+def test_render_report_go_methods_and_refs_present(tmp_path):
+    inp = _full_inputs(tmp_path)
+    inp["enrichment_up"] = _enrich_rows_tsv(tmp_path)
+    inp["enrichment_down"] = []
+    inp["enrichment_manifest"] = None
+    inp["enrichment_dir"] = tmp_path
+    doc = render_report(inp, _cfg("tr"), version="0.1.0")
+    assert "hipergeometrik" in doc                         # yöntemlerde GO paragrafı
+    assert "10.1093/nar/gku1113" in doc                    # EBI-GOA kaynağı
+    assert "Biyolojik Süreç" in doc                        # tablo açıklaması

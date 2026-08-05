@@ -216,6 +216,14 @@ LABELS: dict[str, dict[str, str]] = {
         "no_enrichment": "Bu yönde anlamlı zenginleşen GO terimi bulunamadı.",
         "enrichment_not_run": "GO zenginleştirme bu koşuda çalıştırılmadı "
                               "(rnaforge enrich ile aynı --run-id üzerinde üretilir).",
+        "enrichment_legend": (
+            "Sütunlar — <b>GO id</b>: terim kimliği · <b>GO terimi</b>: terim adı · "
+            "<b>Kategori</b>: GO alanı (<b>BP</b> = Biyolojik Süreç, <b>MF</b> = Moleküler İşlev, "
+            "<b>CC</b> = Hücresel Bileşen) · <b>Set / arka plan</b>: terimdeki DEG sayısı / "
+            "arka plandaki (test edilen, anotasyonlu) gen sayısı · <b>Kat-zenginleşme</b>: "
+            "gözlenen oranın beklenene oranı (>1 = zenginleşme) · <b>padj</b>: Benjamini–Hochberg ile "
+            "çoklu-test düzeltilmiş p-değeri. Yalnız anlamlı terimler (padj &lt; 0,05), kategori başına "
+            "en güçlü ilk 10 gösterilir; tam liste enrichment/enrichment_{up,down}.tsv dosyalarındadır."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -243,6 +251,14 @@ LABELS: dict[str, dict[str, str]] = {
         "no_enrichment": "No significantly enriched GO terms in this direction.",
         "enrichment_not_run": "GO enrichment was not run for this run "
                               "(produced by rnaforge enrich on the same --run-id).",
+        "enrichment_legend": (
+            "Columns — <b>GO id</b>: term identifier · <b>GO term</b>: term name · "
+            "<b>Category</b>: GO domain (<b>BP</b> = Biological Process, <b>MF</b> = Molecular Function, "
+            "<b>CC</b> = Cellular Component) · <b>Study / background</b>: DEGs in the term / genes in the "
+            "background (tested, annotated) · <b>Fold enrichment</b>: observed-to-expected ratio "
+            "(>1 = enriched) · <b>padj</b>: Benjamini–Hochberg multiple-testing adjusted p-value. "
+            "Only significant terms (padj &lt; 0.05), top 10 per category, are shown; the full list is in "
+            "enrichment/enrichment_{up,down}.tsv."),
     },
 }
 
@@ -477,6 +493,8 @@ def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
                 f'<figure><img src="{embed_png(figs_dir / fig["png"])}" '
                 f'alt="{_esc(fig.get("title"))}"/>'
                 f'<figcaption>{_esc(cap)}</figcaption></figure>')
+    # Tabloların/figürlerin altına sütun + kısaltma (BP/MF/CC) açıklaması. Sabit, kontrollü HTML.
+    blocks.append(f'<p class="note">{L["enrichment_legend"]}</p>')
     return (f'<section id="enrichment"><h2>{_esc(L["enrichment"])}</h2>'
             f'{_intro("enrichment", L)}{"".join(blocks)}</section>')
 
@@ -518,8 +536,35 @@ _METHODS_AGGR: dict[str, dict[bool, str]] = {
     "en": {False: "disabled (Williams et al. 2016)", True: "enabled"},
 }
 
+# GO ORA yöntem anlatısı — yalnız m09 çalıştıysa eklenir (koşmadıysa yazmak yanıltıcı olur).
+_ENRICHMENT_METHODS: dict[str, str] = {
+    "tr": (
+        "Diferansiyel eksprese genlerin fonksiyonel yorumu için Gene Ontology (GO) aşırı-temsil "
+        "analizi (ORA) uygulandı. Artan ve azalan gen setleri ayrı ayrı, tek-yönlü hipergeometrik "
+        "testle değerlendirildi (arka plan: test edilen, GO anotasyonu bulunan tüm genler; en az "
+        "{min_term} gene anotlı terimler dikkate alındı). GO anotasyonları birincil olarak referans "
+        "genom GFF'inden alındı ve EBI-GOA anotasyonlarıyla (yalnız anotasyonsuz genler, benzersiz gen "
+        "sembolü eşleşmesiyle) tamamlandı; terimler Gene Ontology yapısı (go-basic) boyunca ata "
+        "terimlere yayıldı (is_a ve part_of ilişkileri). p-değerleri her GO kategorisi (biyolojik "
+        "süreç, moleküler işlev, hücresel bileşen) içinde Benjamini–Hochberg yöntemiyle düzeltildi; "
+        "düzeltilmiş p < 0,05 olan terimler zenginleşmiş sayıldı."
+    ),
+    "en": (
+        "For functional interpretation of the differentially expressed genes, Gene Ontology (GO) "
+        "over-representation analysis (ORA) was performed. Up- and down-regulated gene sets were "
+        "tested separately with a one-sided hypergeometric test (background: all tested genes carrying "
+        "a GO annotation; terms annotated to at least {min_term} genes were considered). GO annotations "
+        "were taken primarily from the reference genome GFF and supplemented with EBI-GOA annotations "
+        "(only for otherwise unannotated genes, matched by unique gene symbol); terms were propagated to "
+        "ancestor terms along the Gene Ontology structure (go-basic; is_a and part_of relationships). "
+        "P-values were adjusted within each GO category (biological process, molecular function, "
+        "cellular component) by the Benjamini–Hochberg method; terms with adjusted p < 0.05 were "
+        "considered enriched."
+    ),
+}
 
-def section_methods(config, L: dict) -> str:
+
+def section_methods(config, L: dict, enrichment_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -529,7 +574,11 @@ def section_methods(config, L: dict) -> str:
         feature_type=q.feature_type, attribute=q.attribute,
         design=d.design, fdr=d.fdr_threshold, lfc=d.log2fc_threshold,
     )
-    return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}<p>{_esc(text)}</p></section>'
+    paras = f'<p>{_esc(text)}</p>'
+    if enrichment_ran:
+        go = _ENRICHMENT_METHODS[lang].format(min_term=config.enrichment.min_term_size)
+        paras += f'<p>{_esc(go)}</p>'
+    return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
 # (atıf, DOI/URL). DOI'ler doğrulandı (doi.org). FastQC bir araçtır; DOI'si yoktur → proje URL'si.
@@ -552,17 +601,32 @@ _REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1007/978-3-319-24277-4"),
 ]
 
+# GO ORA kaynakları — yalnız m09 çalıştıysa eklenir (DOI'ler doğrulandı).
+_ENRICHMENT_REFERENCES: list[tuple[str, str]] = [
+    ("Ashburner M, Ball CA, Blake JA, et al. Gene ontology: tool for the unification of biology. "
+     "Nat Genet. 2000;25(1):25–29.", "https://doi.org/10.1038/75556"),
+    ("The Gene Ontology Consortium. The Gene Ontology knowledgebase in 2023. "
+     "Genetics. 2023;224(1):iyad031.", "https://doi.org/10.1093/genetics/iyad031"),
+    ("Huntley RP, Sawford T, Mutowo-Meullenet P, et al. The GOA database: Gene Ontology annotation "
+     "updates for 2015. Nucleic Acids Res. 2015;43(D1):D1057–D1063.",
+     "https://doi.org/10.1093/nar/gku1113"),
+    ("Benjamini Y, Hochberg Y. Controlling the false discovery rate: a practical and powerful approach "
+     "to multiple testing. J R Stat Soc Series B. 1995;57(1):289–300.",
+     "https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
 
 
-def section_references(L: dict) -> str:
+def section_references(L: dict, enrichment_ran: bool = False) -> str:
+    refs = _REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
         f'{"doi:" if "doi.org/" in url else ""}{_esc(_ref_link_label(url))}</a></li>'
-        for cite, url in _REFERENCES
+        for cite, url in refs
     )
     return f'<section id="references"><h2>{_esc(L["references"])}</h2>{_intro("references", L)}<ol>{items}</ol></section>'
 
@@ -595,6 +659,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     cond_order, cond_samples = condition_layout(inputs.get("coldata", []))
     cond_ctx = {"norm_counts": inputs.get("norm_counts", {}),
                 "order": cond_order, "samples": cond_samples}
+    enrichment_ran = (inputs.get("enrichment_up") is not None
+                      or inputs.get("enrichment_down") is not None)
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -609,8 +675,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_enrichment(inputs, L, lang),
-        section_methods(config, L),
-        section_references(L),
+        section_methods(config, L, enrichment_ran),
+        section_references(L, enrichment_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
