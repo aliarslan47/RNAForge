@@ -79,3 +79,22 @@ def test_overlay_de_status(tmp_path):
     assert st["LT_3"] == "ns" and st["LT_4"] == "untested"
     assert st["LT_9"] == "untested"              # matriste yok
     assert out[0]["de_status"] in ("up", "down") # up/down önce sıralı
+
+
+from rnaforge.abricate import parse_amrfinder
+
+AFP_HEADER = ("Protein id\tContig id\tStart\tStop\tStrand\tElement symbol\tElement name\tScope\t"
+              "Type\tSubtype\tClass\tSubclass\tMethod\tTarget length\tReference sequence length\t"
+              "% Coverage of reference\t% Identity to reference\n")
+
+
+def test_parse_amrfinder_filters_type_and_types(tmp_path):
+    tsv = tmp_path / "afp.tsv"
+    tsv.write_text(
+        AFP_HEADER +
+        "na\tchr1\t100\t1200\t+\tacrF\tefflux pump\tcore\tAMR\tAMR\tEFFLUX\tNA\tBLAST\t1\t1\t100.0\t99.0\n"
+        "na\tchr1\t2000\t2100\t+\tvfX\tadhesin\tplus\tVIRULENCE\tv\tNA\tNA\tBLAST\t1\t1\t100.0\t99.0\n")
+    hits = parse_amrfinder(tsv, 80, 80)
+    assert len(hits) == 1                        # VIRULENCE tipi elendi (AMR/STRESS tutulur)
+    assert hits[0]["gene"] == "acrF" and hits[0]["db"] == "amrfinderplus"
+    assert hits[0]["resistance"] == "EFFLUX" and hits[0]["contig"] == "chr1"

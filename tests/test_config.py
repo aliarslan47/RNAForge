@@ -272,3 +272,12 @@ def test_ppi_config_defaults(tmp_path):
 def test_ppi_config_parsed(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY + "\nppi:\n  taxid: '511145'\n  min_score: 400\n"))
     assert cfg.ppi.taxid == "511145" and cfg.ppi.min_score == 400
+
+
+def test_amr_amrfinder_fields(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\namr:\n  amrfinder_organism: Escherichia\n"))
+    assert cfg.amr.amrfinder_organism == "Escherichia" and cfg.amr.amrfinder_env == "ali-amrfinder"
+
+
+def test_amr_amrfinder_default_none(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).amr.amrfinder_organism is None

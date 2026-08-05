@@ -84,10 +84,13 @@ def test_run_amr_writes_tables_and_stats(tmp_path, monkeypatch):
     assert (rd / "statistics" / "amr_statistics.json").exists()
     assert s["n_amr_genes"] == 1 and s["n_amr_de"] == 1     # acrB -> LT_1 up
     assert s["n_vir_genes"] == 1                             # vfX -> LT_2 (ns)
+    assert s["n_amr_amrfinder"] == 0                         # amrfinder_organism yok -> yalnız CARD
     body = amr_tsv.read_text().splitlines()
-    assert body[0].split("\t") == ["gene", "locus_tag", "db", "label", "pct_identity",
-                                    "pct_coverage", "log2fc", "padj", "de_status"]
-    assert body[1].startswith("acrB\tLT_1\tcard") and body[1].endswith("up")
+    assert body[0].split("\t") == ["gene", "locus_tag", "card", "amrfinder", "pct_identity",
+                                    "log2fc", "padj", "de_status"]
+    cols = body[1].split("\t")
+    assert cols[:4] == ["acrB", "LT_1", "MULTIDRUG", "—"]   # CARD dolu, AMRFinderPlus yok
+    assert cols[-1] == "up"
 
 
 def test_run_amr_no_gate(tmp_path, monkeypatch):
@@ -104,3 +107,29 @@ def test_run_amr_resume(tmp_path, monkeypatch):
     m13_amr.run_amr(cfg, md, rd)
     s2 = m13_amr.run_amr(cfg, md, rd)
     assert s2.get("resumed") is True
+
+
+AFP_HEADER = ("Protein id\tContig id\tStart\tStop\tStrand\tElement symbol\tElement name\tScope\t"
+              "Type\tSubtype\tClass\tSubclass\tMethod\tTarget length\tReference sequence length\t"
+              "% Coverage of reference\t% Identity to reference\n")
+
+
+def test_run_amr_side_by_side_with_amrfinder(tmp_path, monkeypatch):
+    cfg, md, rd = _setup(tmp_path)
+    import dataclasses
+    cfg = dataclasses.replace(cfg, amr=dataclasses.replace(cfg.amr, amrfinder_organism="Escherichia"))
+    _fake_abricate(monkeypatch, None)          # CARD -> acrB (LT_1)
+
+    def fake_afp(genome_fa, out_tsv, organism, env="ali-amrfinder"):
+        Path(out_tsv).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_tsv).write_text(          # AMRFinderPlus de acrB'yi (LT_1) bulur -> yan yana
+            AFP_HEADER +
+            "na\tchr1\t100\t1200\t+\tacrB\tefflux\tcore\tAMR\tAMR\tEFFLUX\tNA\tBLAST\t1\t1\t100.0\t98.0\n")
+        return ""
+    monkeypatch.setattr(m13_amr, "run_amrfinder", fake_afp)
+
+    s = m13_amr.run_amr(cfg, md, rd)
+    assert s["amrfinder_organism"] == "Escherichia"
+    assert s["n_amr_card"] == 1 and s["n_amr_amrfinder"] == 1 and s["n_amr_both"] == 1
+    cols = (rd / "amr" / "amr_genes.tsv").read_text().splitlines()[1].split("\t")
+    assert cols[0] == "acrB" and cols[2] == "MULTIDRUG" and cols[3] == "EFFLUX"   # CARD ↔ AMRFinderPlus

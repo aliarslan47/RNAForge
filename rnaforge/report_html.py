@@ -379,13 +379,15 @@ LABELS: dict[str, dict[str, str]] = {
         "amr": "Direnç ve Virülans (AMR / VFDB)", "amr_genes": "Direnç genleri (AMR)",
         "vir_genes": "Virülans genleri (VFDB)", "de_status": "DE durumu",
         "identity": "%kimlik", "amr_label": "Sınıf / faktör",
+        "card_col": "CARD", "amrfinder_col": "AMRFinderPlus",
         "amr_not_run": "AMR/virülans taraması bu koşuda çalıştırılmadı (rnaforge amr ile üretilir).",
         "amr_more": "… ve {n} DE-olmayan gen daha (tam liste amr/ TSV dosyalarında).",
         "amr_legend": (
-            "Suşun genomu abricate ile <b>CARD</b> (direnç) ve <b>VFDB</b> (virülans) veritabanlarına "
-            "tarandı; bulunan genler koordinatla locus_tag'e eşlenip <b>DE durumu</b> (artan/azalan/ns) "
-            "eklendi. Not: veritabanları abricate ile paket halinde gelir; en güncel sürüm için "
-            "<code>abricate-get_db</code> ile yenilenebilir."),
+            "Direnç genleri iki bağımsız araçla <b>yan yana</b> gösterilir: <b>CARD</b> (abricate; geniş, "
+            "intrinsik efflux dahil) ve <b>AMRFinderPlus</b> (NCBI; küratörlü, yüksek-güven). Her ikisinin "
+            "bulduğu gen konkordans işareti; yalnız birinin bulduğu araç farkını gösterir. Virülans <b>VFDB</b> "
+            "(abricate). Genler koordinatla locus_tag'e eşlenip <b>DE durumu</b> eklendi. Veritabanları "
+            "araçlarla paket gelir (abricate-get_db / amrfinder -u ile yenilenir)."),
         "operon": "Operon Analizi", "operon_genes": "Genler", "operon_size": "Boyut",
         "operon_dir": "Yön", "operon_not_run": "Operon analizi bu koşuda çalıştırılmadı "
                                                "(rnaforge operon ile üretilir).",
@@ -452,13 +454,16 @@ LABELS: dict[str, dict[str, str]] = {
         "amr": "Resistance and Virulence (AMR / VFDB)", "amr_genes": "Resistance genes (AMR)",
         "vir_genes": "Virulence genes (VFDB)", "de_status": "DE status",
         "identity": "%identity", "amr_label": "Class / factor",
+        "card_col": "CARD", "amrfinder_col": "AMRFinderPlus",
         "amr_not_run": "AMR/virulence scan was not run for this run (produced by rnaforge amr).",
         "amr_more": "… and {n} more non-DE genes (full list in the amr/ TSV files).",
         "amr_legend": (
-            "The strain genome was scanned with abricate against <b>CARD</b> (resistance) and <b>VFDB</b> "
-            "(virulence); hits were mapped to locus tags by coordinate and annotated with their <b>DE "
-            "status</b> (up/down/ns). Note: the databases are bundled with abricate; refresh with "
-            "<code>abricate-get_db</code> for the latest versions."),
+            "Resistance genes are shown <b>side by side</b> from two independent tools: <b>CARD</b> "
+            "(abricate; broad, includes intrinsic efflux) and <b>AMRFinderPlus</b> (NCBI; curated, "
+            "high-confidence). A gene found by both is a concordance mark; a gene found by only one shows the "
+            "tool difference. Virulence uses <b>VFDB</b> (abricate). Hits were mapped to locus tags by "
+            "coordinate and annotated with their <b>DE status</b>. Databases ship with the tools "
+            "(refresh with abricate-get_db / amrfinder -u)."),
         "operon": "Operon Analysis", "operon_genes": "Genes", "operon_size": "Size",
         "operon_dir": "Direction", "operon_not_run": "Operon analysis was not run for this run "
                                                      "(produced by rnaforge operon).",
@@ -867,21 +872,31 @@ def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
 
 
 def _amr_table(rows: list[dict], L: dict, cap: int = 40) -> str:
-    """AMR/virülans gen tablosu: gene, sınıf/faktör, %kimlik, DE durumu (up/down önce). Uzunsa kırp."""
+    """AMR (CARD↔AMRFinderPlus yan yana) veya virülans (tek araç) tablosu. up/down önce; uzunsa kırp."""
     if not rows:
         return f'<p>{_esc(L["no_degs"])}</p>'
     de = [r for r in rows if r.get("de_status") in ("up", "down")]
     shown = rows[:cap]
-    headers = [L["gene"], L["amr_label"], L["identity"], L["log2fc"], L["padj"], L["de_status"]]
-    body = []
-    for r in shown:
-        body.append([
+    side_by_side = "card" in rows[0] or "amrfinder" in rows[0]   # AMR tablosu iki araç sütunlu
+    if side_by_side:
+        headers = [L["gene"], L["card_col"], L["amrfinder_col"], L["identity"],
+                   L["log2fc"], L["padj"], L["de_status"]]
+        body = [[
+            r.get("gene"), r.get("card") or "—", r.get("amrfinder") or "—",
+            f'{r["pct_identity"]:.1f}' if r.get("pct_identity") is not None else "—",
+            f'{r["log2fc"]:.2f}' if r.get("log2fc") is not None else "—",
+            f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
+            r.get("de_status"),
+        ] for r in shown]
+    else:
+        headers = [L["gene"], L["amr_label"], L["identity"], L["log2fc"], L["padj"], L["de_status"]]
+        body = [[
             r.get("gene"), r.get("label"),
             f'{r["pct_identity"]:.1f}' if r.get("pct_identity") is not None else "—",
             f'{r["log2fc"]:.2f}' if r.get("log2fc") is not None else "—",
             f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
             r.get("de_status"),
-        ])
+        ] for r in shown]
     tbl = _table(headers, body)
     note = ""
     if len(rows) > cap:
@@ -1157,6 +1172,11 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
     if amr_ran:
         am = _AMR_METHODS[lang].format(amr_db=config.amr.amr_db, vir_db=config.amr.virulence_db,
                                        min_id=config.amr.min_identity, min_cov=config.amr.min_coverage)
+        if config.amr.amrfinder_organism:
+            am += (" AMR genleri ayrıca NCBI AMRFinderPlus ile bağımsız olarak tespit edilip CARD "
+                   "sonuçlarıyla yan yana raporlandı (konkordans)." if lang == "tr" else
+                   " AMR genes were additionally detected independently with NCBI AMRFinderPlus and "
+                   "reported side by side with the CARD results (concordance).")
         paras += f'<p>{_esc(am)}</p>'
     if operon_ran:
         op = _OPERON_METHODS[lang].format(gap=config.operon.max_gap)
@@ -1234,6 +1254,9 @@ _AMR_REFERENCES: list[tuple[str, str]] = [
     ("Liu B, Zheng D, Jin Q, Chen L, Yang J. VFDB 2019: a comparative pathogenomic platform with an "
      "interactive web interface. Nucleic Acids Res. 2019;47(D1):D687–D692.",
      "https://doi.org/10.1093/nar/gky1080"),
+    ("Feldgarden M, Brover V, Gonzalez-Escalona N, et al. AMRFinderPlus and the Reference Gene Catalog "
+     "facilitate examination of the genomic links among antimicrobial resistance, stress response, and "
+     "virulence. Sci Rep. 2021;11:12728.", "https://doi.org/10.1038/s41598-021-91456-0"),
 ]
 
 # Operon kaynağı — yalnız m14 çalıştıysa (DOI doğrulandı).
