@@ -9,6 +9,17 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m16 SEKANS QC (rRNA% + STRANDEDNESS) TAMAM ve `main`'de (2026-08-05, merge `05b04ea`, push).** Ali'nin
+  "QC ekle" isteği — eksik girdi-QC kapıları. İki bağımsız araç (Ali seçti): **SortMeRNA** (rRNA%) + **RSeQC**
+  (strandedness), yeni `rnaforge-seqqc` env. **İki yeni WARN kapısı** (asla FAIL): `rrna_fraction` (>eşik,
+  profilde 0.20) + `strandedness_match` (çıkarım≠beyan). Güvence kartına akar. Yeni `rnaforge seqqc`. **385 test.**
+  - **Kod:** `seqqc.py` (rRNA-ref **genomdan çıkarılır** — indirme yok, agnostik; subsample gzip/düz oto;
+    sortmerna/infer_experiment runner+parser; GFF→BED12). `m16_seqqc.py` ön koşul m04. Rapor "Kalite ve İşleme"ye
+    rRNA%/strandedness/uyum satırları.
+  - **GSE300731_final canlı:** rRNA **%0.6** (depletion mükemmel → PASS), strandedness **unstranded = beyan**
+    (PASS). İki kapı da PASS (PASS 10→12), verdict SUSPECT değişmedi. Yalancı alarm yok, gerçek sinyal doğru.
+  - **DÜZELTME:** m03 trimlenmiş çıktı gzipli DEĞİL → `subsample_fastq` gzip/düz oto-algılama (`05b04ea`).
+  - Spec `docs/.../2026-08-05-m16-seqqc-design.md`.
 - **★ RAPOR YENİDEN YAPILANDIRMA TAMAM ve `main`'de (2026-08-05, merge `9b3bb27`, push).** Ali'nin standart
   RNA-seq bileşen listesine göre: (1) **Bölüm sırası** = liste sırası (Kalite→DESeq2→Figürler→Top DEG→**GO**→
   **KEGG**→GSEA→REVIGO→[AMR/Operon/PPI ek]→Yöntem/Kaynak). (2) **GO ve KEGG artık AYRI üst-bölümler**
