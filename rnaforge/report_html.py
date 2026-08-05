@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 10
+N_SECTIONS = 11
 
 
 def _num(v):
@@ -49,6 +49,22 @@ def parse_enrichment_tsv(path: Path) -> list[dict]:
                 row[k] = int(row[k]) if row.get(k) not in (None, "") else None
             for k in ("expected", "fold_enrichment", "p_value", "p_adj"):
                 row[k] = _num(row[k])
+            rows.append(row)
+    return rows
+
+
+def parse_gsea_tsv(path: Path) -> list[dict]:
+    """m11 gsea_<coll>.tsv -> tipli satırlar. Yoksa/başlık-only -> boş liste."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            row["size"] = int(row["size"]) if row.get("size") not in (None, "") else None
+            for k in ("ES", "NES", "pval", "padj"):
+                row[k] = _num(row.get(k))
             rows.append(row)
     return rows
 
@@ -196,6 +212,14 @@ def load_report_inputs(run_dir: Path) -> dict:
         "kegg_manifest": json.loads(kegg_manifest.read_text())
         if kegg_manifest.exists() else None,
         "kegg_dir": kegg_dir,
+        # m11 GSEA — opsiyonel: çalıştırılmadıysa None.
+        "gsea_go": parse_gsea_tsv(run_dir / "gsea" / "gsea_go.tsv")
+        if (run_dir / "gsea" / "gsea_go.tsv").exists() else None,
+        "gsea_kegg": parse_gsea_tsv(run_dir / "gsea" / "gsea_kegg.tsv")
+        if (run_dir / "gsea" / "gsea_kegg.tsv").exists() else None,
+        "gsea_manifest": json.loads((run_dir / "gsea" / "manifest.json").read_text())
+        if (run_dir / "gsea" / "manifest.json").exists() else None,
+        "gsea_dir": run_dir / "gsea",
     }
 
 
@@ -238,6 +262,15 @@ LABELS: dict[str, dict[str, str]] = {
             "çoklu-test düzeltilmiş p-değeri. Yalnız anlamlı terimler (padj &lt; 0,05), kategori başına "
             "en güçlü ilk 10 gösterilir; tam liste enrichment/ ve kegg/ TSV dosyalarındadır. "
             "KEGG bölümünde Kategori sütunu 'KEGG' (yolak) anlamına gelir."),
+        "gsea": "Gen Seti Zenginleştirme (GSEA)", "nes": "NES", "set_size": "Set boyutu",
+        "leading_edge": "Öncü genler",
+        "gsea_pos": "Artan tarafta zenginleşen (NES > 0)", "gsea_neg": "Azalan tarafta zenginleşen (NES < 0)",
+        "gsea_not_run": "GSEA bu koşuda çalıştırılmadı (rnaforge gsea ile aynı --run-id üzerinde üretilir).",
+        "gsea_legend": (
+            "GSEA tüm genleri Wald istatistiğine göre sıralar ve gen setlerinin sıralamanın hangi ucunda "
+            "yoğunlaştığını ölçer. <b>NES</b> = normalize zenginleşme skoru: pozitif → set artan (yüksek) "
+            "genlerde, negatif → azalan genlerde zenginleşmiş. <b>Öncü genler</b> = skora en çok katkı veren "
+            "çekirdek genler. Yalnız padj &lt; 0,05 gösterilir; tam liste gsea/ TSV dosyalarındadır."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -276,6 +309,15 @@ LABELS: dict[str, dict[str, str]] = {
             "(>1 = enriched) · <b>padj</b>: Benjamini–Hochberg multiple-testing adjusted p-value. "
             "Only significant terms (padj &lt; 0.05), top 10 per category, are shown; the full lists are in "
             "the enrichment/ and kegg/ TSV files. In the KEGG section the Category column reads 'KEGG' (pathway)."),
+        "gsea": "Gene Set Enrichment (GSEA)", "nes": "NES", "set_size": "Set size",
+        "leading_edge": "Leading edge",
+        "gsea_pos": "Enriched on the up side (NES > 0)", "gsea_neg": "Enriched on the down side (NES < 0)",
+        "gsea_not_run": "GSEA was not run for this run (produced by rnaforge gsea on the same --run-id).",
+        "gsea_legend": (
+            "GSEA ranks all genes by the Wald statistic and measures where a gene set concentrates along "
+            "that ranking. <b>NES</b> = normalized enrichment score: positive → the set is enriched among "
+            "up-regulated (high) genes, negative → among down-regulated genes. <b>Leading edge</b> = the "
+            "core genes driving the score. Only padj &lt; 0.05 shown; full lists in the gsea/ TSV files."),
     },
 }
 
@@ -313,6 +355,14 @@ FIGURE_CAPTIONS["en"].update({
     "kegg_up": "KEGG pathways enriched among up-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
     "kegg_down": "KEGG pathways enriched among down-regulated genes; x = fold enrichment, point size = gene count, colour = padj.",
 })
+FIGURE_CAPTIONS["tr"].update({
+    "gsea_go": "GSEA (GO) işaretli NES; sağ = artan tarafta, sol = azalan tarafta zenginleşen setler. Renk = padj, boyut = set boyutu.",
+    "gsea_kegg": "GSEA (KEGG) işaretli NES; sağ = artan tarafta, sol = azalan tarafta zenginleşen yolaklar. Renk = padj, boyut = set boyutu.",
+})
+FIGURE_CAPTIONS["en"].update({
+    "gsea_go": "GSEA (GO) signed NES; right = enriched on the up side, left = on the down side. Colour = padj, size = set size.",
+    "gsea_kegg": "GSEA (KEGG) signed NES; right = enriched on the up side, left = on the down side. Colour = padj, size = set size.",
+})
 
 SECTION_INTRO: dict[str, dict[str, str]] = {
     "tr": {
@@ -324,6 +374,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "table": "İstatistiksel eşiği geçen en güçlü artan ve azalan genler.",
         "enrichment": "Artan ve azalan DEG'lerde aşırı temsil edilen GO terimleri (hipergeometrik ORA, BH-FDR). "
                       "Anlamlı terimler (padj<0.05) hangi biyolojik süreçlerin değiştiğini özetler.",
+        "gsea": "Tüm genlerin sıralı listesinde koordineli değişen gen setleri (GSEA, fgsea). "
+                "ORA'nın kaçırabildiği zayıf ama tutarlı sinyalleri yakalar.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -336,6 +388,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
         "table": "The strongest up- and down-regulated genes passing the statistical threshold.",
         "enrichment": "GO terms over-represented among up- and down-regulated DEGs (hypergeometric ORA, BH-FDR). "
                       "Significant terms (padj<0.05) summarise which biological processes changed.",
+        "gsea": "Gene sets that change coordinately across the full ranked gene list (GSEA, fgsea). "
+                "Captures weak but consistent signals that ORA can miss.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -543,6 +597,55 @@ def section_enrichment(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("enrichment", L)}{"".join(blocks)}</section>')
 
 
+def _gsea_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
+    """İşaretli NES tablosu: en güçlü pozitif + en güçlü negatif (padj<0.05). Boşsa not."""
+    sig = [r for r in rows if (r.get("padj") is not None and r["padj"] < 0.05)]
+    if not sig:
+        return f'<p>{_esc(L["no_enrichment"])}</p>'
+    pos = sorted([r for r in sig if (r.get("NES") or 0) > 0],
+                 key=lambda r: -r["NES"])[:top_n]
+    neg = sorted([r for r in sig if (r.get("NES") or 0) < 0],
+                 key=lambda r: r["NES"])[:top_n]
+    headers = [L["go_term"], L["nes"], L["padj"], L["set_size"], L["leading_edge"]]
+    body: list[list] = []
+    for r in pos + neg:
+        le = (r.get("leading_edge") or "").split(";")
+        le_txt = ", ".join(le[:8]) + ("…" if len(le) > 8 else "")
+        body.append([
+            r.get("name") or r.get("pathway_id"),
+            f'{r["NES"]:.2f}' if r.get("NES") is not None else "—",
+            f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
+            r.get("size"), le_txt,
+        ])
+    return _table(headers, body)
+
+
+def section_gsea(inputs: dict, L: dict, lang: str = "tr") -> str:
+    go, kegg = inputs.get("gsea_go"), inputs.get("gsea_kegg")
+    if go is None and kegg is None:      # m11 çalıştırılmadı — dürüst not
+        return (f'<section id="gsea"><h2>{_esc(L["gsea"])}</h2>'
+                f'<p class="note">{_esc(L["gsea_not_run"])}</p></section>')
+    caps = FIGURE_CAPTIONS.get(lang, FIGURE_CAPTIONS["tr"])
+    figs_dir = Path(inputs.get("gsea_dir", "."))
+    fig_by_id = {f["id"]: f for f in (inputs.get("gsea_manifest") or {}).get("figures", [])}
+    blocks = []
+    for coll, rows, heading, fid in (("go", go, "go_heading", "gsea_go"),
+                                     ("kegg", kegg, "kegg_heading", "gsea_kegg")):
+        if rows is None:
+            continue
+        blocks.append(f'<h3>{_esc(L[heading])}</h3>')
+        blocks.append(_gsea_table(rows, L))
+        fig = fig_by_id.get(fid)
+        if fig and (figs_dir / fig["png"]).exists():
+            cap = caps.get(fid, "")
+            blocks.append(
+                f'<figure><img src="{embed_png(figs_dir / fig["png"])}" '
+                f'alt="{_esc(fig.get("title"))}"/><figcaption>{_esc(cap)}</figcaption></figure>')
+    blocks.append(f'<p class="note">{L["gsea_legend"]}</p>')
+    return (f'<section id="gsea"><h2>{_esc(L["gsea"])}</h2>'
+            f'{_intro("gsea", L)}{"".join(blocks)}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -624,7 +727,24 @@ _KEGG_METHODS: dict[str, str] = {
 }
 
 
-def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False) -> str:
+_GSEA_METHODS: dict[str, str] = {
+    "tr": (
+        "Gen seti zenginleştirme analizi (GSEA) genlerin DESeq2 Wald istatistiğine göre sıralanmış tam "
+        "listesi üzerinde fgsea (multilevel) ile yapıldı; GO ve KEGG gen setleri kullanıldı (set boyutu "
+        "{min_size}–{max_size} genle sınırlandı). Normalize zenginleşme skorunun (NES) işareti yönü verir "
+        "(pozitif = artan tarafta) ve p-değerleri Benjamini–Hochberg ile düzeltildi."
+    ),
+    "en": (
+        "Gene set enrichment analysis (GSEA) was run over the full gene list ranked by the DESeq2 Wald "
+        "statistic with fgsea (multilevel), using GO and KEGG gene sets (set size restricted to "
+        "{min_size}–{max_size} genes). The sign of the normalized enrichment score (NES) gives direction "
+        "(positive = up side) and p-values were adjusted by Benjamini–Hochberg."
+    ),
+}
+
+
+def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
+                    gsea_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -641,6 +761,10 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
     if kegg_ran:
         kegg = _KEGG_METHODS[lang].format(org=config.enrichment.kegg_organism or "—")
         paras += f'<p>{_esc(kegg)}</p>'
+    if gsea_ran:
+        g = _GSEA_METHODS[lang].format(min_size=config.enrichment.gsea_min_size,
+                                       max_size=config.enrichment.gsea_max_size)
+        paras += f'<p>{_esc(g)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -684,14 +808,25 @@ _KEGG_REFERENCES: list[tuple[str, str]] = [
      "Nucleic Acids Res. 2000;28(1):27–30.", "https://doi.org/10.1093/nar/28.1.27"),
 ]
 
+# GSEA kaynakları — yalnız m11 çalıştıysa (DOI doğrulandı).
+_GSEA_REFERENCES: list[tuple[str, str]] = [
+    ("Subramanian A, Tamayo P, Mootha VK, et al. Gene set enrichment analysis: a knowledge-based "
+     "approach for interpreting genome-wide expression profiles. Proc Natl Acad Sci USA. "
+     "2005;102(43):15545–15550.", "https://doi.org/10.1073/pnas.0506580102"),
+    ("Korotkevich G, Sukhov V, Budin N, et al. Fast gene set enrichment analysis. bioRxiv. 2021.",
+     "https://doi.org/10.1101/060012"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
 
 
-def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False) -> str:
+def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
+                       gsea_ran: bool = False) -> str:
     refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
-            + (_KEGG_REFERENCES if kegg_ran else []))
+            + (_KEGG_REFERENCES if kegg_ran else [])
+            + (_GSEA_REFERENCES if gsea_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -733,6 +868,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                       or inputs.get("enrichment_down") is not None)
     kegg_ran = (inputs.get("kegg_up") is not None
                 or inputs.get("kegg_down") is not None)
+    gsea_ran = (inputs.get("gsea_go") is not None
+                or inputs.get("gsea_kegg") is not None)
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -747,8 +884,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_enrichment(inputs, L, lang),
-        section_methods(config, L, enrichment_ran, kegg_ran),
-        section_references(L, enrichment_ran, kegg_ran),
+        section_gsea(inputs, L, lang),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'

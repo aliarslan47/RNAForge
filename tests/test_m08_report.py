@@ -59,7 +59,7 @@ def test_run_report_writes_and_resumes(tmp_path):
     rd = tmp_path / "run"; _seed_run(rd)
     RunState(rd).mark_done("m07_figures", [])
     s = m08_report.run_report(_cfg(tmp_path), tmp_path / "m.tsv", rd)
-    assert s["n_sections"] == 10
+    assert s["n_sections"] == 11
     doc = (rd / "report" / "report.html").read_text()
     assert "TRUSTWORTHY" in doc and doc.count('src="data:image/png;base64,') == 4
     assert (rd / "statistics" / "report_statistics.json").exists()
