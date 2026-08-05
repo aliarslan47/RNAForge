@@ -29,6 +29,10 @@
     respirasyon/enerji metabolizması** (büyüme durması). Anotasyonlu gen **2278→3835** (GAF doldurma katkısı).
     Rapor 3.14 MB, 10 gömülü figür (8 DE + 2 enrichment). Verdict SUSPECT değişmedi (gate yok).
   - Spec: `docs/superpowers/specs/2026-08-05-m09-go-enrichment-design.md` · Plan: `.../plans/2026-08-05-m09-go-enrichment.md`.
+  - **Cila (2026-08-05, `714eef6`, push):** enrichment figürü sıkışıktı → düzeltildi (uzun etiket sarma,
+    geniş panel 10in, dinamik yükseklik, 0-tabanlı x-ekseni, BP/MF/CC facet tam Türkçe adlı). Rapora
+    eklendi: GO tablolarının altına **sütun + kısaltma açıklaması** (çift dilli), **Yöntemler'e GO ORA
+    paragrafı**, **Kaynaklar'a GO/GOA/Benjamini–Hochberg** (yalnız enrich koştuysa). 267 test.
 
 ### (önceki durak)
 - **DEG tablolarına KOŞUL-BAŞI ORTALAMA EKSPRESYON sütunları eklendi ve `main`'de (2026-08-04, merge
