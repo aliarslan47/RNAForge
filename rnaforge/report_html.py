@@ -340,6 +340,9 @@ LABELS: dict[str, dict[str, str]] = {
         "full_table_note": "Tam tablo: differential_expression/deseq2_results.tsv",
         "min_length": "Min uzunluk", "aggressive": "Agresif kalite trimming",
         "summary": "Özet",
+        "cap_gates": "Kalite kapıları", "cap_samples": "Örnekler",
+        "cap_quality": "Hizalama, atama ve rRNA oranları", "cap_de": "Diferansiyel ekspresyon özeti",
+        "cap_operon": "Koordineli operonlar", "cap_ppi": "Protein etkileşim modülleri",
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
         "mean_suffix": "ort.",
         "enrichment": "Fonksiyonel Zenginleştirme (GO)",
@@ -433,6 +436,9 @@ LABELS: dict[str, dict[str, str]] = {
         "full_table_note": "Full table: differential_expression/deseq2_results.tsv",
         "min_length": "Min length", "aggressive": "Aggressive quality trimming",
         "summary": "Summary",
+        "cap_gates": "Quality gates", "cap_samples": "Samples",
+        "cap_quality": "Alignment, assignment and rRNA rates", "cap_de": "Differential expression summary",
+        "cap_operon": "Coordinated operons", "cap_ppi": "Protein interaction modules",
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
         "mean_suffix": "mean",
         "enrichment": "Functional Enrichment (GO)",
@@ -620,10 +626,11 @@ def _esc(x) -> str:
     return html.escape(str(x))
 
 
-def _table(headers: list[str], rows: list[list]) -> str:
+def _table(headers: list[str], rows: list[list], caption: str = "") -> str:
     head = "".join(f"<th>{_esc(h)}</th>" for h in headers)
     body = "".join("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in row) + "</tr>" for row in rows)
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    cap = f"<caption>{_esc(caption)}</caption>" if caption else ""
+    return f"<table>{cap}<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
 def _pct(v) -> str:
@@ -641,7 +648,7 @@ def section_confidence(conf: dict, L: dict) -> str:
     prof = conf.get("profile", {})
     gate_rows = [[g.get("name"), g.get("status"), g.get("measured"), g.get("threshold")]
                  for g in conf.get("gates", [])]
-    gate_tbl = _table([L["gate"], L["status"], L["measured"], L["threshold"]], gate_rows)
+    gate_tbl = _table([L["gate"], L["status"], L["measured"], L["threshold"]], gate_rows, L["cap_gates"])
     overrides = prof.get("overrides") or {}
     ov = "" if not overrides else f"<p>overrides: {_esc(overrides)}</p>"
     return (
@@ -660,7 +667,8 @@ def section_dataset(raw: dict, L: dict) -> str:
             f'{_esc(L["design"])}: {_esc(raw.get("design"))} · {_esc(conds)}</p>')
     rows = [[s.get("sample_id"), s.get("condition"), s.get("batch"), s.get("paired"),
              s.get("mean_read_length"), s.get("mean_quality")] for s in raw.get("samples", [])]
-    tbl = _table([L["sample"], L["condition"], L["batch"], L["paired"], L["read_len"], L["quality_col"]], rows)
+    tbl = _table([L["sample"], L["condition"], L["batch"], L["paired"], L["read_len"], L["quality_col"]],
+                 rows, L["cap_samples"])
     return f'<section id="dataset"><h2>{_esc(L["dataset"])}</h2>{_intro("dataset", L)}{meta}{tbl}</section>'
 
 
@@ -675,7 +683,7 @@ def section_quality(align: dict, count: dict, trimming_cfg: dict, L: dict,
     rows = [[sid, _pct(asamp.get(sid, {}).get("alignment_rate")),
              _pct(csamp.get(sid, {}).get("assignment_rate")),
              _pct(rrna[sid]) if sid in rrna else "—"] for sid in asamp]
-    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"], L["rrna_pct"]], rows)
+    tbl = _table([L["sample"], L["alignment_rate"], L["assignment_rate"], L["rrna_pct"]], rows, L["cap_quality"])
     # rRNA% + strandedness özet satırı (m16 çalıştıysa)
     seq_line = ""
     if seqqc:
@@ -701,7 +709,7 @@ def section_de(de: dict, L: dict) -> str:
         [L["down"], de.get("n_down")],
         ["min replicate corr.", de.get("min_replicate_correlation")],
     ]
-    tbl = _table([" ", " "], rows)
+    tbl = _table([" ", " "], rows, L["cap_de"])
     return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}</section>'
 
 
@@ -720,7 +728,7 @@ def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: st
     return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{_intro("figures", L)}{"".join(blocks)}</section>'
 
 
-def _deg_table(rows: list[dict], L: dict, cond_ctx: dict | None = None) -> str:
+def _deg_table(rows: list[dict], L: dict, cond_ctx: dict | None = None, caption: str = "") -> str:
     cond_order = cond_ctx["order"] if cond_ctx else []
     headers = [L["gene"], L["log2fc"], L["padj"]]
     headers += [f'{c} {L["mean_suffix"]}' for c in cond_order]
@@ -735,7 +743,7 @@ def _deg_table(rows: list[dict], L: dict, cond_ctx: dict | None = None) -> str:
             row.append(f'{m:.1f}' if m is not None else "—")
         row.append(f'{r["base_mean"]:.1f}' if r["base_mean"] is not None else "—")
         body.append(row)
-    return _table(headers, body)
+    return _table(headers, body, caption)
 
 
 def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: dict,
@@ -744,9 +752,9 @@ def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: d
     down = top_degs_by_direction(de_results, gene_map, fdr, lfc, "Down", n=25)
     if not up and not down:
         return f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}<p>{_esc(L["no_degs"])}</p></section>'
-    up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L, cond_ctx)}' if up
+    up_html = (f'<h3>{_esc(L["up_table"])}</h3>{_deg_table(up, L, cond_ctx, L["up_table"])}' if up
                else f'<h3>{_esc(L["up_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
-    down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L, cond_ctx)}' if down
+    down_html = (f'<h3>{_esc(L["down_table"])}</h3>{_deg_table(down, L, cond_ctx, L["down_table"])}' if down
                  else f'<h3>{_esc(L["down_table"])}</h3><p>{_esc(L["no_degs"])}</p>')
     return (f'<section id="table"><h2>{_esc(L["table"])}</h2>{_intro("table", L)}{up_html}{down_html}'
             f'<p class="note">{_esc(L["full_table_note"])}</p></section>')
@@ -755,7 +763,7 @@ def section_table(de_results: list, gene_map: dict, fdr: float, lfc: float, L: d
 _NS_ORDER = ["BP", "MF", "CC"]
 
 
-def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
+def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10, caption: str = "") -> str:
     """Anlamlı (padj<0.05) terimleri namespace başına top_n ile tablola. Boşsa not.
     Namespace GO (BP/MF/CC) veya KEGG olabilir — bilinen sıra önce, gerisi alfabetik."""
     sig = [r for r in rows if (r.get("p_adj") is not None and r["p_adj"] < 0.05)]
@@ -774,7 +782,7 @@ def _enrichment_dir_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
                 f'{r["fold_enrichment"]:.1f}' if r["fold_enrichment"] is not None else "—",
                 f'{r["p_adj"]:.2e}' if r["p_adj"] is not None else "—",
             ])
-    return _table(headers, body)
+    return _table(headers, body, caption)
 
 
 def _enrichment_collection(up, down, manifest, figs_dir: Path, L: dict, lang: str,
@@ -786,7 +794,7 @@ def _enrichment_collection(up, down, manifest, figs_dir: Path, L: dict, lang: st
     for rows, lab, fid in ((up or [], up_label, cap_ids[0]),
                            (down or [], down_label, cap_ids[1])):
         blocks.append(f'<h4>{_esc(L[lab])}</h4>')
-        blocks.append(_enrichment_dir_table(rows, L))
+        blocks.append(_enrichment_dir_table(rows, L, caption=L[lab]))
         fig = fig_by_id.get(fid)
         if fig and (Path(figs_dir) / fig["png"]).exists():
             cap = caps.get(fid, "")
@@ -822,7 +830,7 @@ def section_kegg(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("kegg", L)}{block}<p class="note">{L["kegg_legend"]}</p></section>')
 
 
-def _gsea_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
+def _gsea_table(rows: list[dict], L: dict, top_n: int = 10, caption: str = "") -> str:
     """İşaretli NES tablosu: en güçlü pozitif + en güçlü negatif (padj<0.05). Boşsa not."""
     sig = [r for r in rows if (r.get("padj") is not None and r["padj"] < 0.05)]
     if not sig:
@@ -842,7 +850,7 @@ def _gsea_table(rows: list[dict], L: dict, top_n: int = 10) -> str:
             f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
             r.get("size"), le_txt,
         ])
-    return _table(headers, body)
+    return _table(headers, body, caption)
 
 
 def section_gsea(inputs: dict, L: dict, lang: str = "tr") -> str:
@@ -859,7 +867,7 @@ def section_gsea(inputs: dict, L: dict, lang: str = "tr") -> str:
         if rows is None:
             continue
         blocks.append(f'<h3>{_esc(L[heading])}</h3>')
-        blocks.append(_gsea_table(rows, L))
+        blocks.append(_gsea_table(rows, L, caption=f'GSEA — {L[heading]}'))
         fig = fig_by_id.get(fid)
         if fig and (figs_dir / fig["png"]).exists():
             cap = caps.get(fid, "")
@@ -871,7 +879,7 @@ def section_gsea(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("gsea", L)}{"".join(blocks)}</section>')
 
 
-def _reduced_table(rows: list[dict], L: dict) -> str:
+def _reduced_table(rows: list[dict], L: dict, caption: str = "") -> str:
     """Temsilci GO terimleri: term, namespace, padj, temsil ettiği terim sayısı."""
     if not rows:
         return f'<p>{_esc(L["no_enrichment"])}</p>'
@@ -885,7 +893,7 @@ def _reduced_table(rows: list[dict], L: dict) -> str:
             f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
             r.get("n_collapsed"),
         ])
-    return summary + _table(headers, body)
+    return summary + _table(headers, body, caption)
 
 
 def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
@@ -900,14 +908,14 @@ def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
         if rows is None:
             continue
         blocks.append(f'<h3>{_esc(L[label])}</h3>')
-        blocks.append(_reduced_table(rows, L))
+        blocks.append(_reduced_table(rows, L, caption=L[label]))
     blocks.append(_embed_first_figure(inputs.get("semantic_manifest"), inputs.get("semantic_dir", ".")))
     blocks.append(f'<p class="note">{L["semantic_legend"]}</p>')
     return (f'<section id="semantic"><h2>{_esc(L["semantic"])}</h2>'
             f'{_intro("semantic", L)}{"".join(blocks)}</section>')
 
 
-def _amr_table(rows: list[dict], L: dict, cap: int = 40) -> str:
+def _amr_table(rows: list[dict], L: dict, cap: int = 40, caption: str = "") -> str:
     """AMR (CARD↔AMRFinderPlus yan yana) veya virülans (tek araç) tablosu. up/down önce; uzunsa kırp."""
     if not rows:
         return f'<p>{_esc(L["no_degs"])}</p>'
@@ -933,7 +941,7 @@ def _amr_table(rows: list[dict], L: dict, cap: int = 40) -> str:
             f'{r["padj"]:.2e}' if r.get("padj") is not None else "—",
             r.get("de_status"),
         ] for r in shown]
-    tbl = _table(headers, body)
+    tbl = _table(headers, body, caption)
     note = ""
     if len(rows) > cap:
         note = f'<p class="note">{_esc(L["amr_more"].format(n=len(rows) - cap))}</p>'
@@ -948,9 +956,9 @@ def section_amr(inputs: dict, L: dict, lang: str = "tr") -> str:
                 f'<p class="note">{_esc(L["amr_not_run"])}</p></section>')
     blocks = []
     if amr is not None:
-        blocks.append(f'<h3>{_esc(L["amr_genes"])}</h3>{_amr_table(amr, L)}')
+        blocks.append(f'<h3>{_esc(L["amr_genes"])}</h3>{_amr_table(amr, L, caption=L["amr_genes"])}')
     if vir is not None:
-        blocks.append(f'<h3>{_esc(L["vir_genes"])}</h3>{_amr_table(vir, L)}')
+        blocks.append(f'<h3>{_esc(L["vir_genes"])}</h3>{_amr_table(vir, L, caption=L["vir_genes"])}')
     blocks.append(f'<p class="note">{L["amr_legend"]}</p>')
     return (f'<section id="amr"><h2>{_esc(L["amr"])}</h2>'
             f'{_intro("amr", L)}{"".join(blocks)}</section>')
@@ -990,7 +998,7 @@ def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> st
                 ", ".join(o.get("genes", "").split(";")), o.get("size"), o.get("n_deg"),
                 direction, f'{o["mean_log2fc"]:.2f}' if o.get("mean_log2fc") is not None else "—",
             ])
-        body_html = _table(headers, rows)
+        body_html = _table(headers, rows, L["cap_operon"])
     fig_html = _embed_first_figure(inputs.get("operon_manifest"), inputs.get("operon_dir", "."))
     legend = f'<p class="note">{L["operon_legend"].format(gap=gap)}</p>'
     return (f'<section id="operon"><h2>{_esc(L["operon"])}</h2>'
@@ -1013,7 +1021,7 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
             direction = L["up"] if c.get("n_up", 0) >= c.get("n_down", 0) else L["down"]
             rows.append([c.get("community_id"), c.get("size"), direction,
                          ", ".join(c.get("genes", "").split(";"))])
-        body_html = _table(headers, rows)
+        body_html = _table(headers, rows, L["cap_ppi"])
     fig_html = _embed_first_figure(inputs.get("ppi_manifest"), inputs.get("ppi_dir", "."))
     score = stats.get("min_score", 700)
     legend = f'<p class="note">{L["ppi_legend"].format(score=score)}</p>'
@@ -1343,7 +1351,9 @@ padding:0 1rem;color:#1a1a1a;line-height:1.5}
 h1{font-size:1.7rem} h2{margin-top:2rem;border-bottom:2px solid #eee;padding-bottom:.3rem}
 table{border-collapse:collapse;width:100%;margin:.6rem 0;font-size:.9rem}
 th,td{border:1px solid #ddd;padding:.35rem .5rem;text-align:left}
-th{background:#f6f6f6} .banner{padding:.8rem 1rem;border-radius:6px;margin:.6rem 0;font-size:1.05rem}
+th{background:#f6f6f6}
+caption{caption-side:top;text-align:left;font-weight:600;font-size:.9rem;color:#333;margin-bottom:.25rem}
+.banner{padding:.8rem 1rem;border-radius:6px;margin:.6rem 0;font-size:1.05rem}
 .verdict-trustworthy{background:#e6f4ea;border:1px solid #34a853}
 .verdict-suspect{background:#fef7e0;border:1px solid #f9ab00}
 .verdict-invalid{background:#fce8e6;border:1px solid #d93025}
@@ -1417,6 +1427,14 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         _fig["n"] += 1
         return f'<figcaption>{fig_word} {_fig["n"]}. '
     body = re.sub(r'<figcaption>', _numbered, body)
+    # Tabloları belge sırasına göre numaralandır: "Tablo N. <ad>" / "Table N. <name>"
+    tbl_word = "Tablo" if lang == "tr" else "Table"
+    _tbl = {"n": 0}
+
+    def _numbered_tbl(_m):
+        _tbl["n"] += 1
+        return f'<caption>{tbl_word} {_tbl["n"]}. '
+    body = re.sub(r'<caption>', _numbered_tbl, body)
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>RNAForge report</title><style>{_CSS}</style></head>'
