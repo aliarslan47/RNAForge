@@ -79,6 +79,10 @@ class Enrichment:
     top_n: int = 15
     obo: Path | None = None
     gaf: Path | None = None
+    # m10 KEGG: organizma kodu (eco/hsa/mmu…) ZORUNLU (yoksa m10 çalışmaz, net hata).
+    # kegg_dir: KEGG REST dosyalarının bulunduğu dizin (yoksa references/kegg/<org>).
+    kegg_organism: str | None = None
+    kegg_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -245,5 +249,8 @@ def load_config(path: Path | str) -> Config:
             top_n=_as_int(enrichment_raw.get("top_n", 15), "enrichment.top_n"),
             obo=(Path(enrichment_raw["obo"]) if enrichment_raw.get("obo") else None),
             gaf=(Path(enrichment_raw["gaf"]) if enrichment_raw.get("gaf") else None),
+            kegg_organism=(str(enrichment_raw["kegg_organism"])
+                           if enrichment_raw.get("kegg_organism") else None),
+            kegg_dir=(Path(enrichment_raw["kegg_dir"]) if enrichment_raw.get("kegg_dir") else None),
         ),
     )
