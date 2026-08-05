@@ -434,3 +434,47 @@ def test_methods_and_refs_kegg_when_ran():
     assert "10.1093/nar/28.1.27" in refs           # Kanehisa & Goto 2000
     refs_no = section_references(LABELS["en"], enrichment_ran=True, kegg_ran=False)
     assert "10.1093/nar/28.1.27" not in refs_no
+
+
+from rnaforge.report_html import parse_gsea_tsv, section_gsea
+
+
+def _gsea_rows_tsv(tmp_path):
+    p = tmp_path / "gsea_go.tsv"
+    p.write_text(
+        "pathway_id\tname\tsize\tES\tNES\tpval\tpadj\tleading_edge\n"
+        "GO:0009279\touter membrane\t30\t0.7\t2.5\t1e-5\t2e-4\tpspA;ompC;ompF\n"
+        "GO:0006119\toxidative phosphorylation\t40\t-0.8\t-2.8\t1e-6\t5e-5\tnuoA;nuoB\n"
+        "GO:0000001\tns term\t20\t0.2\t1.1\t0.3\t0.6\tgeneX\n"      # padj>0.05 -> elenmeli
+    )
+    return parse_gsea_tsv(p)
+
+
+def test_parse_gsea_tsv_types(tmp_path):
+    rows = _gsea_rows_tsv(tmp_path)
+    assert rows[0]["NES"] == 2.5 and rows[0]["size"] == 30
+    assert rows[1]["NES"] == -2.8
+
+
+def test_section_gsea_present(tmp_path):
+    inputs = {"gsea_go": _gsea_rows_tsv(tmp_path), "gsea_kegg": None,
+              "gsea_manifest": None, "gsea_dir": tmp_path}
+    html = section_gsea(inputs, LABELS["tr"], "tr")
+    assert "GSEA" in html and "NES" in html
+    assert "outer membrane" in html and "oxidative phosphorylation" in html   # +NES ve -NES
+    assert "ns term" not in html                    # padj>0.05 elendi
+    assert "pspA" in html                           # öncü genler
+
+
+def test_section_gsea_absent_note():
+    html = section_gsea({"gsea_go": None, "gsea_kegg": None}, LABELS["en"], "en")
+    assert "was not run" in html
+
+
+def test_methods_refs_gsea_when_ran():
+    withg = section_methods(_cfg("tr"), LABELS["tr"], gsea_ran=True)
+    assert "GSEA" in withg and "fgsea" in withg
+    refs = section_references(LABELS["en"], gsea_ran=True)
+    assert "10.1073/pnas.0506580102" in refs         # Subramanian 2005
+    refs_no = section_references(LABELS["en"], gsea_ran=False)
+    assert "10.1073/pnas.0506580102" not in refs_no
