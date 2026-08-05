@@ -392,3 +392,45 @@ def test_render_report_go_methods_and_refs_present(tmp_path):
     assert "hipergeometrik" in doc                         # yöntemlerde GO paragrafı
     assert "10.1093/nar/gku1113" in doc                    # EBI-GOA kaynağı
     assert "Biyolojik Süreç" in doc                        # tablo açıklaması
+
+
+def _kegg_rows_tsv(tmp_path):
+    p = tmp_path / "kegg_up.tsv"
+    p.write_text(
+        "go_id\tnamespace\tterm\tstudy_count\tstudy_n\tbg_count\tbg_n\texpected\t"
+        "fold_enrichment\tp_value\tp_adj\tgenes\n"
+        "eco02020\tKEGG\tTwo-component system\t10\t50\t30\t500\t3.0\t3.3\t1.0e-06\t5.0e-05\tphoB;ompR\n"
+    )
+    return parse_enrichment_tsv(p)
+
+
+def test_section_enrichment_kegg_subsection(tmp_path):
+    inputs = {"enrichment_up": None, "enrichment_down": None,
+              "kegg_up": _kegg_rows_tsv(tmp_path), "kegg_down": [],
+              "kegg_manifest": None, "kegg_dir": tmp_path}
+    html = section_enrichment(inputs, LABELS["tr"], "tr")
+    assert "KEGG Yolakları" in html
+    assert "Two-component system" in html          # KEGG namespace tabloda görünüyor
+    assert "çalıştırılmadı" not in html            # KEGG koştu -> not-run notu yok
+
+
+def test_section_enrichment_both_go_and_kegg(tmp_path):
+    inputs = {"enrichment_up": _enrich_rows_tsv(tmp_path), "enrichment_down": [],
+              "enrichment_manifest": None, "enrichment_dir": tmp_path,
+              "kegg_up": _kegg_rows_tsv(tmp_path), "kegg_down": [],
+              "kegg_manifest": None, "kegg_dir": tmp_path}
+    html = section_enrichment(inputs, LABELS["en"], "en")
+    assert "Gene Ontology (GO)" in html and "KEGG Pathways" in html
+    assert "outer membrane" in html and "Two-component system" in html
+
+
+def test_methods_and_refs_kegg_when_ran():
+    cfg = _cfg("tr")
+    cfg = __import__("dataclasses").replace(
+        cfg, enrichment=__import__("dataclasses").replace(cfg.enrichment, kegg_organism="eco"))
+    withk = section_methods(cfg, LABELS["tr"], enrichment_ran=True, kegg_ran=True)
+    assert "KEGG" in withk and "eco" in withk
+    refs = section_references(LABELS["en"], enrichment_ran=True, kegg_ran=True)
+    assert "10.1093/nar/28.1.27" in refs           # Kanehisa & Goto 2000
+    refs_no = section_references(LABELS["en"], enrichment_ran=True, kegg_ran=False)
+    assert "10.1093/nar/28.1.27" not in refs_no
