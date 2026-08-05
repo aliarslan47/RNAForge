@@ -9,6 +9,17 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m12 SEMANTIC REDUCTION (REVIGO) TAMAM ve `main`'de (2026-08-05, merge `7f0cb89`, push). Dalga 1 #3 (son).
+  DOWNSTREAM DALGA 1 TAMAMEN BİTTİ (KEGG+GSEA+REVIGO).** Saf Python stdlib (numpy YOK). Gate YOK. **316 test.**
+  - **Motor** (`semantic.py`): IC = −log(terim frekansı, arka plan `build_gene2go`'dan) + **Lin** benzerliği
+    (obo `_ancestors` yeniden kullanılır, MICA) + **REVIGO-benzeri greedy indirgeme** (namespace-içi, padj
+    sıralı; max Lin ≥ eşik → tek temsilci). Eşik `enrichment.revigo_similarity` (0.7).
+  - **Kaynaklar:** m09 ORA GO (up/down) + m11 GSEA GO. Çıktı `semantic/reduced_{ora_up,ora_down,gsea_go}.tsv`
+    (temsilci + n_collapsed + members). Yeni `rnaforge semantic`. **Figür YOK** (MDS scatter numpy/R → bilinçli sonraya).
+  - **Rapor:** "Anlamsal İndirgeme (REVIGO)" bölümü (temsilci tablo + "N→M" özet); Lin 1998 + Supek 2011 kaynak.
+  - **GSE300731 canlı:** ora_up 58→24, ora_down 51→24, gsea_go 81→32. Polisakkarit/kolanik asit/slime layer
+    ailesi temsilcilerde toplandı; **kapsül/zarf-stres teması korundu**. Verdict SUSPECT değişmedi. Rapor 4.4 MB.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m12-semantic*`.
 - **★ m11 GSEA TAMAM ve `main`'de (2026-08-05, merge `835b651`, push). Dalga 1 #2.**
   Motor **fgsea** (Bioconductor, altın standart — DESeq2 kararıyla tutarlı; `rnaforge-de` env'ine kuruldu,
   `envs/rnaforge-de.yml` güncel). ORA'dan farklı: **tüm genlerin ranked listesi** (DESeq2 `stat` = Wald).
@@ -207,11 +218,15 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
     Motor yeniden kullanım; `rnaforge kegg`; GSE300731 canlı (peptidoglikan/respirasyon, GO ile uyumlu).
 14b. ~~m11 = GSEA (Dalga 1 #2)~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `835b651`). fgsea (rnaforge-de),
     işaretli NES; `rnaforge gsea`; GSE300731 canlı (ORA GO+KEGG ile birebir uyumlu).
+14c. ~~m12 = Semantic/REVIGO (Dalga 1 #3, son)~~ ✅ BİTTİ (2026-08-05) — `main`'de (merge `7f0cb89`). Lin,
+    saf Python; `rnaforge semantic`; 58→24 vb. indirgeme. **DOWNSTREAM DALGA 1 TAMAM.**
 
 ### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
-- **Dalga 1 (m09 motoru + agnostik):** ~~KEGG ORA~~ ✅ → ~~GSEA~~ ✅ (m11, fgsea) → **★ SIRADAKİ:
-  Semantic similarity + REVIGO** (obo bizde; çok GO terimini indirger/kümeler; saf Python; GOSemSim mantığı).
+- **Dalga 1 ✅ TAMAM:** ~~KEGG ORA~~ (m10) → ~~GSEA~~ (m11, fgsea) → ~~Semantic/REVIGO~~ (m12, Lin). Hepsi agnostik.
+  **★ SIRADAKİ SEÇENEKLER:** (a) **Dalga 2** bakteri overlay — AMR (CARD/AMRFinder) + Virulence (VFDB) →
+  Operon → PPI (STRING)+community; antibiyotik verisine birebir. (b) **Ökaryot yolu** (m04-euk salmon +
+  m05-euk tximport). (c) Küçük cila (REVIGO MDS scatter numpy/R; m07 PCA etiket). Ali seçecek.
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
 - **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
