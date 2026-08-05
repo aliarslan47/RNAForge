@@ -7,6 +7,12 @@ from rnaforge.config import load_config
 from rnaforge.modules import m14_operon
 from rnaforge.state import RunState
 
+
+@pytest.fixture(autouse=True)
+def _no_operon_r(monkeypatch):
+    # Figür best-effort; birim testte R çağrısını atla (env-bağımsız, hızlı).
+    monkeypatch.setattr(m14_operon, "run_operon_r", lambda *a, **k: "")
+
 GFF = (
     "c1\tx\tgene\t100\t200\t.\t+\t.\tlocus_tag=A;gene=a\n"
     "c1\tx\tgene\t210\t300\t.\t+\t.\tlocus_tag=B;gene=b\n"

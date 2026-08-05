@@ -43,5 +43,7 @@ dependencies:
   - zstd=1.5.7
   - pip:
       - networkx==3.6.1
+      - numpy==2.4.6
       - rnaforge==0.1.0
+      - scipy==1.17.1
 prefix: /home/ali/miniconda3/envs/rnaforge-core

@@ -289,6 +289,9 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "semantic" / "reduced_ora_down.tsv").exists() else None,
         "reduced_gsea_go": parse_reduced_tsv(run_dir / "semantic" / "reduced_gsea_go.tsv")
         if (run_dir / "semantic" / "reduced_gsea_go.tsv").exists() else None,
+        "semantic_manifest": json.loads((run_dir / "semantic" / "manifest.json").read_text())
+        if (run_dir / "semantic" / "manifest.json").exists() else None,
+        "semantic_dir": run_dir / "semantic",
         # m13 AMR/virülans — opsiyonel: çalıştırılmadıysa None.
         "amr_genes": parse_amr_tsv(run_dir / "amr" / "amr_genes.tsv")
         if (run_dir / "amr" / "amr_genes.tsv").exists() else None,
@@ -301,11 +304,17 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "operon" / "operons.tsv").exists() else None,
         "operon_stats": _read_json(stats / "operon_statistics.json")
         if (stats / "operon_statistics.json").exists() else None,
+        "operon_manifest": json.loads((run_dir / "operon" / "manifest.json").read_text())
+        if (run_dir / "operon" / "manifest.json").exists() else None,
+        "operon_dir": run_dir / "operon",
         # m15 PPI — opsiyonel: çalıştırılmadıysa None.
         "communities": parse_community_tsv(run_dir / "ppi" / "communities.tsv")
         if (run_dir / "ppi" / "communities.tsv").exists() else None,
         "ppi_stats": _read_json(stats / "ppi_statistics.json")
         if (stats / "ppi_statistics.json").exists() else None,
+        "ppi_manifest": json.loads((run_dir / "ppi" / "manifest.json").read_text())
+        if (run_dir / "ppi" / "manifest.json").exists() else None,
+        "ppi_dir": run_dir / "ppi",
     }
 
 
@@ -851,6 +860,7 @@ def section_semantic(inputs: dict, L: dict, lang: str = "tr") -> str:
             continue
         blocks.append(f'<h3>{_esc(L[label])}</h3>')
         blocks.append(_reduced_table(rows, L))
+    blocks.append(_embed_first_figure(inputs.get("semantic_manifest"), inputs.get("semantic_dir", ".")))
     blocks.append(f'<p class="note">{L["semantic_legend"]}</p>')
     return (f'<section id="semantic"><h2>{_esc(L["semantic"])}</h2>'
             f'{_intro("semantic", L)}{"".join(blocks)}</section>')
@@ -895,6 +905,19 @@ def section_amr(inputs: dict, L: dict, lang: str = "tr") -> str:
             f'{_intro("amr", L)}{"".join(blocks)}</section>')
 
 
+def _embed_first_figure(manifest: dict | None, figs_dir) -> str:
+    """Manifest'teki figürleri (varsa) gömer. Yoksa/dosya yoksa boş döner (tolerant)."""
+    if not manifest:
+        return ""
+    figs_dir = Path(figs_dir)
+    blocks = []
+    for fig in manifest.get("figures", []):
+        png = figs_dir / fig.get("png", "")
+        if png.exists():
+            blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/></figure>')
+    return "".join(blocks)
+
+
 def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> str:
     operons = inputs.get("operons")
     if operons is None:
@@ -916,9 +939,10 @@ def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> st
                 direction, f'{o["mean_log2fc"]:.2f}' if o.get("mean_log2fc") is not None else "—",
             ])
         body_html = _table(headers, rows)
+    fig_html = _embed_first_figure(inputs.get("operon_manifest"), inputs.get("operon_dir", "."))
     legend = f'<p class="note">{L["operon_legend"].format(gap=gap)}</p>'
     return (f'<section id="operon"><h2>{_esc(L["operon"])}</h2>'
-            f'{_intro("operon", L)}{summary}{body_html}{legend}</section>')
+            f'{_intro("operon", L)}{summary}{body_html}{fig_html}{legend}</section>')
 
 
 def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
@@ -938,10 +962,11 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
             rows.append([c.get("community_id"), c.get("size"), direction,
                          ", ".join(c.get("genes", "").split(";"))])
         body_html = _table(headers, rows)
+    fig_html = _embed_first_figure(inputs.get("ppi_manifest"), inputs.get("ppi_dir", "."))
     score = stats.get("min_score", 700)
     legend = f'<p class="note">{L["ppi_legend"].format(score=score)}</p>'
     return (f'<section id="ppi"><h2>{_esc(L["ppi"])}</h2>'
-            f'{_intro("ppi", L)}{summary}{body_html}{legend}</section>')
+            f'{_intro("ppi", L)}{summary}{fig_html}{body_html}{legend}</section>')
 
 
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;

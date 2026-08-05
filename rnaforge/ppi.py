@@ -6,11 +6,14 @@ DEG-DEG kenarları alt-ağı → louvain_communities (deterministik seed). Elle 
 from __future__ import annotations
 
 import gzip
+import subprocess
 from pathlib import Path
 
 import networkx as nx
 
 from rnaforge.go_annotation import _symbol_to_locus
+
+_SCRIPT = Path(__file__).parent / "scripts" / "ppi.R"
 
 
 def parse_string_info(info_gz: Path) -> dict[str, str]:
@@ -102,3 +105,52 @@ def summarize_communities(communities: list[list[str]], gene_symbol: dict[str, s
                     "n_up": n_up, "n_down": n_down, "dominant": dominant, "genes": symbols})
     out.sort(key=lambda r: -r["size"])
     return out
+
+
+def network_layout(g: nx.Graph, communities: list[list[str]], gene_symbol: dict[str, str],
+                   de: dict[str, tuple[float | None, float | None]], top_modules: int = 8,
+                   min_size: int = 3, seed: int = 42):
+    """En büyük modüllerin alt-ağını konumla (spring layout) → düğüm + kenar kayıtları (ggplot için).
+    Hairball değil: yalnız en büyük `top_modules` modül. Boşsa ([],[])."""
+    sized = sorted((c for c in communities if len(c) >= min_size), key=len, reverse=True)[:top_modules]
+    node2mod = {lt: i for i, comm in enumerate(sized, 1) for lt in comm}
+    if not node2mod:
+        return [], []
+    h = g.subgraph(node2mod.keys())
+    pos = nx.spring_layout(h, seed=seed, weight="weight")
+    nodes = []
+    for n in h.nodes:
+        x, y = pos[n]
+        l2fc, _ = de.get(n, (None, None))
+        direction = "up" if (l2fc or 0) > 0 else ("down" if (l2fc or 0) < 0 else "ns")
+        nodes.append({"locus_tag": n, "symbol": gene_symbol.get(n, n),
+                      "x": x, "y": y, "module": f"M{node2mod[n]}", "direction": direction,
+                      "degree": h.degree(n)})
+    edges = []
+    for a, b in h.edges:
+        edges.append({"x1": pos[a][0], "y1": pos[a][1], "x2": pos[b][0], "y2": pos[b][1]})
+    return nodes, edges
+
+
+def write_network_tsv(nodes: list[dict], edges: list[dict], nodes_path: Path, edges_path: Path) -> None:
+    with Path(nodes_path).open("w") as f:
+        f.write("locus_tag\tsymbol\tx\ty\tmodule\tdirection\tdegree\n")
+        for n in nodes:
+            f.write(f'{n["locus_tag"]}\t{n["symbol"]}\t{n["x"]:.5f}\t{n["y"]:.5f}\t'
+                    f'{n["module"]}\t{n["direction"]}\t{n["degree"]}\n')
+    with Path(edges_path).open("w") as f:
+        f.write("x1\ty1\tx2\ty2\n")
+        for e in edges:
+            f.write(f'{e["x1"]:.5f}\t{e["y1"]:.5f}\t{e["x2"]:.5f}\t{e["y2"]:.5f}\n')
+
+
+def run_ppi_r(nodes_tsv: Path, edges_tsv: Path, out_dir: Path, env: str = "rnaforge-de") -> str:
+    """ppi.R (modül-renkli ağ figürü). stdout/stderr döndür, hatada gürültülü yüksel."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
+           str(nodes_tsv), str(edges_tsv), str(out_dir)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"ppi.R failed (exit {r.returncode}):\n{r.stderr}")
+    return (r.stdout or "") + (r.stderr or "")

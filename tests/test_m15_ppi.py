@@ -10,6 +10,12 @@ from rnaforge.config import load_config
 from rnaforge.modules import m15_ppi
 from rnaforge.state import RunState
 
+
+@pytest.fixture(autouse=True)
+def _no_ppi_r(monkeypatch):
+    # Ağ figürü best-effort; birim testte R çağrısını atla (networkx layout saf-Python, kalır).
+    monkeypatch.setattr(m15_ppi, "run_ppi_r", lambda *a, **k: "")
+
 GFF = (
     "c1\tx\tCDS\t1\t9\t.\t+\t0\tgene=a;locus_tag=LT_1\n"
     "c1\tx\tCDS\t1\t9\t.\t+\t0\tgene=b;locus_tag=LT_2\n"

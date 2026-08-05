@@ -8,8 +8,13 @@ from pathlib import Path
 
 from rnaforge.config import Config
 from rnaforge.go_annotation import build_gene2go, parse_obo
-from rnaforge.semantic import compute_ic, reduce_terms
+from rnaforge.semantic import (
+    compute_ic, lin_distance_matrix, reduce_terms, run_semantic_r, write_distance_matrix,
+)
 from rnaforge.state import RunState
+
+_FIG_TITLES = {"ora_up": "Anlamsal harita — Artan (GO)", "ora_down": "Anlamsal harita — Azalan (GO)",
+               "gsea_go": "Anlamsal harita — GSEA (GO)"}
 
 MODULE_NAME = "m12_semantic"
 _REDUCED_HEADER = ["go_id", "namespace", "term", "padj", "n_collapsed", "members"]
@@ -95,6 +100,7 @@ def run_semantic(config: Config, metadata_path: Path, run_dir: Path,
                                         "pathway_id", "name", "padj", None, go_meta)),
         ]
         collections: dict[str, dict] = {}
+        figures = []
         for name, terms in sources:
             if not terms:
                 continue
@@ -102,13 +108,33 @@ def run_semantic(config: Config, metadata_path: Path, run_dir: Path,
             _write_reduced(reps, out_dir / f"reduced_{name}.tsv")
             collections[name] = {"n_terms": len(terms), "n_representatives": len(reps)}
             log(f"m12: {name} {len(terms)} terms -> {len(reps)} representatives")
+            # REVIGO-benzeri MDS scatter — best-effort (çekirdek tabloyu bozmasın; ≥3 temsilci gerekir)
+            if len(reps) >= 3:
+                rep_ids = [r["go_id"] for r in reps]
+                dist = lin_distance_matrix(rep_ids, obo, ic)
+                dist_path = out_dir / f"mds_{name}_dist.tsv"
+                write_distance_matrix(rep_ids, dist, dist_path)
+                try:
+                    r_out = run_semantic_r(dist_path, out_dir / f"reduced_{name}.tsv", out_dir,
+                                           f"mds_{name}", _FIG_TITLES.get(name, name))
+                    if r_out:
+                        log_file.write(r_out if r_out.endswith("\n") else r_out + "\n")
+                    if (out_dir / f"mds_{name}.png").exists():
+                        figures.append({"id": f"mds_{name}", "title": _FIG_TITLES.get(name, name),
+                                        "png": f"mds_{name}.png",
+                                        "svg": f"mds_{name}.svg" if (out_dir / f"mds_{name}.svg").exists() else None})
+                except Exception as exc:  # noqa: BLE001 — figür opsiyonel; logla, koşuyu bozma
+                    log(f"m12: {name} MDS figürü üretilemedi (opsiyonel): {exc}")
             state.heartbeat()
 
         if not collections:
             raise ValueError(
                 "m12 (semantic): no significant GO terms found in m09/m11 outputs to reduce.")
 
-        summary = {"collections": collections, "similarity_threshold": thr}
+        if figures:
+            (out_dir / "manifest.json").write_text(json.dumps({"figures": figures}, indent=2))
+        summary = {"collections": collections, "similarity_threshold": thr,
+                   "n_figures": len(figures)}
         stats_path.write_text(json.dumps(summary, indent=2))
         log(f"m12 semantic done: {summary}")
 
