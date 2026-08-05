@@ -87,6 +87,11 @@ rnaforge counts   --config config/config.yaml --metadata samples.tsv --run-id de
 rnaforge de       --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge figures  --config config/config.yaml --metadata samples.tsv --run-id demo
 
+# optional QC / diagnostics (require m04; produce diagnostic figures/tables, never FAIL)
+rnaforge seqqc    --config config/config.yaml --metadata samples.tsv --run-id demo  # rRNA% + strandedness (m16)
+rnaforge alignqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # insert-size + coverage + read-distribution (m17)
+rnaforge multiqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # aggregate MultiQC view (m18, run last)
+
 # optional functional analyses (any subset; each needs its reference data — see below)
 rnaforge enrich   --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge kegg     --config config/config.yaml --metadata samples.tsv --run-id demo

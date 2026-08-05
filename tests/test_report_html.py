@@ -127,6 +127,21 @@ def test_section_quality_rates():
     assert "c1" in h and "99" in h
 
 
+def test_section_quality_qc_extras(tmp_path):
+    # F1-F5: dedup sütunu + read-distribution tablosu + multiqc linki gömülür
+    align = {"samples": {"c1": {"alignment_rate": 0.99}}}
+    count = {"samples": {"c1": {"assignment_rate": 0.85}}, "n_genes": 10}
+    qc = {"deduplication": {"c1": 57.3}}
+    alignqc = {"read_distribution": {"CDS_Exons": 91.7, "Intergenic": 8.3},
+               "insert_size_figure": None, "coverage_figure": None}
+    multiqc = {"report_relpath": "../multiqc/multiqc_report.html"}
+    h = section_quality(align, count, {"min_length": 36, "aggressive": False},
+                        LABELS["tr"], None, qc, tmp_path, alignqc, multiqc)
+    assert "57.3%" in h              # dedup sütunu
+    assert "CDS_Exons" in h and "91.7%" in h   # read-distribution tablosu
+    assert "multiqc_report.html" in h          # multiqc linki
+
+
 from rnaforge.report_html import (
     section_de, section_figures, section_table, section_methods, section_references,
 )
