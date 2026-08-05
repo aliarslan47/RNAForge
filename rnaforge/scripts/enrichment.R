@@ -30,10 +30,12 @@ render_set <- function(path, title, base){
   # namespace başına en anlamlı top_n
   df <- do.call(rbind, lapply(split(df, df$namespace), function(g){
     g <- g[order(g$p_adj, g$p_value), , drop=FALSE]; head(g, top_n) }))
-  # namespace okunur ada dönüşsün (facet şeridi); sıra BP, MF, CC
+  # namespace okunur ada dönüşsün (facet şeridi); GO: BP/MF/CC sırayla, diğerleri (ör. KEGG) sonra
   ns_full <- c(BP="Biyolojik süreç (BP)", MF="Moleküler işlev (MF)", CC="Hücresel bileşen (CC)")
-  df$ns <- factor(ifelse(df$namespace %in% names(ns_full), ns_full[df$namespace], df$namespace),
-                  levels=ns_full)
+  mapped <- ifelse(df$namespace %in% names(ns_full), ns_full[df$namespace], df$namespace)
+  lv <- c(ns_full[names(ns_full) %in% unique(df$namespace)],
+          sort(setdiff(unique(mapped), ns_full)))   # KEGG gibi GO-dışı seviyeler sonda
+  df$ns <- factor(mapped, levels=unique(lv))
   # etiketleri sar; y sırası fold'a göre (büyük üstte)
   df$label <- wrap_lab(df$term)
   df$label <- factor(df$label, levels=rev(df$label[order(df$fold_enrichment)]))
