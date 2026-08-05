@@ -9,6 +9,17 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m14 OPERON ANALİZİ TAMAM ve `main`'de (2026-08-05, merge `90112ef`, push). Dalga 2 #B.**
+  İntergenik-mesafe sezgiseli (saf Python, GFF'ten; Ali harici araçtan yalın yerele döndü — Operon-mapper
+  web/veri-dışarı, Rockhopper ağır). Yeni `rnaforge operon`; gate YOK; operonlar TAHMİN (dürüst not). **347 test.**
+  - **Kod:** `operon.py` (`predict_operons` aynı-strand+gap≤max_gap; `aggregate_operon_de` koordineli);
+    `modules/m14_operon.py`. `config.operon.max_gap`(50). Çıktı `operon/operons.tsv`. Figür yok (tablo-öncelikli).
+    Rapor "Operon Analizi" bölümü + Moreno-Hagelsieb 2002 kaynak.
+  - **GSE300731 canlı (yayın kalitesi):** 2781 operon (804 çok-genli, 217 koordineli DE). thrABC doğru.
+    Koordineli operonlar tüm hikâyeyi topladı: **wca kolanik asit/kapsül (11 gen UP, log2FC +7.62)**, dcw
+    peptidoglikan/hücre-duvarı (mraZ/fts/mur), ribozom UP, wec ECA; **his/arn/nrf DOWN**. GO/KEGG/GSEA/AMR
+    ile birebir. Verdict SUSPECT değişmedi.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m14-operon*`.
 - **★ m13 AMR + VIRÜLANS OVERLAY TAMAM ve `main`'de (2026-08-05, merge `eeb1cd0`, push). Dalga 2 #A.**
   abricate (yeni `rnaforge-amr` env, 1.4.0) genome'u **CARD** (AMR) + **VFDB** (virülans) tarar → koordinatla
   locus_tag → **DE durumu overlay**. Yeni `rnaforge amr`; gate YOK. **332 test.**
@@ -236,8 +247,8 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 ### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
 - **Dalga 1 ✅ TAMAM:** ~~KEGG ORA~~ (m10) → ~~GSEA~~ (m11, fgsea) → ~~Semantic/REVIGO~~ (m12, Lin). Hepsi agnostik.
-- **Dalga 2 (bakteri overlay):** ~~#A AMR+Virülans~~ ✅ (m13, abricate CARD/VFDB) → **★ SIRADAKİ #B: Operon
-  analizi** (operon tahmini + DEG koordinasyonu) → #C: PPI (STRING) + community detection.
+- **Dalga 2 (bakteri overlay):** ~~#A AMR+Virülans~~ ✅ (m13) → ~~#B Operon~~ ✅ (m14) → **★ SIRADAKİ #C:
+  PPI (STRING) + community detection** (protein etkileşim ağı + modül tespiti; STRING per-organism).
   **DİĞER SEÇENEKLER:** Ökaryot yolu (m04-euk salmon + m05-euk tximport); küçük cila (REVIGO MDS, m07 PCA etiket).
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
