@@ -157,6 +157,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m14 already completed in this run directory",
     )
 
+    ppi = sub.add_parser("ppi", help="STRING PPI network + community detection (m15)")
+    ppi.add_argument("--config", required=True, type=Path)
+    ppi.add_argument("--metadata", required=True, type=Path)
+    ppi.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    ppi.add_argument("--run-id", default="run")
+    ppi.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m15 already completed in this run directory",
+    )
+
     report = sub.add_parser("report", help="assemble self-contained HTML report (m08)")
     report.add_argument("--config", required=True, type=Path)
     report.add_argument("--metadata", required=True, type=Path)
@@ -460,6 +470,28 @@ def _cmd_operon(args) -> int:
     return 0
 
 
+def _cmd_ppi(args) -> int:
+    from rnaforge.modules.m15_ppi import run_ppi
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = load_profile(config.organism_type, config.quality)
+    summary = run_ppi(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m15_ppi already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"PPI OK: {summary['n_deg_in_network']}/{summary['n_deg']} DEGs in network, "
+          f"{summary['n_edges']} edges, {summary['n_communities']} community/-ies "
+          f"(STRING {summary['taxid']}, score>={summary['min_score']})")
+    print(f"run directory: {run_dir}")
+    # GATE YOK: güvence kartı yalnız m06/m07 verdict'ini taşır.
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -509,6 +541,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_amr(args)
         if args.command == "operon":
             return _cmd_operon(args)
+        if args.command == "ppi":
+            return _cmd_ppi(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)

@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 14
+N_SECTIONS = 15
 
 
 def _num(v):
@@ -112,6 +112,21 @@ def parse_operon_tsv(path: Path) -> list[dict]:
                 row[k] = int(row[k]) if row.get(k) not in (None, "") else 0
             row["mean_log2fc"] = _num(row.get("mean_log2fc"))
             row["coordinated"] = row.get("coordinated") == "yes"
+            rows.append(row)
+    return rows
+
+
+def parse_community_tsv(path: Path) -> list[dict]:
+    """m15 communities.tsv -> tipli satırlar."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    with path.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            row = dict(r)
+            for k in ("size", "n_up", "n_down"):
+                row[k] = int(row[k]) if row.get(k) not in (None, "") else 0
             rows.append(row)
     return rows
 
@@ -286,6 +301,11 @@ def load_report_inputs(run_dir: Path) -> dict:
         if (run_dir / "operon" / "operons.tsv").exists() else None,
         "operon_stats": _read_json(stats / "operon_statistics.json")
         if (stats / "operon_statistics.json").exists() else None,
+        # m15 PPI — opsiyonel: çalıştırılmadıysa None.
+        "communities": parse_community_tsv(run_dir / "ppi" / "communities.tsv")
+        if (run_dir / "ppi" / "communities.tsv").exists() else None,
+        "ppi_stats": _read_json(stats / "ppi_statistics.json")
+        if (stats / "ppi_statistics.json").exists() else None,
     }
 
 
@@ -366,6 +386,13 @@ LABELS: dict[str, dict[str, str]] = {
             "transkripsiyon birimi sayıldı (Moreno-Hagelsieb ve Collado-Vides 2002). Deneysel doğrulanmamıştır. "
             "<b>Koordineli</b> = ≥2 geni ve ≥2 DEG'i aynı yönde değişen operon (birlikte-düzenlenen yanıt). "
             "Tam liste operon/operons.tsv'de."),
+        "ppi": "Protein Etkileşim Modülleri (STRING)", "ppi_module": "Modül", "ppi_size": "Boyut",
+        "ppi_not_run": "PPI/community analizi bu koşuda çalıştırılmadı (rnaforge ppi ile üretilir).",
+        "ppi_summary": "{net}/{deg} DEG ağda · {edges} kenar · {mods} modül",
+        "ppi_legend": (
+            "Diferansiyel eksprese genler STRING protein-etkileşim kenarlarıyla (combined score ≥ {score}) "
+            "bağlandı ve ağ Louvain yöntemiyle modüllere ayrıldı. STRING etkileşimleri kanıt-skorlu "
+            "tahminlerdir, hepsi deneysel doğrulanmış değildir. Tam liste ppi/communities.tsv'de."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -432,6 +459,14 @@ LABELS: dict[str, dict[str, str]] = {
             "taken as one transcription unit (Moreno-Hagelsieb and Collado-Vides 2002). Not experimentally "
             "validated. <b>Coordinated</b> = an operon with ≥2 genes and ≥2 DEGs changing in the same direction "
             "(a co-regulated response). Full list in operon/operons.tsv."),
+        "ppi": "Protein Interaction Modules (STRING)", "ppi_module": "Module", "ppi_size": "Size",
+        "ppi_not_run": "PPI/community analysis was not run for this run (produced by rnaforge ppi).",
+        "ppi_summary": "{net}/{deg} DEGs in the network · {edges} edges · {mods} modules",
+        "ppi_legend": (
+            "The differentially expressed genes were connected by STRING protein-interaction edges (combined "
+            "score ≥ {score}) and the network was partitioned into modules by the Louvain method. STRING "
+            "interactions are evidence-scored predictions, not all experimentally validated. Full list in "
+            "ppi/communities.tsv."),
         "semantic": "Semantic Reduction (REVIGO)", "n_collapsed": "Terms represented",
         "sem_ora_up": "Up GO terms (representatives)", "sem_ora_down": "Down GO terms (representatives)",
         "sem_gsea_go": "GSEA GO terms (representatives)",
@@ -506,6 +541,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                "diferansiyel ekspresyon durumu — tedavi altında indüklenen direnç/virülans yanıtını gösterir.",
         "operon": "Tahmin edilen operonlar ve içlerindeki genlerin koordineli değişimi — birlikte "
                   "düzenlenen transkripsiyon birimlerini gen-düzeyinin üstünde gösterir.",
+        "ppi": "DEG'lerin STRING protein etkileşim ağındaki modülleri — birlikte işleyen fonksiyonel "
+               "gen gruplarını (kompleksler/yolaklar) ağ topolojisinden çıkarır.",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
     },
@@ -526,6 +563,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                "its differential-expression status — showing the resistance/virulence response under treatment.",
         "operon": "Predicted operons and the coordinated change of their genes — revealing co-regulated "
                   "transcription units above the gene level.",
+        "ppi": "Modules of the DEGs in the STRING protein-interaction network — revealing co-functioning "
+               "gene groups (complexes/pathways) from network topology.",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
     },
@@ -882,6 +921,29 @@ def section_operon(inputs: dict, L: dict, lang: str = "tr", cap: int = 30) -> st
             f'{_intro("operon", L)}{summary}{body_html}{legend}</section>')
 
 
+def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
+    comms = inputs.get("communities")
+    if comms is None:
+        return (f'<section id="ppi"><h2>{_esc(L["ppi"])}</h2>'
+                f'<p class="note">{_esc(L["ppi_not_run"])}</p></section>')
+    stats = inputs.get("ppi_stats") or {}
+    summary = f'<p class="note">{_esc(L["ppi_summary"].format(net=stats.get("n_deg_in_network", 0), deg=stats.get("n_deg", 0), edges=stats.get("n_edges", 0), mods=stats.get("n_communities", len(comms))))}</p>'
+    if not comms:
+        body_html = f'<p>{_esc(L["no_degs"])}</p>'
+    else:
+        headers = [L["ppi_module"], L["ppi_size"], L["operon_dir"], L["operon_genes"]]
+        rows = []
+        for c in comms[:cap]:
+            direction = L["up"] if c.get("n_up", 0) >= c.get("n_down", 0) else L["down"]
+            rows.append([c.get("community_id"), c.get("size"), direction,
+                         ", ".join(c.get("genes", "").split(";"))])
+        body_html = _table(headers, rows)
+    score = stats.get("min_score", 700)
+    legend = f'<p class="note">{L["ppi_legend"].format(score=score)}</p>'
+    return (f'<section id="ppi"><h2>{_esc(L["ppi"])}</h2>'
+            f'{_intro("ppi", L)}{summary}{body_html}{legend}</section>')
+
+
 # Yöntem anlatısı — DESeq2 (Love ve ark. 2014) ve standart bulk RNA-seq pratiğinden;
 # config parametreleriyle doldurulur. Çift dilli. {aggr} = agresif-trimming ifadesi.
 _METHODS_TEXT: dict[str, str] = {
@@ -1026,9 +1088,24 @@ _OPERON_METHODS: dict[str, str] = {
 }
 
 
+_PPI_METHODS: dict[str, str] = {
+    "tr": (
+        "Diferansiyel eksprese genler arasındaki protein-protein etkileşimleri STRING veritabanından "
+        "(combined score ≥ {score}) alınarak bir ağ kuruldu ve ağ, modülarite temelli Louvain yöntemiyle "
+        "(networkx) topluluklara (modüllere) ayrıldı. STRING etkileşimleri kanıt-skorlu tahminlerdir."
+    ),
+    "en": (
+        "Protein–protein interactions among the differentially expressed genes were taken from the STRING "
+        "database (combined score ≥ {score}) to build a network, which was partitioned into communities "
+        "(modules) by the modularity-based Louvain method (networkx). STRING interactions are "
+        "evidence-scored predictions."
+    ),
+}
+
+
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                     gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False,
-                    operon_ran: bool = False) -> str:
+                    operon_ran: bool = False, ppi_ran: bool = False) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
@@ -1059,6 +1136,9 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
     if operon_ran:
         op = _OPERON_METHODS[lang].format(gap=config.operon.max_gap)
         paras += f'<p>{_esc(op)}</p>'
+    if ppi_ran:
+        pp = _PPI_METHODS[lang].format(score=config.ppi.min_score)
+        paras += f'<p>{_esc(pp)}</p>'
     return f'<section id="methods"><h2>{_esc(L["methods"])}</h2>{_intro("methods", L)}{paras}</section>'
 
 
@@ -1138,6 +1218,15 @@ _OPERON_REFERENCES: list[tuple[str, str]] = [
      "https://doi.org/10.1093/bioinformatics/18.suppl_1.S329"),
 ]
 
+# PPI/community kaynakları — yalnız m15 çalıştıysa (DOI doğrulandı).
+_PPI_REFERENCES: list[tuple[str, str]] = [
+    ("Szklarczyk D, Kirsch R, Koutrouli M, et al. The STRING database in 2023: protein–protein "
+     "association networks and functional enrichment analyses. Nucleic Acids Res. 2023;51(D1):D638–D646.",
+     "https://doi.org/10.1093/nar/gkac1000"),
+    ("Blondel VD, Guillaume JL, Lambiotte R, Lefebvre E. Fast unfolding of communities in large networks. "
+     "J Stat Mech. 2008;2008(10):P10008.", "https://doi.org/10.1088/1742-5468/2008/10/P10008"),
+]
+
 
 def _ref_link_label(url: str) -> str:
     return url.split("doi.org/", 1)[1] if "doi.org/" in url else url
@@ -1145,13 +1234,15 @@ def _ref_link_label(url: str) -> str:
 
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                        gsea_ran: bool = False, semantic_ran: bool = False,
-                       amr_ran: bool = False, operon_ran: bool = False) -> str:
+                       amr_ran: bool = False, operon_ran: bool = False,
+                       ppi_ran: bool = False) -> str:
     refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
             + (_GSEA_REFERENCES if gsea_ran else [])
             + (_SEMANTIC_REFERENCES if semantic_ran else [])
             + (_AMR_REFERENCES if amr_ran else [])
-            + (_OPERON_REFERENCES if operon_ran else []))
+            + (_OPERON_REFERENCES if operon_ran else [])
+            + (_PPI_REFERENCES if ppi_ran else []))
     items = "".join(
         f'<li>{_esc(cite)} '
         f'<a href="{_esc(url)}" target="_blank" rel="noopener">'
@@ -1200,6 +1291,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     amr_ran = (inputs.get("amr_genes") is not None
                or inputs.get("virulence_genes") is not None)
     operon_ran = inputs.get("operons") is not None
+    ppi_ran = inputs.get("communities") is not None
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -1218,8 +1310,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_semantic(inputs, L, lang),
         section_amr(inputs, L, lang),
         section_operon(inputs, L, lang),
-        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran),
-        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran),
+        section_ppi(inputs, L, lang),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
     ])
     return (f'<!doctype html><html lang="{_esc(lang)}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'

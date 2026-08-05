@@ -600,3 +600,44 @@ def test_methods_refs_operon_when_ran():
     refs = section_references(LABELS["en"], operon_ran=True)
     assert "18.suppl_1.S329" in refs
     assert "18.suppl_1.S329" not in section_references(LABELS["en"], operon_ran=False)
+
+
+from rnaforge.report_html import parse_community_tsv, section_ppi
+
+
+def _community_rows(tmp_path):
+    p = tmp_path / "communities.tsv"
+    p.write_text(
+        "community_id\tsize\tn_up\tn_down\tdominant\tgenes\n"
+        "module_1\t6\t6\t0\tup\twcaA;wcaB;wcaC;wcaD;wcaE;wcaF\n"
+        "module_2\t4\t0\t4\tdown\thisA;hisB;hisC;hisD\n")
+    return parse_community_tsv(p)
+
+
+def test_parse_community_tsv_types(tmp_path):
+    rows = _community_rows(tmp_path)
+    assert rows[0]["size"] == 6 and rows[0]["n_up"] == 6 and rows[0]["dominant"] == "up"
+
+
+def test_section_ppi_present(tmp_path):
+    inputs = {"communities": _community_rows(tmp_path),
+              "ppi_stats": {"n_deg": 100, "n_deg_in_network": 80, "n_edges": 200,
+                            "n_communities": 2, "min_score": 700}}
+    html = section_ppi(inputs, LABELS["tr"], "tr")
+    assert "Protein Etkileşim Modülleri" in html
+    assert "wcaA, wcaB" in html and "hisA, hisB" in html
+    assert "80/100 DEG ağda" in html
+    assert "STRING" in html and "700" in html      # kanıt-skoru notu
+
+
+def test_section_ppi_absent_note():
+    html = section_ppi({"communities": None}, LABELS["en"], "en")
+    assert "was not run" in html
+
+
+def test_methods_refs_ppi_when_ran():
+    withp = section_methods(_cfg("tr"), LABELS["tr"], ppi_ran=True)
+    assert "STRING" in withp and "Louvain" in withp
+    refs = section_references(LABELS["en"], ppi_ran=True)
+    assert "10.1093/nar/gkac1000" in refs and "P10008" in refs
+    assert "10.1093/nar/gkac1000" not in section_references(LABELS["en"], ppi_ran=False)
