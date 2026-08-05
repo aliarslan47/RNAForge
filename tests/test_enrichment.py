@@ -112,3 +112,40 @@ def test_write_ora_tsv_roundtrip(tmp_path):
     write_ora_tsv(rows, out)
     body = out.read_text().splitlines()
     assert body[1].startswith("GO:T\tBP\ttarget process")
+
+
+# --- figür runner + manifest ---
+import subprocess
+
+from rnaforge.enrichment import build_enrichment_manifest, run_enrichment_r, write_ora_tsv
+
+
+def _has_de_env():
+    return subprocess.run(["conda", "run", "-n", "rnaforge-de", "Rscript", "-e",
+        'cat(requireNamespace("ggplot2",quietly=TRUE))'], capture_output=True, text=True
+        ).stdout.strip().endswith("TRUE")
+
+
+def test_build_enrichment_manifest_missing_is_empty(tmp_path):
+    # PNG yoksa (R koşmadı / boş) manifest boş liste — m07'nin aksine YÜKSELMEZ.
+    assert build_enrichment_manifest(tmp_path) == {"figures": []}
+
+
+def test_build_enrichment_manifest_present(tmp_path):
+    (tmp_path / "enrichment_up.png").write_bytes(b"x")
+    (tmp_path / "enrichment_up.svg").write_bytes(b"x")
+    m = build_enrichment_manifest(tmp_path)
+    ids = [f["id"] for f in m["figures"]]
+    assert ids == ["enrichment_up"]
+
+
+@pytest.mark.skipif(not _has_de_env(), reason="rnaforge-de env/ggplot2 yok")
+def test_enrichment_r_renders(tmp_path):
+    gene2go, go_meta, sym = _annotation()
+    rows = run_ora(["g1", "g2", "g3"], list(gene2go), gene2go, go_meta, sym, min_term_size=3)
+    up = tmp_path / "enrichment_up.tsv"; down = tmp_path / "enrichment_down.tsv"
+    write_ora_tsv(rows, up)
+    write_ora_tsv([], down)          # boş set -> boş-durum paneli, çökmemeli
+    run_enrichment_r(up, down, tmp_path, top_n=15)
+    assert (tmp_path / "enrichment_up.png").exists()
+    assert (tmp_path / "enrichment_down.png").exists()   # boş bile olsa panel var
