@@ -9,6 +9,18 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
+- **★ m13 AMR + VIRÜLANS OVERLAY TAMAM ve `main`'de (2026-08-05, merge `eeb1cd0`, push). Dalga 2 #A.**
+  abricate (yeni `rnaforge-amr` env, 1.4.0) genome'u **CARD** (AMR) + **VFDB** (virülans) tarar → koordinatla
+  locus_tag → **DE durumu overlay**. Yeni `rnaforge amr`; gate YOK. **332 test.**
+  - **Kod:** `abricate.py` (runner + parser + koordinat örtüşme eşleme + DE overlay); `modules/m13_amr.py`.
+    Eşleme gen adıyla DEĞİL koordinatla (abricate adı sembolle eşleşmeyebilir). `config.amr` (AMRConfig:
+    amr_db/virulence_db/env/min_id/min_cov). Rapor "Direnç ve Virülans" bölümü + **DB-tarih dürüst notu**
+    (abricate bundled DB) + abricate/CARD 2020/VFDB 2019 kaynak.
+  - **GSE300731 canlı (yayın kalitesinde konkordans):** 43 AMR (24 DE), 74 virülans (43 DE).
+    **ARTAN:** marA (mar regulonu master aktivatör — antibiyotik stres imzası), acrAB/acrD/emrAB (multidrug
+    efflux İNDÜKLENDİ), ugd/arn (peptid direnci), enterobaktin siderofor (fep/ent), rcsB (Rcs kapsül).
+    **AZALAN:** gadW/gadX (asit direnci). **GO/KEGG/GSEA'nın tümüyle örtüşüyor.** Verdict SUSPECT değişmedi.
+  - Spec/Plan: `docs/superpowers/{specs,plans}/2026-08-05-m13-amr*`.
 - **★ m12 SEMANTIC REDUCTION (REVIGO) TAMAM ve `main`'de (2026-08-05, merge `7f0cb89`, push). Dalga 1 #3 (son).
   DOWNSTREAM DALGA 1 TAMAMEN BİTTİ (KEGG+GSEA+REVIGO).** Saf Python stdlib (numpy YOK). Gate YOK. **316 test.**
   - **Motor** (`semantic.py`): IC = −log(terim frekansı, arka plan `build_gene2go`'dan) + **Lin** benzerliği
@@ -224,9 +236,9 @@ Reviewer'ların yakaladığı 3 gerçek bug (hepsi düzeltildi):
 ### Downstream analiz kuyruğu (Ali seçti 2026-08-05; ökaryot yolundan ÖNCE)
 Karar: prokaryot odaklı ama ökaryota taşınabilenler agnostik tasarlanır. WGCNA ELENDİ (6 örnek zayıf).
 - **Dalga 1 ✅ TAMAM:** ~~KEGG ORA~~ (m10) → ~~GSEA~~ (m11, fgsea) → ~~Semantic/REVIGO~~ (m12, Lin). Hepsi agnostik.
-  **★ SIRADAKİ SEÇENEKLER:** (a) **Dalga 2** bakteri overlay — AMR (CARD/AMRFinder) + Virulence (VFDB) →
-  Operon → PPI (STRING)+community; antibiyotik verisine birebir. (b) **Ökaryot yolu** (m04-euk salmon +
-  m05-euk tximport). (c) Küçük cila (REVIGO MDS scatter numpy/R; m07 PCA etiket). Ali seçecek.
+- **Dalga 2 (bakteri overlay):** ~~#A AMR+Virülans~~ ✅ (m13, abricate CARD/VFDB) → **★ SIRADAKİ #B: Operon
+  analizi** (operon tahmini + DEG koordinasyonu) → #C: PPI (STRING) + community detection.
+  **DİĞER SEÇENEKLER:** Ökaryot yolu (m04-euk salmon + m05-euk tximport); küçük cila (REVIGO MDS, m07 PCA etiket).
 - **Dalga 2 (bakteri overlay, antibiyotik verisine birebir):** AMR (CARD/AMRFinder) + Virulence (VFDB) →
   Operon → PPI (STRING) + community detection.
 - **Agnostik-KIRAN (en sona, opsiyonel/E.coli):** Regulon / Sigma factor (RegulonDB/EcoCyc — yalnız E.coli).
