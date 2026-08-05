@@ -19,7 +19,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
-    "quantification", "enrichment",
+    "quantification", "enrichment", "amr",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -91,6 +91,17 @@ class Enrichment:
 
 
 @dataclass(frozen=True)
+class AMR:
+    # m13 AMR/virülans (abricate). amr_db: direnç DB (card/ncbi/resfinder); virulence_db: vfdb.
+    # env: izole abricate ortamı; min_identity/coverage: abricate hit eşikleri (%).
+    amr_db: str = "card"
+    virulence_db: str = "vfdb"
+    env: str = "rnaforge-amr"
+    min_identity: float = 80.0
+    min_coverage: float = 80.0
+
+
+@dataclass(frozen=True)
 class Report:
     language: str = "tr"
 
@@ -116,6 +127,7 @@ class Config:
     quality: dict = field(default_factory=dict)
     quantification: Quantification = field(default_factory=Quantification)
     enrichment: Enrichment = field(default_factory=Enrichment)
+    amr: AMR = field(default_factory=AMR)
 
 
 def _one_of(value, allowed, field: str):
@@ -206,6 +218,7 @@ def load_config(path: Path | str) -> Config:
     resources_raw = _section(raw, "resources")
     quantification_raw = _section(raw, "quantification")
     enrichment_raw = _section(raw, "enrichment")
+    amr_raw = _section(raw, "amr")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -261,5 +274,12 @@ def load_config(path: Path | str) -> Config:
             gsea_max_size=_as_int(enrichment_raw.get("gsea_max_size", 500), "enrichment.gsea_max_size"),
             revigo_similarity=_as_float(
                 enrichment_raw.get("revigo_similarity", 0.7), "enrichment.revigo_similarity"),
+        ),
+        amr=AMR(
+            amr_db=str(amr_raw.get("amr_db", "card")),
+            virulence_db=str(amr_raw.get("virulence_db", "vfdb")),
+            env=str(amr_raw.get("env", "rnaforge-amr")),
+            min_identity=_as_float(amr_raw.get("min_identity", 80.0), "amr.min_identity"),
+            min_coverage=_as_float(amr_raw.get("min_coverage", 80.0), "amr.min_coverage"),
         ),
     )

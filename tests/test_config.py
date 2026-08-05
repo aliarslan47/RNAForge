@@ -243,3 +243,14 @@ def test_enrichment_revigo_similarity(tmp_path):
 
 def test_enrichment_revigo_default(tmp_path):
     assert load_config(_write(tmp_path, PROK_BODY)).enrichment.revigo_similarity == 0.7
+
+
+def test_amr_config_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY))
+    assert cfg.amr.amr_db == "card" and cfg.amr.virulence_db == "vfdb"
+    assert cfg.amr.min_identity == 80.0 and cfg.amr.env == "rnaforge-amr"
+
+
+def test_amr_config_parsed(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + "\namr:\n  amr_db: ncbi\n  min_identity: 90\n"))
+    assert cfg.amr.amr_db == "ncbi" and cfg.amr.min_identity == 90.0
