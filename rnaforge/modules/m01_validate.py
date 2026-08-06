@@ -12,7 +12,7 @@ from pathlib import Path
 from rnaforge.config import REQUIRED_REFERENCE, Config
 from rnaforge.gates import raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata, validate_design
-from rnaforge.platform import PlatformInfo, detect_platform, require_supported
+from rnaforge.platform import PlatformInfo, detect_platform, read_type_for, require_supported
 from rnaforge.quality import load_profile
 from rnaforge.state import RunState
 
@@ -103,9 +103,6 @@ def run_validation(
             log(f"{sample.sample_id}: platform={info.platform} "
                 f"mean_read_length={info.mean_read_length}")
 
-        # NOT: aşağıdaki iki kontrol MVP'de ulaşılamaz (require_supported illumina
-        # dışını zaten reddediyor, config.platform yalnız auto|illumina olabilir).
-        # m02+ ONT desteği geldiğinde canlanacakları için bilerek bırakıldı.
         if len(platforms) > 1:
             raise ValueError(
                 f"samples come from mixed platforms: {', '.join(sorted(platforms))}. "
@@ -119,11 +116,25 @@ def run_validation(
                 f"{platform!r}. Fix the config, or set platform: auto."
             )
 
+        read_type = read_type_for(platform)
+        chemistry = config.library.chemistry
+        # cDNA vs direct-RNA is undetectable from FASTQ but changes m03 (Pychopper).
+        # ONT long reads must declare it; HiFi is inferred, short reads don't care.
+        if read_type == "long" and platform == "ont" and chemistry is None:
+            raise ValueError(
+                "ONT long-read input requires library.chemistry to be set "
+                "('cdna' or 'direct_rna'): it cannot be detected from the FASTQ "
+                "and it changes preprocessing (cDNA needs Pychopper). "
+                "Set library.chemistry in the config and re-run validate."
+            )
+
         conditions = dict(Counter(s.condition for s in samples))
         summary = {
             "organism": config.organism,
             "organism_type": config.organism_type,
             "platform": platform,
+            "read_type": read_type,
+            "chemistry": chemistry,
             "n_samples": len(samples),
             "conditions": conditions,
             "design": config.de.design,
