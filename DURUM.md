@@ -30,10 +30,20 @@
   (genome+GFF, GCF_000005845.2 — GO/KEGG(eco)/GAF ile birebir tutarlı). **Canlı smoke** (`runs/*_mbp_smoke`,
   4 PCR-cDNA örnek subset): validate→read_type=long, qc→NanoPlot koştu (N50 472-633, meanQ 8.1-8.6), m03 hâlâ
   dürüstçe durdu. microbepore çoğunlukla tek-koşul → DE-sinyal smoke için değil (aday B: glucose-vs-pyruvate sonra).
-- **★ SIRADAKİ — ADIM 3+: m03-long (Pychopper+chopper, cDNA ön-işleme) · m04-long (minimap2) · m05-long
-  (featureCounts `-L`) · long profil/kapılar · rapor read_type rozeti.** Her biri kendi planı (TDD+merge).
-  m03-long: config `library.chemistry` cdna→Pychopper (tam-boy yönlendir/kes)+chopper, direct_rna→yalnız chopper.
-  Pychopper kit desteği: PCS109/110/111/114, LSK114, PCB111/114. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 3 (m03-long Pychopper+chopper) TAMAM ve `main`'de (2026-08-06, merge `a5aed57`, push).**
+  Plan `docs/superpowers/plans/2026-08-06-longread-step3-m03-pychopper.md`, 4 görev TDD, **435 test**.
+  `rnaforge/chopper.py` (`run_chopper`, ONT uzunluk/kalite filtresi, stdin→stdout) + `rnaforge/pychopper.py`
+  (`run_pychopper` tam-boy cDNA yönlendir/kes + `parse_pychopper_stats`). **m03 read_type dispatch:** short→fastp
+  (`_trim_short`, survival FAIL kapısı korunur), long→`_trim_long` (kimyaya göre: **cdna→Pychopper+chopper**,
+  **direct_rna→yalnız chopper**); long DIAGNOSTIK (FAIL kapısı yok — long profil Step 6). Trimlenmiş çıktı m04
+  sözleşme yolunda. **ÖNEMLİ:** pychopper 2.7.10 pandas-3'te sonda PDF rapor çizerken çöküyor (`_plot_stats`
+  `float(Series)`) AMA çekirdek çıktı+stats tam → `run_pychopper` bu **bilinen çöküşü** (çıktı var + stderr'de
+  `_plot_stats`) tolere eder (yüksek sesle uyarır), başka her hatada fırlatır. Canlı smoke (mbp_smoke cdna):
+  survival 0.54-0.63, m04 hâlâ durdu.
+- **★ SIRADAKİ — ADIM 4+: m04-long (minimap2 hizalama `-ax map-ont`) · m05-long (featureCounts `-L`) ·
+  long profil/kapılar · rapor read_type rozeti + uçtan-uca canlı smoke.** Her biri kendi planı (TDD+merge).
+  m04-long: minimap2 ile MG1655 genomuna hizala (BAM), `alignment_rate` benzeri; sonra m05-long featureCounts
+  `-L` moduyla gen-seviyesi sayım → ortak count matrisinde m06+ ile buluşur. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
