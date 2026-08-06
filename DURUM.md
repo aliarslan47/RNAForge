@@ -9,15 +9,24 @@
 **Son güncelleme:** 2026-08-05
 
 ## Şu an nerede kaldık
-- **★★ SIRADAKİ İŞ — UZUN-OKUMA (ONT/PacBio) YOLU (Ali: "kaydet yarın başla", 2026-08-06 başlar).**
-  Tasarım ONAYLI, kod YOK. Tasarım+literatür: `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
-  Ali'nin kararları: **ONT cDNA + ONT direct-RNA + PacBio HiFi**; **gen-seviyesi** (minimap2→featureCounts→
-  mevcut DESeq2 downstream, izoform YOK); **prokaryot uzun-okuma ÖNCE**. Fikir: `platform.py` uzun okumayı
-  şu an REDDEDİYOR → **yönlendirmeye** çevrilecek. Yeni boyut **read_type (short|long)**, m02'den itibaren;
-  m06–m18 değişmez (ortak count matrisi). Araçlar: NanoPlot (QC) · Pychopper+chopper (cDNA ön-işleme) ·
-  minimap2 (hizalama) · featureCounts `-L` (sayım); yeni env `rnaforge-longread`; config `library.chemistry`
-  (cdna|direct_rna). **YARIN İLK ADIM:** spec (`docs/.../specs/`) → writing-plans → Adım 1 (tespit+yönlendirme,
-  TDD). Ayrıca gerçek bakteri ONT doğrulama veri seti seçilecek (microbepore *E.coli* aday).
+- **★★ UZUN-OKUMA (ONT/PacBio) YOLU — ADIM 1 (tespit→yönlendirme + `library.chemistry`) TAMAM ve `main`'de
+  (2026-08-06, merge `a2acbca`, push).** Plan: `docs/superpowers/plans/2026-08-06-longread-step1-routing.md`.
+  5 görev TDD, **423 test yeşil** (412→423). Yapılanlar: `platform.py` `read_type_for()` (illumina→short,
+  ont/pacbio_hifi→long); long okumalar artık **REDDEDİLMİYOR, YÖNLENDİRİLİYOR** (`SUPPORTED_PLATFORMS`
+  genişledi, yalnız `unknown` reddedilir); `library.chemistry` (cdna|direct_rna) config; **m01** read_type+
+  chemistry'yi `raw_statistics.json`'a yazar + ONT-long için chemistry ZORUNLU; yeni `rnaforge/routing.py`
+  (`resolve_read_type` + `require_short_read`) → **m02–m05'te muhafız**: long okuma gelince YÜKSEK SESLE durur
+  (NotImplementedError, yanlış araçla sessiz koşmaz). Canlı smoke: GSE300731 short etkilenmedi; sentetik ONT
+  yönlendi→m02 dürüstçe durdu.
+- **★ SIRADAKİ — ADIM 2+ (uzun-okuma araçları): m02-long NanoPlot · m03-long Pychopper+chopper · m04-long
+  minimap2 · m05-long featureCounts `-L` · long profil/kapılar · rapor read_type rozeti + canlı smoke.**
+  Bunlar `rnaforge-longread` env kurulumu + **seçilecek gerçek bakteri ONT veri seti** gerektirir.
+  **Veri seti adayları (2026-08-06 tarandı):** (A) **microbepore** (Grünberger RNA 2022) — *E. coli* K-12
+  MG1655, ONT dRNA+cDNA+PCR-cDNA, biyo-replika, SRA PRJNA731531 (+ RNA001 PRJNA632538), Zenodo 4879174
+  basecalled FASTQ. **Bizim MG1655/BW25113 referansları + GO/KEGG/GAF birebir yeniden kullanılır; 3 kimyayı
+  da kapsar** → araç kurulumu için ideal. (B) *E. coli* ONT cDNA DE-kontrast (glucose vs pyruvate, ~674↓/709↑
+  DEG) — GSE300731-tarzı DE konkordans smoke için. **Ali seçecek** (m04/m05 dokümantasyonu spec'teki açık nokta).
+  Tasarım+literatür: `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
