@@ -16,6 +16,7 @@ from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_r
 from rnaforge.metadata import load_metadata
 from rnaforge.modules.m03_trim import trimmed_reads
 from rnaforge.quality import Profile, load_profile
+from rnaforge.routing import require_short_read
 from rnaforge.state import RunState
 
 MODULE_NAME = "m04_quant"
@@ -72,6 +73,7 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
             "m04 (quant) requires m03 (trim) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge trim` with the same --run-id, then re-run quant."
         )
+    require_short_read(run_dir, "quant")  # long-read align (minimap2) not built yet
 
     profile = load_profile(config.organism_type, config.quality)
     log_path = logs_dir / "quant.log"

@@ -9,7 +9,6 @@ from rnaforge.cli import main
 from rnaforge.config import load_config
 from rnaforge.gates import FAIL, PASS, GateFailure
 from rnaforge.modules.m01_validate import run_validation
-from rnaforge.platform import UnsupportedPlatformError
 from tests.conftest import write_fastq
 
 
@@ -53,6 +52,16 @@ def _ont(path):
     write_fastq(path, 50, (1000, 20000), "+")
 
 
+def _setup_ont_with_chemistry(tmp_path, chemistry):
+    """_setup but ONT reads + optional library.chemistry."""
+    config_path, metadata_path = _setup(tmp_path, _ont)
+    text = config_path.read_text()
+    if chemistry is not None:
+        text += f'library:\n  chemistry: "{chemistry}"\n'
+    config_path.write_text(text)
+    return config_path, metadata_path
+
+
 def test_validation_succeeds_on_illumina(tmp_path):
     config_path, metadata_path = _setup(tmp_path, _illumina)
     run_dir = tmp_path / "run"
@@ -76,10 +85,26 @@ def test_validation_writes_log_and_statistics(tmp_path):
     assert stats["samples"][0]["mean_read_length"] == pytest.approx(150.0)
 
 
-def test_validation_rejects_ont(tmp_path):
-    config_path, metadata_path = _setup(tmp_path, _ont)
-    with pytest.raises(UnsupportedPlatformError, match="ont"):
+def test_illumina_records_short_read_type(tmp_path):
+    config_path, metadata_path = _setup(tmp_path, _illumina)
+    summary = run_validation(load_config(config_path), metadata_path, tmp_path / "run")
+    assert summary["read_type"] == "short"
+    assert summary["chemistry"] is None
+
+
+def test_ont_with_chemistry_records_long(tmp_path):
+    config_path, metadata_path = _setup_ont_with_chemistry(tmp_path, "cdna")
+    summary = run_validation(load_config(config_path), metadata_path, tmp_path / "run")
+    assert summary["platform"] == "ont"
+    assert summary["read_type"] == "long"
+    assert summary["chemistry"] == "cdna"
+
+
+def test_ont_without_chemistry_is_rejected(tmp_path):
+    config_path, metadata_path = _setup_ont_with_chemistry(tmp_path, None)
+    with pytest.raises(ValueError) as exc:
         run_validation(load_config(config_path), metadata_path, tmp_path / "run")
+    assert "chemistry" in str(exc.value).lower()
 
 
 def test_validation_marks_module_done_for_resume(tmp_path):
@@ -104,8 +129,8 @@ def test_cli_validate_returns_zero_on_success(tmp_path, capsys):
     assert "illumina" in capsys.readouterr().out
 
 
-def test_cli_validate_returns_one_on_ont(tmp_path, capsys):
-    config_path, metadata_path = _setup(tmp_path, _ont)
+def test_cli_validate_returns_one_on_ont_without_chemistry(tmp_path, capsys):
+    config_path, metadata_path = _setup_ont_with_chemistry(tmp_path, None)
     code = main([
         "validate",
         "--config", str(config_path),
@@ -114,7 +139,7 @@ def test_cli_validate_returns_one_on_ont(tmp_path, capsys):
         "--run-id", "demo",
     ])
     assert code == 1
-    assert "not supported" in capsys.readouterr().err
+    assert "chemistry" in capsys.readouterr().err.lower()
 
 
 def test_m01_writes_gate_results(tmp_path):

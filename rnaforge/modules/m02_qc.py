@@ -15,6 +15,7 @@ from rnaforge.gates import FAIL, PASS, WARN, GateResult, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.qcplots import QCPlotError, render_qc_figure
 from rnaforge.quality import Profile, load_profile
+from rnaforge.routing import require_short_read
 from rnaforge.state import RunState
 
 MODULE_NAME = "m02_qc"
@@ -142,6 +143,7 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
             f"directory first: {run_dir}. Run `rnaforge validate` with the same "
             "--run-id, then re-run qc."
         )
+    require_short_read(run_dir, "qc")  # long-read QC (NanoPlot) not built yet
 
     log_path = logs_dir / "qc.log"
     with log_path.open("w") as log_file:

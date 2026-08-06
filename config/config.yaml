@@ -20,6 +20,9 @@ library:
   # FASTQ'dan TESPİT EDİLEMEZ, buradan gelmeli (PLAN §4.1)
   strandedness: "unstranded"   # unstranded | stranded | reverse
   selection: "rrna_depletion"  # rrna_depletion | polya
+  # Long-read only (ONT): cdna | direct_rna. FASTQ'dan tespit EDİLEMEZ.
+  # cDNA -> Pychopper full-length yönlendirme; direct-RNA -> yok. HiFi platformdan çıkar.
+  # chemistry: "cdna"
 
 trimming:
   # PLAN §4.2: agresif kalite trimming ekspresyon tahminlerini bozar
