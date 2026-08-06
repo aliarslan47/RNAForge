@@ -67,3 +67,27 @@ def parse_nanostats(text: str) -> NanoStats:
         q10 = float(m.group(1))
 
     return NanoStats(reads_above_q10_pct=q10, **parsed)  # type: ignore[arg-type]
+
+
+def run_nanoplot(fastq: Path, out_dir: Path, env: str = "rnaforge-longread") -> Path:
+    """Run NanoPlot on a single long-read FASTQ; return the NanoStats.txt path.
+
+    --tsv_stats gives the parseable stats file; --no_static skips the
+    kaleido/orca static-image dependency (HTML plots are still written)."""
+    fastq = Path(fastq)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "conda", "run", "-n", env, "NanoPlot",
+        "--fastq", str(fastq),
+        "--outdir", str(out_dir),
+        "--tsv_stats", "--no_static",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    stats_path = out_dir / "NanoStats.txt"
+    if proc.returncode != 0 or not stats_path.exists():
+        raise NanoPlotRunError(
+            f"NanoPlot failed (exit {proc.returncode}) on {fastq}\n"
+            f"stdout: {proc.stdout[-500:]}\nstderr: {proc.stderr[-500:]}"
+        )
+    return stats_path

@@ -36,3 +36,25 @@ def test_parse_nanostats_core_fields():
 def test_parse_nanostats_missing_core_raises():
     with pytest.raises(NanoStatsParseError):
         parse_nanostats("Metrics\tdataset\nnumber_of_reads\t10\n")
+
+
+import shutil  # noqa: E402
+
+from rnaforge.nanoplot import run_nanoplot  # noqa: E402
+
+_HAS_ENV = shutil.which("conda") is not None
+
+
+@pytest.mark.skipif(not _HAS_ENV, reason="conda/rnaforge-longread not available")
+def test_run_nanoplot_on_tiny_fastq(tmp_path):
+    fq = tmp_path / "r.fastq"
+    fq.write_text(
+        "@r1\n" + "ACGT" * 60 + "\n+\n" + "I" * 240 + "\n"
+        "@r2\n" + "ACGT" * 80 + "\n+\n" + "I" * 320 + "\n"
+        "@r3\n" + "ACGT" * 50 + "\n+\n" + "I" * 200 + "\n"
+    )
+    stats_path = run_nanoplot(fq, tmp_path / "out")
+    assert stats_path.name == "NanoStats.txt"
+    assert stats_path.exists()
+    s = parse_nanostats(stats_path.read_text())
+    assert s.number_of_reads == 3
