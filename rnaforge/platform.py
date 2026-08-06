@@ -10,7 +10,7 @@ import gzip
 from dataclasses import dataclass
 from pathlib import Path
 
-SUPPORTED_PLATFORMS = ("illumina",)
+SUPPORTED_PLATFORMS = ("illumina", "ont", "pacbio_hifi")
 
 READ_TYPES = ("short", "long")
 
@@ -109,16 +109,16 @@ def detect_platform(
 
 
 def require_supported(info: PlatformInfo, fastq: Path) -> None:
-    """Desteklenmeyen platformu net mesajla reddet. Sessiz devam YOK."""
+    """Refuse only input we cannot identify. Long reads (ONT/PacBio) are routed
+    by read_type downstream; unidentifiable input has no safe route (Rule 7)."""
     if info.platform in SUPPORTED_PLATFORMS:
         return
     raise UnsupportedPlatformError(
-        f"detected platform {info.platform!r} is not supported in the MVP "
-        f"(supported: {', '.join(SUPPORTED_PLATFORMS)}).\n"
+        f"could not identify the sequencing platform for this input "
+        f"(detected {info.platform!r}; supported: {', '.join(SUPPORTED_PLATFORMS)}).\n"
         f"  file: {fastq}\n"
         f"  mean read length: {info.mean_read_length}, N50: {info.n50}, "
         f"mean quality: {info.mean_quality}, reads sampled: {info.n_reads_sampled}\n"
-        f"Long-read support (ONT/PacBio) needs a different route (minimap2) "
-        f"and is planned for a later phase. Running the Illumina route on this "
-        f"input would produce wrong results, so it is refused."
+        f"Running any route on unidentifiable reads would produce wrong results, "
+        f"so it is refused."
     )

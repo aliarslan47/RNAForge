@@ -34,20 +34,13 @@ def test_illumina_is_supported(illumina_fastq):
     require_supported(detect_platform(illumina_fastq), illumina_fastq)  # raise etmemeli
 
 
-def test_ont_rejected_with_actionable_message(ont_fastq):
-    """PLAN Kural 7: tespit etmek != desteklemek. Sessizce yanlis araçla koşulmaz."""
-    info = detect_platform(ont_fastq)
-    with pytest.raises(UnsupportedPlatformError) as exc:
-        require_supported(info, ont_fastq)
-    message = str(exc.value)
-    assert "ont" in message.lower()
-    assert "illumina" in message.lower()
-    assert str(ont_fastq) in message
+def test_ont_is_now_routed_not_rejected(ont_fastq):
+    """Long reads are routed, no longer refused (Step 1 of the long-read arm)."""
+    require_supported(detect_platform(ont_fastq), ont_fastq)  # must NOT raise
 
 
-def test_pacbio_rejected(pacbio_fastq):
-    with pytest.raises(UnsupportedPlatformError):
-        require_supported(detect_platform(pacbio_fastq), pacbio_fastq)
+def test_pacbio_is_now_routed_not_rejected(pacbio_fastq):
+    require_supported(detect_platform(pacbio_fastq), pacbio_fastq)  # must NOT raise
 
 
 def test_empty_fastq_is_unknown_and_rejected(tmp_path):
