@@ -10,6 +10,7 @@ ORGANISM_TYPES = ("prokaryote", "eukaryote")
 PLATFORMS = ("auto", "illumina")
 STRANDEDNESS = ("unstranded", "stranded", "reverse")
 SELECTIONS = ("rrna_depletion", "polya")
+CHEMISTRY = ("cdna", "direct_rna")
 REPORT_LANGUAGES = ("tr", "en")
 
 # İzin verilen üst seviye anahtarlar. Bunun DIŞINDA bir anahtar (ör. `design:`
@@ -45,6 +46,9 @@ class Reference:
 class Library:
     strandedness: str = "unstranded"
     selection: str = "rrna_depletion"
+    # Long-read only: cDNA needs Pychopper full-length orientation; direct-RNA does not.
+    # NOT detectable from FASTQ (spec 2026-08-05). None = unset (fine for short reads).
+    chemistry: str | None = None
 
 
 @dataclass(frozen=True)
@@ -261,6 +265,11 @@ def load_config(path: Path | str) -> Config:
             ),
             selection=_one_of(
                 library_raw.get("selection", "rrna_depletion"), SELECTIONS, "library.selection"
+            ),
+            chemistry=(
+                _one_of(library_raw["chemistry"], CHEMISTRY, "library.chemistry")
+                if library_raw.get("chemistry") is not None
+                else None
             ),
         ),
         trimming=trimming,

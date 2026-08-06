@@ -281,3 +281,17 @@ def test_amr_amrfinder_fields(tmp_path):
 
 def test_amr_amrfinder_default_none(tmp_path):
     assert load_config(_write(tmp_path, PROK_BODY)).amr.amrfinder_organism is None
+
+
+def test_library_chemistry_parsed(tmp_path):
+    cfg = load_config(_write(tmp_path, PROK_BODY + '\nlibrary:\n  chemistry: "direct_rna"\n'))
+    assert cfg.library.chemistry == "direct_rna"
+
+
+def test_library_chemistry_defaults_to_none(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).library.chemistry is None
+
+
+def test_library_chemistry_invalid_rejected(tmp_path):
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, PROK_BODY + '\nlibrary:\n  chemistry: "nanopore"\n'))
