@@ -106,12 +106,98 @@ def test_run_trim_writes_outputs_and_passes(tmp_path, monkeypatch):
     summary = run_trim(load_config(config_path), metadata_path, run_dir)
 
     assert summary["n_samples"] == 4
+    assert summary["read_type"] == "short"   # dispatch: kısa-okuma fastp yolu
     assert (run_dir / "trimmed" / "s1").is_dir()
     stats = json.loads((run_dir / "statistics" / "trimming_statistics.json").read_text())
     assert set(stats["samples"]) == {"s1", "s2", "s3", "s4"}
     gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
     assert any(g["module"] == "m03_trim" and g["status"] == "PASS" for g in gates)
     assert any(g["module"] == "m01" for g in gates)   # m01 kapıları korundu
+
+
+def _seed_long(tmp_path, chemistry="cdna"):
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"
+    (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        json.dumps({"read_type": "long", "chemistry": chemistry})
+    )
+    RunState(run_dir).mark_done("m01_validate", [])
+    return run_dir
+
+
+def _long_cfg(chemistry="cdna"):
+    from rnaforge.config import (
+        Config, Reference, Library, Trimming, DE, Report, Resources,
+    )
+    return Config(
+        organism="E. coli", organism_type="prokaryote", platform="auto",
+        reference=Reference(), library=Library(chemistry=chemistry),
+        trimming=Trimming(), de=DE(), report=Report(), resources=Resources(),
+    )
+
+
+def test_run_trim_long_cdna_pychopper_then_chopper(tmp_path, monkeypatch):
+    import rnaforge.modules.m03_trim as m03
+    from rnaforge.pychopper import PychopperStats
+    run_dir = _seed_long(tmp_path, "cdna")
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("@r\n" + "ACGT" * 50 + "\n+\n" + "I" * 200 + "\n")
+    meta = tmp_path / "m.tsv"
+    meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+
+    calls = []
+
+    def fake_pychopper(in_fastq, out_fastq, stats_tsv, **k):
+        calls.append("pychopper")
+        Path(out_fastq).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_fastq).write_text("@r\nACGT\n+\nIIII\n")
+        return PychopperStats(pass_reads=100, primers_found=60,
+                              rescue=5, unusable=35, len_fail=3)
+
+    def fake_chopper(in_fastq, out_fastq, **k):
+        calls.append("chopper")
+        Path(out_fastq).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_fastq).write_text("@r\nACGT\n+\nIIII\n")
+        return 57
+
+    monkeypatch.setattr(m03, "run_pychopper", fake_pychopper)
+    monkeypatch.setattr(m03, "run_chopper", fake_chopper)
+
+    summary = m03.run_trim(_long_cfg("cdna"), meta, run_dir)
+    assert summary["read_type"] == "long"
+    assert summary["chemistry"] == "cdna"
+    assert calls == ["pychopper", "chopper"]      # sıra önemli
+    assert summary["samples"]["s1"]["reads_after"] == 57
+    assert not (run_dir / "quality" / "gates.json").exists()  # diagnostik, FAIL kapısı yok
+    from rnaforge.modules.m03_trim import trimmed_reads
+    from rnaforge.metadata import load_metadata
+    out1, out2 = trimmed_reads(run_dir, load_metadata(meta)[0])
+    assert out1.exists() and out2 is None
+
+
+def test_run_trim_long_direct_rna_chopper_only(tmp_path, monkeypatch):
+    import rnaforge.modules.m03_trim as m03
+    run_dir = _seed_long(tmp_path, "direct_rna")
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("@r\n" + "ACGT" * 50 + "\n+\n" + "I" * 200 + "\n")
+    meta = tmp_path / "m.tsv"
+    meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+
+    calls = []
+    monkeypatch.setattr(m03, "run_pychopper",
+                        lambda *a, **k: calls.append("pychopper"))
+
+    def fake_chopper(in_fastq, out_fastq, **k):
+        calls.append("chopper")
+        Path(out_fastq).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_fastq).write_text("@r\nACGT\n+\nIIII\n")
+        return 90
+
+    monkeypatch.setattr(m03, "run_chopper", fake_chopper)
+    summary = m03.run_trim(_long_cfg("direct_rna"), meta, run_dir)
+    assert calls == ["chopper"]                   # direct-RNA'da pychopper yok
+    assert summary["samples"]["s1"]["reads_after"] == 90
 
 
 def test_run_trim_low_survival_fails_and_records_gate(tmp_path, monkeypatch):
