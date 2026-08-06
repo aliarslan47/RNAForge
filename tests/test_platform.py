@@ -57,3 +57,16 @@ def test_empty_fastq_is_unknown_and_rejected(tmp_path):
     assert info.platform == "unknown"
     with pytest.raises(UnsupportedPlatformError):
         require_supported(info, path)
+
+
+def test_read_type_for_maps_platforms():
+    from rnaforge.platform import read_type_for
+    assert read_type_for("illumina") == "short"
+    assert read_type_for("ont") == "long"
+    assert read_type_for("pacbio_hifi") == "long"
+
+
+def test_read_type_for_rejects_unknown():
+    from rnaforge.platform import read_type_for
+    with pytest.raises(ValueError):
+        read_type_for("unknown")

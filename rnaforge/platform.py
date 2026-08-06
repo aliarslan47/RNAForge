@@ -12,6 +12,25 @@ from pathlib import Path
 
 SUPPORTED_PLATFORMS = ("illumina",)
 
+READ_TYPES = ("short", "long")
+
+_PLATFORM_READ_TYPE = {
+    "illumina": "short",
+    "ont": "long",
+    "pacbio_hifi": "long",
+}
+
+
+def read_type_for(platform: str) -> str:
+    """Detected platform -> read_type. 'unknown' has no route (Rule 7)."""
+    try:
+        return _PLATFORM_READ_TYPE[platform]
+    except KeyError:
+        raise ValueError(
+            f"cannot derive read_type for platform {platform!r}; "
+            f"known platforms: {', '.join(_PLATFORM_READ_TYPE)}"
+        ) from None
+
 
 class UnsupportedPlatformError(RuntimeError):
     """Girdi tespit edildi ama MVP'de desteklenmiyor (PLAN Kural 7)."""
