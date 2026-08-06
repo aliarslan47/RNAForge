@@ -256,7 +256,8 @@ def _cmd_qc(args) -> int:
     if summary.get("resumed"):
         print("m02_qc already completed in this run directory — reusing its result "
               "(use --force to re-run).")
-    print(f"FastQC OK: {summary['n_samples']} sample(s)")
+    _qc_tool = "NanoPlot" if summary.get("read_type") == "long" else "FastQC"
+    print(f"{_qc_tool} OK: {summary['n_samples']} sample(s)")
     print(f"run directory: {run_dir}")
     card_path = write_confidence_card(run_dir, profile)
     card = json.loads(card_path.read_text())

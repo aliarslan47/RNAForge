@@ -122,12 +122,64 @@ def test_run_qc_writes_outputs_and_gates(tmp_path, monkeypatch):
     assert summary["n_samples"] == 4
     assert (run_dir / "raw_qc" / "s1").is_dir()
     assert (run_dir / "raw_qc" / "s4").is_dir()
+    assert summary["read_type"] == "short"   # dispatch: kısa-okuma FastQC yolu
     stats = json.loads((run_dir / "statistics" / "qc_statistics.json").read_text())
     assert set(stats["samples"]) == {"s1", "s2", "s3", "s4"}
     gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
     assert any(g["module"] == "m02_qc" for g in gates)
     assert any(g["module"] == "m01" for g in gates)  # m01 kapıları KORUNDU
     assert (run_dir / "logs" / "qc.log").exists()
+
+
+def _seed_long_run(tmp_path):
+    """m01'i long read_type ile tamamlanmış say (NanoPlot dispatch testi için)."""
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"
+    (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        json.dumps({"read_type": "long"})
+    )
+    RunState(run_dir).mark_done("m01_validate", [])
+    return run_dir
+
+
+def test_run_qc_long_uses_nanoplot(tmp_path, monkeypatch):
+    from rnaforge.config import (
+        Config, Reference, Library, Trimming, DE, Report, Resources,
+    )
+    run_dir = _seed_long_run(tmp_path)
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("@r\n" + "ACGT" * 50 + "\n+\n" + "I" * 200 + "\n")
+    meta = tmp_path / "m.tsv"
+    meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+
+    _FAKE = (
+        "Metrics\tdataset\nnumber_of_reads\t89032\nnumber_of_bases\t74816374.0\n"
+        "median_read_length\t724.0\nmean_read_length\t840.3\nread_length_stdev\t786.1\n"
+        "n50\t1371.0\nmean_qual\t6.7\nmedian_qual\t9.3\nReads >Q10:\t38965 (43.8%) 50.4Mb\n"
+    )
+
+    def fake_run_nanoplot(fastq, out_dir, env="rnaforge-longread"):
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p = out_dir / "NanoStats.txt"
+        p.write_text(_FAKE)
+        return p
+
+    monkeypatch.setattr(m02_qc, "run_nanoplot", fake_run_nanoplot)
+
+    cfg = Config(
+        organism="E. coli", organism_type="prokaryote", platform="auto",
+        reference=Reference(), library=Library(), trimming=Trimming(),
+        de=DE(), report=Report(), resources=Resources(),
+    )
+    summary = run_qc(cfg, meta, run_dir)
+    assert summary["read_type"] == "long"
+    assert summary["n_samples"] == 1
+    assert summary["samples"]["s1"]["n50"] == pytest.approx(1371.0)
+    assert summary["samples"]["s1"]["mean_read_length"] == pytest.approx(840.3)
+    # diagnostik: long dalı FAIL üretmez (kapı yok bu adımda)
+    assert not (run_dir / "quality" / "gates.json").exists()
 
 
 def test_run_qc_resumes_without_rerunning(tmp_path, monkeypatch):
