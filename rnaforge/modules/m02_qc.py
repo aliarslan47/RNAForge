@@ -14,8 +14,9 @@ from rnaforge.fastqc import FastQCReport, parse_fastqc_zip, run_fastqc
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.qcplots import QCPlotError, render_qc_figure
+from rnaforge.nanoplot import parse_nanostats, run_nanoplot
 from rnaforge.quality import Profile, load_profile
-from rnaforge.routing import require_short_read
+from rnaforge.routing import resolve_read_type
 from rnaforge.state import RunState
 
 MODULE_NAME = "m02_qc"
@@ -143,8 +144,24 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
             f"directory first: {run_dir}. Run `rnaforge validate` with the same "
             "--run-id, then re-run qc."
         )
-    require_short_read(run_dir, "qc")  # long-read QC (NanoPlot) not built yet
+    # read_type yönlendirmesi (m04 router deseni): kısa → FastQC, uzun → NanoPlot.
+    # İkisi de DIAGNOSTIK — koşuyu asla durdurmaz.
+    read_type = resolve_read_type(run_dir)
+    if read_type == "long":
+        summary = _qc_long(config, metadata_path, run_dir,
+                           raw_qc_dir, stats_dir, logs_dir, state)
+    else:
+        summary = _qc_short(config, metadata_path, run_dir,
+                            raw_qc_dir, stats_dir, logs_dir, state)
 
+    state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "qc.log")])
+    return summary
+
+
+def _qc_short(config: Config, metadata_path: Path, run_dir: Path,
+              raw_qc_dir: Path, stats_dir: Path, logs_dir: Path, state: RunState) -> dict:
+    """Kısa-okuma QC (FastQC). Diagnostik — koşuyu asla durdurmaz."""
+    stats_path = stats_dir / "qc_statistics.json"
     log_path = logs_dir / "qc.log"
     with log_path.open("w") as log_file:
         def log(msg: str) -> None:
@@ -196,6 +213,7 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
 
         gate_counts = dict(Counter(g.status for g in gates))
         summary = {
+            "read_type": "short",
             "n_samples": len(samples),
             "samples": {sid: r.basic_stats for sid, r in reports.items()},
             "module_flags": module_flags,
@@ -209,6 +227,44 @@ def run_qc(config: Config, metadata_path: Path, run_dir: Path,
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         log(f"qc statistics written: {stats_path}")
+    return summary
 
-    state.mark_done(MODULE_NAME, [str(stats_path), str(log_path)])
+
+def _qc_long(config: Config, metadata_path: Path, run_dir: Path,
+             raw_qc_dir: Path, stats_dir: Path, logs_dir: Path, state: RunState) -> dict:
+    """Uzun-okuma QC (NanoPlot). Diagnostik — kapı yok, koşuyu durdurmaz."""
+    stats_path = stats_dir / "qc_statistics.json"
+    log_path = logs_dir / "qc.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        log(f"m02 NanoPlot (long-read): {len(samples)} sample(s)")
+        per_sample: dict[str, dict] = {}
+        for sample in samples:
+            state.heartbeat()
+            sample_out = raw_qc_dir / sample.sample_id
+            stats_txt = run_nanoplot(sample.fastq_1, sample_out)
+            s = parse_nanostats(stats_txt.read_text())
+            per_sample[sample.sample_id] = {
+                "number_of_reads": s.number_of_reads,
+                "number_of_bases": s.number_of_bases,
+                "mean_read_length": s.mean_read_length,
+                "median_read_length": s.median_read_length,
+                "n50": s.n50,
+                "mean_qual": s.mean_qual,
+                "median_qual": s.median_qual,
+                "reads_above_q10_pct": s.reads_above_q10_pct,
+            }
+            log(f"{sample.sample_id}: NanoPlot OK (N50={s.n50}, meanQ={s.mean_qual})")
+
+        summary = {
+            "read_type": "long",
+            "n_samples": len(samples),
+            "samples": per_sample,
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+        log(f"qc statistics written: {stats_path}")
     return summary
