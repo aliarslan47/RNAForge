@@ -18,15 +18,22 @@
   (`resolve_read_type` + `require_short_read`) → **m02–m05'te muhafız**: long okuma gelince YÜKSEK SESLE durur
   (NotImplementedError, yanlış araçla sessiz koşmaz). Canlı smoke: GSE300731 short etkilenmedi; sentetik ONT
   yönlendi→m02 dürüstçe durdu.
-- **★ SIRADAKİ — ADIM 2+ (uzun-okuma araçları): m02-long NanoPlot · m03-long Pychopper+chopper · m04-long
-  minimap2 · m05-long featureCounts `-L` · long profil/kapılar · rapor read_type rozeti + canlı smoke.**
-  Bunlar `rnaforge-longread` env kurulumu + **seçilecek gerçek bakteri ONT veri seti** gerektirir.
-  **Veri seti adayları (2026-08-06 tarandı):** (A) **microbepore** (Grünberger RNA 2022) — *E. coli* K-12
-  MG1655, ONT dRNA+cDNA+PCR-cDNA, biyo-replika, SRA PRJNA731531 (+ RNA001 PRJNA632538), Zenodo 4879174
-  basecalled FASTQ. **Bizim MG1655/BW25113 referansları + GO/KEGG/GAF birebir yeniden kullanılır; 3 kimyayı
-  da kapsar** → araç kurulumu için ideal. (B) *E. coli* ONT cDNA DE-kontrast (glucose vs pyruvate, ~674↓/709↑
-  DEG) — GSE300731-tarzı DE konkordans smoke için. **Ali seçecek** (m04/m05 dokümantasyonu spec'teki açık nokta).
-  Tasarım+literatür: `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 2 (m02-long NanoPlot QC) TAMAM ve `main`'de (2026-08-06, merge `02e30db`, push).**
+  Plan `docs/superpowers/plans/2026-08-06-longread-step2-m02-nanoplot.md`, 4 görev TDD, **427 test**.
+  `rnaforge/nanoplot.py`: `parse_nanostats` (NanoPlot `--tsv_stats` NanoStats.txt) + `run_nanoplot`
+  (`rnaforge-longread` env, `--tsv_stats --no_static`). **m02 read_type'a göre dispatch** (m04 router deseni):
+  short→FastQC (`_qc_short`, aynen), long→NanoPlot (`_qc_long`); ikisi de DIAGNOSTIK (kapı yok, durmaz). CLI qc
+  dala göre araç adı yazar. `envs/rnaforge-longread.yml` eklendi.
+  **★ HAZIRLIK (2026-08-06):** `rnaforge-longread` env KURULDU (minimap2 2.31 · NanoPlot 1.47.1 · Pychopper ·
+  chopper 0.13 · samtools 1.24). **microbepore verisi SEÇİLDİ + İNDİRİLDİ:** `raw/microbepore_mg1655/` 10 run
+  (PRJNA731531, ENA'dan FASTQ, 5.1 GB, ONT/long doğrulandı). **MG1655 referansı** `references/ecoli_mg1655/`
+  (genome+GFF, GCF_000005845.2 — GO/KEGG(eco)/GAF ile birebir tutarlı). **Canlı smoke** (`runs/*_mbp_smoke`,
+  4 PCR-cDNA örnek subset): validate→read_type=long, qc→NanoPlot koştu (N50 472-633, meanQ 8.1-8.6), m03 hâlâ
+  dürüstçe durdu. microbepore çoğunlukla tek-koşul → DE-sinyal smoke için değil (aday B: glucose-vs-pyruvate sonra).
+- **★ SIRADAKİ — ADIM 3+: m03-long (Pychopper+chopper, cDNA ön-işleme) · m04-long (minimap2) · m05-long
+  (featureCounts `-L`) · long profil/kapılar · rapor read_type rozeti.** Her biri kendi planı (TDD+merge).
+  m03-long: config `library.chemistry` cdna→Pychopper (tam-boy yönlendir/kes)+chopper, direct_rna→yalnız chopper.
+  Pychopper kit desteği: PCS109/110/111/114, LSK114, PCB111/114. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
