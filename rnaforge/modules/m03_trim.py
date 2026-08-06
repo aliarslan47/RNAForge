@@ -14,6 +14,7 @@ from rnaforge.fastp import FastpResult, run_fastp, trimmed_name
 from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata
 from rnaforge.quality import Profile, load_profile
+from rnaforge.routing import require_short_read
 from rnaforge.state import RunState
 
 MODULE_NAME = "m03_trim"
@@ -75,6 +76,7 @@ def run_trim(config: Config, metadata_path: Path, run_dir: Path,
             f"directory first: {run_dir}. Run `rnaforge validate` with the same "
             "--run-id, then re-run trim."
         )
+    require_short_read(run_dir, "trim")  # long-read trim (Pychopper/chopper) not built yet
 
     profile = load_profile(config.organism_type, config.quality)
     log_path = logs_dir / "trim.log"

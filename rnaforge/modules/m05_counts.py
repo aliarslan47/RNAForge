@@ -15,6 +15,7 @@ from rnaforge.featurecounts import run_featurecounts, tpm_fpkm
 from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile
+from rnaforge.routing import require_short_read
 from rnaforge.state import RunState
 
 MODULE_NAME = "m05_counts"
@@ -67,6 +68,7 @@ def run_counts(config: Config, metadata_path: Path, run_dir: Path,
             "m05 (counts) requires m04 (quant) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge quant` with the same --run-id, then re-run counts."
         )
+    require_short_read(run_dir, "counts")  # long-read counts (featureCounts -L) not built yet
 
     profile = load_profile(config.organism_type, config.quality)
     log_path = logs_dir / "counts.log"
