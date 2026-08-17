@@ -4,13 +4,44 @@ import json
 
 import pytest
 
-from rnaforge.routing import require_short_read, resolve_read_type
+from rnaforge.routing import (
+    require_short_read,
+    resolve_platform,
+    resolve_read_type,
+)
 
 
 def _write_stats(run_dir, read_type):
     stats = run_dir / "statistics"
     stats.mkdir(parents=True)
     (stats / "raw_statistics.json").write_text(json.dumps({"read_type": read_type}))
+
+
+def _write_stats_full(run_dir, **kv):
+    stats = run_dir / "statistics"
+    stats.mkdir(parents=True)
+    (stats / "raw_statistics.json").write_text(json.dumps(kv))
+
+
+def test_resolve_platform_reads_ont(tmp_path):
+    _write_stats_full(tmp_path, platform="ont", read_type="long")
+    assert resolve_platform(tmp_path) == "ont"
+
+
+def test_resolve_platform_reads_pacbio(tmp_path):
+    _write_stats_full(tmp_path, platform="pacbio_hifi", read_type="long")
+    assert resolve_platform(tmp_path) == "pacbio_hifi"
+
+
+def test_resolve_platform_missing_key_raises(tmp_path):
+    _write_stats_full(tmp_path, read_type="long")  # no platform key
+    with pytest.raises(ValueError):
+        resolve_platform(tmp_path)
+
+
+def test_resolve_platform_missing_file_raises(tmp_path):
+    with pytest.raises(ValueError):
+        resolve_platform(tmp_path)
 
 
 def test_resolve_read_type_reads_short(tmp_path):

@@ -26,6 +26,27 @@ def resolve_read_type(run_dir: Path | str) -> str:
     return read_type
 
 
+def resolve_platform(run_dir: Path | str) -> str:
+    """Return the platform m01 recorded for this run (ont|pacbio_hifi|illumina).
+
+    Used by the long-read aligner (m04) to pick the minimap2 preset. Loud on a
+    missing file / missing key — never guess a platform (Rule 7)."""
+    stats = Path(run_dir) / "statistics" / "raw_statistics.json"
+    if not stats.exists():
+        raise ValueError(
+            f"cannot resolve platform: {stats} not found. "
+            "Run `rnaforge validate` (m01) with the same --run-id first."
+        )
+    data = json.loads(stats.read_text())
+    platform = data.get("platform")
+    if platform is None:
+        raise ValueError(
+            f"cannot resolve platform: no 'platform' key in {stats}. "
+            "Re-run `rnaforge validate` (m01) to regenerate it."
+        )
+    return platform
+
+
 def require_short_read(run_dir: Path | str, stage: str) -> None:
     """Guard at a short-read-only stage. No-op for short; loud stop for long."""
     read_type = resolve_read_type(run_dir)

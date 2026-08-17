@@ -130,6 +130,7 @@ def test_run_quant_writes_bam_and_passes(tmp_path, monkeypatch):
     summary = run_quant(load_config(config_path), metadata_path, run_dir)
 
     assert summary["n_samples"] == 4
+    assert summary["read_type"] == "short"
     assert (run_dir / "quantification" / "s1" / "aligned.sorted.bam").exists()
     stats = json.loads((run_dir / "statistics" / "alignment_statistics.json").read_text())
     assert set(stats["samples"]) == {"s1", "s2", "s3", "s4"}
@@ -160,6 +161,89 @@ def test_run_quant_resumes(tmp_path, monkeypatch):
     summary = run_quant(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def _seed_long(tmp_path, platform="ont", chemistry="cdna"):
+    """Uzun-okuma run dizini doğrudan tohumlanır (m01+m03 done, raw_statistics)."""
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"
+    (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        json.dumps({"platform": platform, "read_type": "long", "chemistry": chemistry})
+    )
+    st = RunState(run_dir)
+    st.mark_done("m01_validate", [])
+    st.mark_done("m03_trim", [])
+    return run_dir
+
+
+def _long_config(tmp_path, chemistry="cdna"):
+    (tmp_path / "ref").mkdir(exist_ok=True)
+    (tmp_path / "ref" / "genome.fa").write_text(">c1\n" + "ACGT" * 25 + "\n")
+    (tmp_path / "ref" / "genes.gff").write_text("##gff-version 3\n")
+    for n in ("s1.fastq", "s2.fastq"):
+        write_fastq(tmp_path / n, 50, 600, "I")   # long ONT-like reads
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(textwrap.dedent(f"""
+        organism: "E. coli"
+        organism_type: "prokaryote"
+        library:
+          chemistry: "{chemistry}"
+        reference:
+          genome_fasta: "{tmp_path / 'ref' / 'genome.fa'}"
+          annotation_gff: "{tmp_path / 'ref' / 'genes.gff'}"
+    """))
+    metadata_path = tmp_path / "samples.tsv"
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "s1\tcontrol\ts1.fastq\n" "s2\ttreated\ts2.fastq\n"
+    )
+    return config_path, metadata_path
+
+
+def _fake_minimap2(monkeypatch, rate=0.92):
+    from rnaforge.minimap2 import AlignmentResult
+    calls = []
+
+    def fake_align(genome_fasta, out_dir, fastq, preset, threads=4,
+                   env="rnaforge-longread"):
+        calls.append(preset)
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        bam = out_dir / "aligned.sorted.bam"; bam.write_bytes(b"BAM")
+        return AlignmentResult(bam=bam, alignment_rate=rate)
+
+    monkeypatch.setattr(m04_quant, "run_minimap2", fake_align)
+    return calls
+
+
+def test_run_quant_long_dispatches_to_minimap2_diagnostic(tmp_path, monkeypatch):
+    config_path, metadata_path = _long_config(tmp_path, "cdna")
+    run_dir = _seed_long(tmp_path, platform="ont")
+    calls = _fake_minimap2(monkeypatch, rate=0.92)
+
+    def boom(*a, **k):
+        raise AssertionError("bowtie2 must not run on the long branch")
+    monkeypatch.setattr(m04_quant, "run_bowtie2", boom)
+
+    summary = run_quant(load_config(config_path), metadata_path, run_dir)
+    assert summary["read_type"] == "long"
+    assert summary["platform"] == "ont"
+    assert calls == ["map-ont", "map-ont"]        # preset per sample, from platform
+    assert summary["samples"]["s1"]["alignment_rate"] == 0.92
+    assert (run_dir / "quantification" / "s1" / "aligned.sorted.bam").exists()
+    # diagnostic branch: NO gate written (long profile/gates = Step 6)
+    assert not (run_dir / "quality" / "gates.json").exists()
+    stats = json.loads((run_dir / "statistics" / "alignment_statistics.json").read_text())
+    assert stats["read_type"] == "long"
+
+
+def test_run_quant_long_pacbio_uses_hifi_preset(tmp_path, monkeypatch):
+    config_path, metadata_path = _long_config(tmp_path, "cdna")
+    run_dir = _seed_long(tmp_path, platform="pacbio_hifi")
+    calls = _fake_minimap2(monkeypatch)
+    summary = run_quant(load_config(config_path), metadata_path, run_dir)
+    assert calls == ["map-hifi", "map-hifi"]
+    assert summary["platform"] == "pacbio_hifi"
 
 
 def test_cli_quant_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
