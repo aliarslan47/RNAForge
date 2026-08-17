@@ -116,6 +116,7 @@ def test_run_counts_writes_matrix_and_passes(tmp_path, monkeypatch):
     summary = run_counts(load_config(config_path), metadata_path, run_dir)
 
     assert summary["n_samples"] == 4
+    assert summary["read_type"] == "short"
     assert summary["n_genes"] == 3
     matrix = (run_dir / "quantification" / "counts.tsv").read_text().splitlines()
     assert matrix[0] == "gene\ts1\ts2\ts3\ts4"        # sample_id basliklari (BAM yollari degil)
@@ -156,6 +157,91 @@ def test_run_counts_resumes(tmp_path, monkeypatch):
     summary = run_counts(load_config(config_path), metadata_path, run_dir)
     assert summary.get("resumed") is True
     assert calls == []
+
+
+def _seed_long_m04(tmp_path, platform="ont"):
+    """Uzun-okuma run dizini: m01..m04 done + fake BAM'ler (m05 sözleşme yolu)."""
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"
+    (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        json.dumps({"platform": platform, "read_type": "long", "chemistry": "cdna"})
+    )
+    st = RunState(run_dir)
+    for m in ("m01_validate", "m03_trim", "m04_quant"):
+        st.mark_done(m, [])
+    for sid in ("ctrl1", "ctrl2", "trt1", "trt2"):
+        d = run_dir / "quantification" / sid; d.mkdir(parents=True)
+        (d / "aligned.sorted.bam").write_bytes(b"BAM")
+    return run_dir
+
+
+def _long_config_meta(tmp_path):
+    (tmp_path / "ref").mkdir(exist_ok=True)
+    (tmp_path / "ref" / "genome.fa").write_text(">c1\n" + "ACGT" * 25 + "\n")
+    (tmp_path / "ref" / "genes.gtf").write_text(
+        'c1\ts\texon\t1\t80\t.\t+\t.\tgene_id "g1";\n')
+    for n in ("c1.fastq", "c2.fastq", "t1.fastq", "t2.fastq"):
+        write_fastq(tmp_path / n, 20, 600, "I")
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(textwrap.dedent(f"""
+        organism: "E. coli"
+        organism_type: "prokaryote"
+        library:
+          chemistry: "cdna"
+        reference:
+          genome_fasta: "{tmp_path / 'ref' / 'genome.fa'}"
+          annotation_gff: "{tmp_path / 'ref' / 'genes.gtf'}"
+    """))
+    meta = tmp_path / "samples.tsv"
+    meta.write_text(
+        "sample_id\tcondition\tfastq_1\n"
+        "ctrl1\tcontrol\tc1.fastq\n" "ctrl2\tcontrol\tc2.fastq\n"
+        "trt1\ttreated\tt1.fastq\n" "trt2\ttreated\tt2.fastq\n"
+    )
+    return cfg, meta
+
+
+def _fake_fc_capture(monkeypatch, rate=0.85, n_genes=2):
+    seen: dict = {}
+
+    def fake_run(bams, gff, out_dir, feature_type, attribute, paired=False,
+                 threads=4, env="rnaforge-quant-prok", long_read=False):
+        seen["long_read"] = long_read
+        seen["paired"] = paired
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        genes = [f"g{i}" for i in range(n_genes)]
+        counts = {str(b): [10 + i for i in range(n_genes)] for b in bams}
+        rates = {str(b): rate for b in bams}
+        return FeatureCountsResult(gene_ids=genes, counts=counts, assignment_rates=rates)
+
+    monkeypatch.setattr(m05_counts, "run_featurecounts", fake_run)
+    return seen
+
+
+def test_run_counts_long_dispatches_L_diagnostic(tmp_path, monkeypatch):
+    cfg, meta = _long_config_meta(tmp_path)
+    run_dir = _seed_long_m04(tmp_path, "ont")
+    seen = _fake_fc_capture(monkeypatch, rate=0.85, n_genes=2)
+    summary = run_counts(load_config(cfg), meta, run_dir)
+    assert seen["long_read"] is True          # -L long-read mode
+    assert seen["paired"] is False            # long reads single-molecule
+    assert summary["read_type"] == "long"
+    assert summary["n_genes"] == 2
+    matrix = (run_dir / "quantification" / "counts.tsv").read_text().splitlines()
+    assert matrix[0] == "gene\tctrl1\tctrl2\ttrt1\ttrt2"   # common m06 contract
+    # diagnostic branch: NO gate written (long profile/gates = Step 6)
+    assert not (run_dir / "quality" / "gates.json").exists()
+    stats = json.loads((run_dir / "statistics" / "count_statistics.json").read_text())
+    assert stats["read_type"] == "long"
+
+
+def test_run_counts_long_empty_matrix_raises(tmp_path, monkeypatch):
+    cfg, meta = _long_config_meta(tmp_path)
+    run_dir = _seed_long_m04(tmp_path, "ont")
+    _fake_fc_capture(monkeypatch, n_genes=0)
+    with pytest.raises(ValueError, match="no genes"):
+        run_counts(load_config(cfg), meta, run_dir)
 
 
 def test_cli_counts_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys):
