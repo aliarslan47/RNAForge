@@ -344,7 +344,7 @@ LABELS: dict[str, dict[str, str]] = {
         "cap_coverage": "Şekil — Kontig başına ortalama okuma derinliği (coverage)",
         "cap_read_dist": "Okumaların genomik özelliklere dağılımı (RSeQC read distribution)",
         "multiqc_note": "Tüm araç çıktılarının toplu MultiQC görünümü:",
-        "organism": "Organizma", "platform": "Platform", "design": "Tasarım",
+        "organism": "Organizma", "platform": "Platform", "read_type": "Okuma tipi", "design": "Tasarım",
         "gate": "Kapı", "status": "Durum", "measured": "Ölçülen", "threshold": "Eşik",
         "profile": "Profil", "contrast": "Kontrast", "n_genes": "Gen sayısı",
         "n_sig": "Anlamlı gen", "gene": "Gen", "log2fc": "log2FC", "padj": "padj",
@@ -450,7 +450,7 @@ LABELS: dict[str, dict[str, str]] = {
         "cap_coverage": "Figure — Mean read depth (coverage) per contig",
         "cap_read_dist": "Read distribution across genomic features (RSeQC)",
         "multiqc_note": "Aggregate MultiQC view of all tool outputs:",
-        "organism": "Organism", "platform": "Platform", "design": "Design",
+        "organism": "Organism", "platform": "Platform", "read_type": "Read type", "design": "Design",
         "gate": "Gate", "status": "Status", "measured": "Measured", "threshold": "Threshold",
         "profile": "Profile", "contrast": "Contrast", "n_genes": "Genes",
         "n_sig": "Significant genes", "gene": "Gene", "log2fc": "log2FC", "padj": "padj",
@@ -690,8 +690,15 @@ def section_confidence(conf: dict, L: dict) -> str:
 
 def section_dataset(raw: dict, L: dict) -> str:
     conds = ", ".join(f"{k}={v}" for k, v in (raw.get("conditions") or {}).items())
+    # read_type rozeti (kısa/uzun okuma) — hangi araç zincirinin koştuğunu gösterir.
+    rt = raw.get("read_type")
+    lang_tr = L is LABELS["tr"]
+    rt_gloss = {"short": ("kısa" if lang_tr else "short"),
+                "long": ("uzun" if lang_tr else "long")}
+    rt_disp = (f'{_esc(L["read_type"])}: {_esc(rt_gloss.get(rt, rt))} · ' if rt else "")
     meta = (f'<p>{_esc(L["organism"])}: {_esc(raw.get("organism"))} · '
             f'{_esc(L["platform"])}: {_esc(raw.get("platform"))} · '
+            f'{rt_disp}'
             f'{_esc(L["design"])}: {_esc(raw.get("design"))} · {_esc(conds)}</p>')
     rows = [[s.get("sample_id"), s.get("condition"), s.get("batch"), s.get("paired"),
              s.get("mean_read_length"), s.get("mean_quality")] for s in raw.get("samples", [])]
@@ -1117,10 +1124,16 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
 # Kullanılan yazılım sürümleri (envs/*.yml ile eşleşir). (araç, sürüm, amaç_tr, amaç_en, koşul).
 _SOFTWARE: list[tuple] = [
     ("Python", "3.11", "Orkestrasyon", "Orchestration", None),
-    ("FastQC", "0.12.1", "Ham okuma QC", "Raw read QC", None),
-    ("fastp", "1.3.6", "Kırpma", "Trimming", None),
-    ("Bowtie2", "2.5.5", "Hizalama", "Alignment", None),
-    ("Subread/featureCounts", "2.1.1", "Sayım (TPM/FPKM)", "Quantification (TPM/FPKM)", None),
+    # Kısa-okuma araç zinciri (cond "short")
+    ("FastQC", "0.12.1", "Ham okuma QC", "Raw read QC", "short"),
+    ("fastp", "1.3.6", "Kırpma", "Trimming", "short"),
+    ("Bowtie2", "2.5.5", "Hizalama", "Alignment", "short"),
+    # Uzun-okuma araç zinciri (cond "long")
+    ("NanoPlot", "1.47.1", "Uzun-okuma QC", "Long-read QC", "long"),
+    ("Pychopper", "2.7.10", "Tam-boy cDNA yönlendirme/kırpma", "Full-length cDNA orient/trim", "long"),
+    ("chopper", "0.13.0", "Uzun-okuma uzunluk/kalite filtresi", "Long-read length/quality filter", "long"),
+    ("minimap2", "2.31", "Uzun-okuma hizalama (-ax map-ont/map-hifi)", "Long-read alignment (-ax map-ont/map-hifi)", "long"),
+    ("Subread/featureCounts", "2.1.1", "Sayım (TPM/FPKM; uzun-okumada -L)", "Quantification (TPM/FPKM; -L for long-read)", None),
     ("DESeq2 (R)", "1.50.2", "Diferansiyel ekspresyon", "Differential expression", None),
     ("ggplot2 (R)", "4.0", "Figürler", "Figures", None),
     ("fgsea (R)", "1.36.2", "GSEA", "GSEA", "gsea"),
@@ -1196,6 +1209,43 @@ _METHODS_TEXT: dict[str, str] = {
 _METHODS_AGGR: dict[str, dict[bool, str]] = {
     "tr": {False: "kapatıldı (Williams ve ark. 2016)", True: "uygulandı"},
     "en": {False: "disabled (Williams et al. 2016)", True: "enabled"},
+}
+
+# Uzun-okuma (ONT/PacBio) yöntem anlatısı — kısa-okuma araç zinciri yerine NanoPlot/
+# Pychopper+chopper/minimap2/featureCounts -L. DESeq2 ve sonrası kuyruğu kısa ile aynı.
+# {aggr} bilinçli olarak kullanılmaz (uzun-okumada agresif-kırpma kavramı yok); .format
+# fazladan kwarg'ı yok sayar.
+_METHODS_TEXT_LONG: dict[str, str] = {
+    "tr": (
+        "Ham uzun okumaların kalitesi NanoPlot ile değerlendirildi (okuma uzunluğu dağılımı, N50, "
+        "okuma kalitesi). cDNA kütüphaneleri için tam-boy transkriptler Pychopper ile yönlendirilip "
+        "kesildi; okumalar chopper ile uzunluk/kalite açısından filtrelendi (asgari uzunluk {min_len} nt). "
+        "Filtrelenen uzun okumalar referans genoma minimap2 ile hizalandı (uzun-okuma ön ayarı "
+        "-ax map-ont/map-hifi). Hizalanan okumalar featureCounts uzun-okuma modunda (-L) özniteliklere "
+        "atanarak gen×örnek sayım matrisi oluşturuldu (öznitelik tipi {feature_type}, kimlik özniteliği "
+        "{attribute}). Diferansiyel ekspresyon DESeq2 ile hesaplandı: kütüphane büyüklüğü medyan-oran "
+        "yöntemiyle normalize edildi (boyut faktörleri); gen-bazlı dispersiyonlar kestirilip ortalama-"
+        "dispersiyon eğilimine doğru empirical-Bayes ile büzüldü; koşul etkisi negatif binom genelleştirilmiş "
+        "doğrusal modelle test edildi (Wald testi) ve p-değerleri Benjamini–Hochberg (FDR) ile düzeltildi. "
+        "Tasarım formülü {design}. Bir gen, düzeltilmiş p (padj) < {fdr} ve |log2 kat değişimi| ≥ {lfc} ise "
+        "anlamlı diferansiyel eksprese sayıldı. Uzun-okuma kalite eşikleri bilinçli olarak permissive'dir "
+        "(prokaryote_long profili, rapora damgalanır). Tüm görseller ggplot2 ile üretildi."
+    ),
+    "en": (
+        "Raw long-read quality was assessed with NanoPlot (read-length distribution, N50, read quality). "
+        "For cDNA libraries, full-length transcripts were oriented and trimmed with Pychopper, and reads were "
+        "length/quality filtered with chopper (minimum length {min_len} nt). Filtered long reads were aligned "
+        "to the reference genome with minimap2 (long-read preset -ax map-ont/map-hifi). Aligned reads were "
+        "assigned to features with featureCounts in long-read mode (-L) to build a gene×sample count matrix "
+        "(feature type {feature_type}, identifier attribute {attribute}). Differential expression was computed "
+        "with DESeq2: library sizes were normalized by the median-of-ratios method (size factors); gene-wise "
+        "dispersions were estimated and shrunk toward the mean–dispersion trend by empirical Bayes; the "
+        "condition effect was tested with a negative-binomial generalized linear model (Wald test) and p-values "
+        "were adjusted by Benjamini–Hochberg (FDR). Design formula {design}. A gene was called significantly "
+        "differentially expressed when adjusted p (padj) < {fdr} and |log2 fold change| ≥ {lfc}. Long-read "
+        "quality thresholds are deliberately permissive (prokaryote_long profile, stamped in the report). All "
+        "figures were produced with ggplot2."
+    ),
 }
 
 # GO ORA yöntem anlatısı — yalnız m09 çalıştıysa eklenir (koşmadıysa yazmak yanıltıcı olur).
@@ -1322,12 +1372,15 @@ _PPI_METHODS: dict[str, str] = {
 
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                     gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False,
-                    operon_ran: bool = False, ppi_ran: bool = False) -> str:
+                    operon_ran: bool = False, ppi_ran: bool = False,
+                    read_type: str = "short") -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
     d = config.de
-    text = _METHODS_TEXT[lang].format(
+    # read_type'a göre araç-zinciri anlatısı (uzun: NanoPlot/Pychopper/minimap2/-L).
+    methods_src = _METHODS_TEXT_LONG if read_type == "long" else _METHODS_TEXT
+    text = methods_src[lang].format(
         min_len=t.min_length, aggr=_METHODS_AGGR[lang][bool(t.aggressive_quality)],
         feature_type=q.feature_type, attribute=q.attribute,
         design=d.design, fdr=d.fdr_threshold, lfc=d.log2fc_threshold,
@@ -1365,21 +1418,34 @@ def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: boo
 
 
 # (atıf, DOI/URL). DOI'ler doğrulandı (doi.org). FastQC bir araçtır; DOI'si yoktur → proje URL'si.
-_REFERENCES: list[tuple[str, str]] = [
+# Kısa-okuma araç zincirine özgü atıflar (yalnız read_type=short raporunda).
+_REFERENCES_SHORT: list[tuple[str, str]] = [
     ("Andrews S. FastQC: a quality control tool for high throughput sequence data. 2010.",
      "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/"),
     ("Chen S, Zhou Y, Chen Y, Gu J. fastp: an ultra-fast all-in-one FASTQ preprocessor. "
      "Bioinformatics. 2018;34(17):i884–i890.", "https://doi.org/10.1093/bioinformatics/bty560"),
     ("Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. "
      "Nat Methods. 2012;9(4):357–359.", "https://doi.org/10.1038/nmeth.1923"),
+    ("Williams CR, Baccarella A, Parrish JZ, Kim CC. Trimming of sequence reads alters RNA-Seq gene "
+     "expression estimates. BMC Bioinformatics. 2016;17:103.",
+     "https://doi.org/10.1186/s12859-016-0956-2"),
+]
+# Uzun-okuma (ONT/PacBio) araç zincirine özgü atıflar (yalnız read_type=long raporunda).
+_REFERENCES_LONG: list[tuple[str, str]] = [
+    ("De Coster W, Rademakers R. NanoPack2: population-scale evaluation of long-read sequencing data. "
+     "Bioinformatics. 2023;39(5):btad311.", "https://doi.org/10.1093/bioinformatics/btad311"),
+    ("Li H. Minimap2: pairwise alignment for nucleotide sequences. "
+     "Bioinformatics. 2018;34(18):3094–3100.", "https://doi.org/10.1093/bioinformatics/bty191"),
+    ("Oxford Nanopore Technologies. Pychopper: identify, orient and trim full-length cDNA reads. 2023.",
+     "https://github.com/epi2me-labs/pychopper"),
+]
+# Okuma-tipinden bağımsız (her raporda) atıflar.
+_REFERENCES: list[tuple[str, str]] = [
     ("Liao Y, Smyth GK, Shi W. featureCounts: an efficient general purpose program for assigning "
      "sequence reads to genomic features. Bioinformatics. 2014;30(7):923–930.",
      "https://doi.org/10.1093/bioinformatics/btt656"),
     ("Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data "
      "with DESeq2. Genome Biol. 2014;15:550.", "https://doi.org/10.1186/s13059-014-0550-8"),
-    ("Williams CR, Baccarella A, Parrish JZ, Kim CC. Trimming of sequence reads alters RNA-Seq gene "
-     "expression estimates. BMC Bioinformatics. 2016;17:103.",
-     "https://doi.org/10.1186/s12859-016-0956-2"),
     ("Wickham H. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York; 2016.",
      "https://doi.org/10.1007/978-3-319-24277-4"),
     # Genel RNA-seq analiz/raporlama metodolojisi (kullanıcı sağladı).
@@ -1470,8 +1536,10 @@ def _ref_link_label(url: str) -> str:
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                        gsea_ran: bool = False, semantic_ran: bool = False,
                        amr_ran: bool = False, operon_ran: bool = False,
-                       ppi_ran: bool = False) -> str:
-    refs = (_REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
+                       ppi_ran: bool = False, read_type: str = "short") -> str:
+    # Okuma-tipine özgü araç atıfları önce (kullanılmayan aracı atıflamaz — dürüstlük).
+    platform_refs = _REFERENCES_LONG if read_type == "long" else _REFERENCES_SHORT
+    refs = (platform_refs + _REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
             + (_GSEA_REFERENCES if gsea_ran else [])
             + (_SEMANTIC_REFERENCES if semantic_ran else [])
@@ -1536,6 +1604,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                or inputs.get("virulence_genes") is not None)
     operon_ran = inputs.get("operons") is not None
     ppi_ran = inputs.get("communities") is not None
+    # read_type: raw_statistics otoriter; alignment stats yedek; varsayılan short.
+    read_type = raw.get("read_type") or (inputs.get("alignment") or {}).get("read_type") or "short"
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -1563,9 +1633,12 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_software(config, L, inputs, {
             "enrichment": enrichment_ran, "kegg": kegg_ran, "gsea": gsea_ran,
             "amr": amr_ran, "operon": operon_ran, "ppi": ppi_ran,
-            "seqqc": inputs.get("seqqc") is not None}),
-        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
-        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran),
+            "seqqc": inputs.get("seqqc") is not None,
+            "short": read_type == "short", "long": read_type == "long"}),
+        section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran,
+                        read_type=read_type),
+        section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran,
+                           read_type=read_type),
     ])
     # Figürleri belge sırasına göre numaralandır: "Şekil N." / "Figure N."
     fig_word = "Şekil" if lang == "tr" else "Figure"
