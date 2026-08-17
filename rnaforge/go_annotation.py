@@ -180,6 +180,8 @@ def build_gene2go(gff_path: Path, obo: dict, gaf_path: Path | None = None, log=N
         direct: dict[locus_tag, set[go_id]]  (propagation ÖNCESİ, denetim izi için)
         sources: dict[(locus_tag, go_id), "GFF"|"GOA"]
         stats: dict
+        gene_symbol: dict[locus_tag, symbol]  (GFF gene= alanı; GFF zaten burada parse
+            edildiği için çağıran ikinci kez parse etmesin diye döndürülür)
     """
     gene2go, gff_meta, gene_symbol = parse_gff_go(gff_path)
     sources: dict[tuple[str, str], str] = {}
@@ -213,4 +215,4 @@ def build_gene2go(gff_path: Path, obo: dict, gaf_path: Path | None = None, log=N
         "n_goa": n_goa,
         "n_terms": len({g for gos in propagated.values() for g in gos}),
     }
-    return propagated, go_meta, direct, sources, stats
+    return propagated, go_meta, direct, sources, stats, gene_symbol

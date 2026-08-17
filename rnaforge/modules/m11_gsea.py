@@ -121,7 +121,7 @@ def _resolve_collections(config: Config, log):
                 f"m11 (gsea): GO requested but go-basic.obo not found at {e.obo}. "
                 "Download it (see m09) or unset enrichment.obo.")
         obo = parse_obo(e.obo)
-        gene2go, go_meta, _, _, _ = build_gene2go(gff, obo, gaf_path=e.gaf, log=log)
+        gene2go, go_meta, _, _, _, _ = build_gene2go(gff, obo, gaf_path=e.gaf, log=log)
         planned.append(("go", gene2go, go_meta, "GSEA — Gene Ontology"))
     else:
         log("m11: enrichment.obo yok -> GO koleksiyonu atlandı")

@@ -138,7 +138,10 @@ def test_build_gene2go_integrates_and_stamps(tmp_path):
     gff = _write(tmp_path, "g.gff", GFF_FOR_GAF)
     gaf = _write(tmp_path, "e.gaf", GAF)
     obo = parse_obo(_write(tmp_path, "go.obo", OBO))
-    g2go, meta, direct, sources, stats = build_gene2go(gff, obo, gaf_path=gaf)
+    g2go, meta, direct, sources, stats, gene_symbol = build_gene2go(gff, obo, gaf_path=gaf)
+    # build_gene2go artık gene_symbol'ü de döndürür (m09 GFF'i iki kez parse etmesin)
+    assert isinstance(gene_symbol, dict)
+    assert gene_symbol == parse_gff_go(gff)[2]
     # LT_A: GO:0000002 (GFF) -> propagate -> +GO:0000001
     assert g2go["LT_A"] == {"GO:0000002", "GO:0000001"}
     assert sources[("LT_A", "GO:0000002")] == "GFF"
@@ -154,6 +157,6 @@ def test_build_gene2go_without_gaf_logs(tmp_path):
     gff = _write(tmp_path, "g.gff", GFF_FOR_GAF)
     obo = parse_obo(_write(tmp_path, "go.obo", OBO))
     msgs = []
-    g2go, meta, direct, sources, stats = build_gene2go(gff, obo, gaf_path=None, log=msgs.append)
+    g2go, meta, direct, sources, stats, gene_symbol = build_gene2go(gff, obo, gaf_path=None, log=msgs.append)
     assert stats["n_goa"] == 0
     assert any("GAF" in m for m in msgs)              # sessiz değil

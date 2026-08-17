@@ -83,7 +83,7 @@ def run_semantic(config: Config, metadata_path: Path, run_dir: Path,
             log_file.write(m + "\n")
 
         obo = parse_obo(obo_path)
-        gene2go, go_meta, _, _, _ = build_gene2go(
+        gene2go, go_meta, _, _, _, _ = build_gene2go(
             config.reference.annotation_gff, obo, gaf_path=config.enrichment.gaf, log=log)
         ic = compute_ic(gene2go)
         thr = config.enrichment.revigo_similarity

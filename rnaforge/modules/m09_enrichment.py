@@ -10,7 +10,7 @@ from rnaforge.enrichment import (
     all_tested_genes, build_enrichment_manifest, deg_sets, run_enrichment_r,
     run_ora, write_enrichment_manifest, write_ora_tsv,
 )
-from rnaforge.go_annotation import build_gene2go, parse_gff_go, parse_obo
+from rnaforge.go_annotation import build_gene2go, parse_obo
 from rnaforge.state import RunState
 
 MODULE_NAME = "m09_enrichment"
@@ -62,9 +62,8 @@ def run_enrichment(config: Config, metadata_path: Path, run_dir: Path,
 
         obo = parse_obo(obo_path)
         state.heartbeat()
-        gene2go, go_meta, direct, sources, ann_stats = build_gene2go(
+        gene2go, go_meta, direct, sources, ann_stats, gene_symbol = build_gene2go(
             gff, obo, gaf_path=config.enrichment.gaf, log=log)
-        _, _, gene_symbol = parse_gff_go(gff)
         _write_gene2go_tsv(enrich_dir / "gene2go.tsv", gene2go, direct, sources, go_meta)
         state.heartbeat()
 
