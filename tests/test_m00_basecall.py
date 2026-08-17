@@ -60,6 +60,7 @@ def test_basecall_pod5_sample_produces_fastq_and_resolved_metadata(tmp_path, mon
     assert rm.exists()
     s = load_metadata(rm)[0]
     assert s.fastq_1.suffix == ".fastq" and s.fastq_1.exists()
+    assert s.fastq_1.is_absolute()   # göreli yol run_dir göreliyken ikilenirdi
     # diagnostic: no gate written
     assert not (run_dir / "quality" / "gates.json").exists()
 

@@ -27,13 +27,16 @@ _COLUMNS = ("sample_id", "condition", "fastq_1", "fastq_2", "batch", "subject")
 
 
 def _write_resolved_metadata(path: Path, rows: list[Sample]) -> None:
+    """Çözülmüş metadata MUTLAK yollarla yazılır: load_metadata yolları metadata
+    dosyasının dizinine göre çözer; göreli yol yazmak (run_dir göreli olduğunda)
+    yolu ikilerdi (canlı e2e'de yakalandı)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as fh:
         fh.write("\t".join(_COLUMNS) + "\n")
         for s in rows:
             fh.write("\t".join([
-                s.sample_id, s.condition, str(s.fastq_1),
-                str(s.fastq_2) if s.fastq_2 else "",
+                s.sample_id, s.condition, str(Path(s.fastq_1).resolve()),
+                str(Path(s.fastq_2).resolve()) if s.fastq_2 else "",
                 s.batch or "", s.subject or "",
             ]) + "\n")
 
