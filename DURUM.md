@@ -67,11 +67,25 @@
   yanlış FAIL'lerdi), m05 gate YOK; **`rnaforge de` (m06 DESeq2) uzun-okuma matrisi üzerinde ÇALIŞTI** →
   "0 significant / 4308 genes" (microbepore tek-koşul, ctrl/trt yapay → 0 beklenen). **Uzun-okuma kolu artık
   m06+ ile birebir buluşuyor (kod değişmeden).**
-- **★ SIRADAKİ — ADIM 6: long-read kalite profili + kapıları.** `profiles/` içinde ONT/uzun-okuma eşikleri
-  (ONT kalite ~Q10-15, alignment/assignment eşikleri ONT'ye göre) → m02/m03/m04/m05 long dallarına FAIL/WARN
-  kapıları eklenir (şu an hepsi diagnostik). Sonra **ADIM 7:** rapor read_type rozeti + uçtan-uca canlı smoke.
-  Her biri kendi planı (TDD+merge). DE-sinyal için aday B (*E. coli* glucose-vs-pyruvate) hâlâ seçilebilir.
-  Tasarım `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 6 (long-read kalite profili + kapıları) TAMAM ve `main`'de (2026-08-17, 462 test).** Plan
+  `docs/superpowers/plans/2026-08-17-longread-step6-profile-gates.md`, 4 görev TDD. Durable: (1) Yeni
+  `rnaforge/profiles/prokaryote_long.yml` (`permissive: true`, DAMGALI) — ONT bilinçli permissive eşikler:
+  `alignment_rate=0.50` (katastrofik/yanlış-referans → **FAIL**), `survival_rate=0.20` + `assignment_rate=0.05`
+  (ONT'de doğal düşük → **WARN**, geçersiz kılmaz). Gerekçe belleğe: *"uydurma eşik kapı sistemini itibarsızlaştırır"*
+  → temsili ONT veri seti gelene dek permissive+damgalı (ökaryot profili deseni). (2) `quality.profile_name_for(
+  organism_type, read_type)` (long→`<organism>_long`) — read_type→profil eşlemesinin tek kaynağı. (3) `build_trim_gates`
+  float-tabanlı yapıldı + `build_trim_gates`/`build_count_gates`'e `warn_only` (eşik altı WARN). (4) Long dalları
+  kapı yazar: **m04-long alignment FAIL** (`build_alignment_gates`+raise_if_failed), **m03-long survival WARN**,
+  **m05-long assignment WARN**; m02-long diagnostik kalır (short m02 gibi). (5) CLI `_load_run_profile(config,run_dir)`
+  — güven kartı long run'da `prokaryote_long` (permissive) damgalar (m01 öncesi kısa'ya düşer); TÜM stage kart
+  yazımlarına uygulandı (m06+ kart damgasını short'a geri çevirmesin). **Canlı smoke (mbp_smoke, quant+counts
+  --force):** kart **profile=prokaryote_long permissive=True**; **alignment PASS** (0.7122>0.50), **assignment PASS**
+  (0.0635>0.05, kıl payı = floor doğru), verdict SUSPECT (m06 replicate_correlation WARN, yapay ctrl/trt → dürüst).
+  Yalancı FAIL yok — Illumina eşikleri reddederdi, long profil geçirdi + damgaladı.
+- **★ SIRADAKİ — ADIM 7 (son): rapor read_type rozeti + uçtan-uca canlı smoke.** Rapora read_type/platform
+  rozeti + long-read yöntem/araç notları (minimap2/featureCounts-L/NanoPlot/Pychopper); tam uçtan-uca smoke.
+  DE-sinyal için aday B (*E. coli* glucose-vs-pyruvate) seçilebilir. Plan kendi (TDD+merge). Tasarım
+  `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
