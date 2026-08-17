@@ -89,6 +89,53 @@ def test_run_featurecounts_counts_genes(tmp_path):
     assert result.assignment_rates[col] > 0.9
 
 
+def _fake_fc_subprocess(monkeypatch, captured):
+    """subprocess.run'ı yakalar; parse'ın geçmesi için minimal counts.txt+.summary yazar."""
+    import rnaforge.featurecounts as fc
+
+    def fake_run(cmd, capture_output=True, text=True):
+        captured["cmd"] = cmd
+        out = Path(cmd[cmd.index("-o") + 1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            "# prog\nGeneid\tChr\tStart\tEnd\tStrand\tLength\ta.bam\n"
+            "g1\tc1\t1\t80\t+\t80\t5\n"
+        )
+        out.with_name(out.name + ".summary").write_text(
+            "Status\ta.bam\nAssigned\t5\nUnassigned_NoFeatures\t1\n"
+        )
+
+        class _R:
+            returncode = 0
+            stderr = ""
+            stdout = ""
+        return _R()
+
+    monkeypatch.setattr(fc.subprocess, "run", fake_run)
+
+
+def test_run_featurecounts_long_read_adds_L(tmp_path, monkeypatch):
+    from rnaforge.featurecounts import run_featurecounts
+    captured: dict = {}
+    _fake_fc_subprocess(monkeypatch, captured)
+    run_featurecounts([Path("a.bam")], Path("g.gtf"), tmp_path / "fc",
+                      feature_type="exon", attribute="gene_id",
+                      paired=True, long_read=True)   # long → -L, paired ignored
+    assert "-L" in captured["cmd"]
+    assert "-p" not in captured["cmd"]
+
+
+def test_run_featurecounts_short_has_no_L_but_paired(tmp_path, monkeypatch):
+    from rnaforge.featurecounts import run_featurecounts
+    captured: dict = {}
+    _fake_fc_subprocess(monkeypatch, captured)
+    run_featurecounts([Path("a.bam")], Path("g.gtf"), tmp_path / "fc",
+                      feature_type="exon", attribute="gene_id",
+                      paired=True, long_read=False)
+    assert "-L" not in captured["cmd"]
+    assert "-p" in captured["cmd"]
+
+
 from rnaforge.featurecounts import compute_tpm_fpkm, parse_lengths
 
 _FC = (

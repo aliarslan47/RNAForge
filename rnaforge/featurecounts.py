@@ -110,14 +110,18 @@ def parse_summary(summary_text: str) -> dict[str, float]:
 
 def run_featurecounts(bams: list[Path], gff: Path, out_dir: Path, feature_type: str,
                       attribute: str, paired: bool = False, threads: int = 4,
-                      env: str = "rnaforge-quant-prok") -> FeatureCountsResult:
+                      env: str = "rnaforge-quant-prok",
+                      long_read: bool = False) -> FeatureCountsResult:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     counts_path = out_dir / "counts.txt"
     cmd = ["conda", "run", "-n", env, "featureCounts",
            "-a", str(gff), "-o", str(counts_path),
            "-t", feature_type, "-g", attribute, "-T", str(threads)]
-    if paired:
+    if long_read:
+        # ONT/PacBio tek-molekül okuma modu; -L, -p ile bağdaşmaz (paired yok sayılır).
+        cmd += ["-L"]
+    elif paired:
         cmd += ["-p", "--countReadPairs"]
     cmd += [str(b) for b in bams]
     r = subprocess.run(cmd, capture_output=True, text=True)
