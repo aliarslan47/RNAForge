@@ -3,7 +3,7 @@
 Tekrarlanabilir, modüler **bulk RNA-seq** analiz pipeline'ı — ham FASTQ'tan tek, kendi kendine yeten
 HTML rapora; diferansiyel ekspresyonun üstünde tam bir fonksiyonel-analiz katmanıyla.
 
-İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.3)
+İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.4)
 
 ## Ne yapar
 
@@ -14,9 +14,15 @@ validate → qc → trim → quant → counts → de → figures → report
                                           └→ enrich · kegg · gsea · semantic · amr · operon · ppi
 ```
 
-- **Çekirdek**: girdi/tasarım doğrulama, FastQC, nazik fastp kırpma, hizalama/kantifikasyon
-  (prokaryot: Bowtie2 + featureCounts · ökaryot: Salmon + tximport), DESeq2 diferansiyel ekspresyon,
-  yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.
+- **Çekirdek**: girdi/tasarım doğrulama, QC, nazik kırpma, hizalama/kantifikasyon, DESeq2 diferansiyel
+  ekspresyon, yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.
+  QC → trim → hizalama araç zinciri **okuma tipine** göre otomatik seçilir (aşağıya bak);
+  kantifikasyon `organism_type` ile yönlendirilir (prokaryot: Bowtie2/minimap2 + featureCounts ·
+  ökaryot: Salmon + tximport). İki boyut da aynı gen × örnek sayım matrisinde buluşur.
+- **Okuma tipleri (kısa / uzun)**: Illumina okumaları kısa-okuma zincirini çalıştırır (FastQC → fastp →
+  Bowtie2); ONT/PacBio okumaları uzun-okuma zincirini (NanoPlot → Pychopper+chopper → minimap2 →
+  featureCounts `-L`). Okuma tipi m01'de otomatik tespit edilir; m05'ten itibaren (DESeq2 ve tüm
+  fonksiyonel analiz) pipeline okuma-tipinden bağımsızdır.
 - **Fonksiyonel analiz** (hepsi opsiyonel, organizma-agnostik, hiçbiri yeni FAIL kapısı üretmez):
   GO aşırı-temsil (ORA), KEGG yolak ORA, GSEA (fgsea), REVIGO-benzeri semantik indirgeme,
   AMR + virülans overlay (abricate/CARD/VFDB), operon tahmini + koordinasyon ve STRING
@@ -30,31 +36,37 @@ ikili politikayla zorlar:
 - **FAIL** → sonuç **geçersiz**: koşu durur, biyolojik çıktı üretilmez (exit 1).
 - **WARN** → sonuç **şüpheli**: üretilir ama öyle damgalanır.
 
-Eşikler veridir (`profiles/{prokaryote,eukaryote}.yml`); ezilen eşik rapora yazılır (sessiz gevşetme yok).
-Her koşu ayrıca bir güvence kartı yazar (`UNKNOWN`/`INVALID`/`SUSPECT`/`TRUSTWORTHY`).
+Eşikler veridir (`profiles/{prokaryote,eukaryote,prokaryote_long}.yml`); ezilen eşik rapora yazılır
+(sessiz gevşetme yok). Uzun-okuma koşuları `prokaryote_long` profilini kullanır; eşikleri bilinçli
+olarak permissive ve damgalıdır (ONT kalitesi ~Q10–15, Q30 değil): yalnız katastrofik hizalama hatası
+(yanlış referans) FAIL verir, ONT'de doğal olan düşük survival/assignment WARN olur. Her koşu ayrıca
+bir güvence kartı yazar (`UNKNOWN`/`INVALID`/`SUSPECT`/`TRUSTWORTHY`).
 
 ## Pipeline modülleri
 
 | Aşama | Subcommand | Ne yapar |
 |---|---|---|
-| m01 | `validate` | Config + metadata + FASTQ doğrulama, platform tespiti, tasarım kapıları |
-| m02 | `qc` | FastQC (teşhis; koşuyu asla durdurmaz) |
-| m03 | `trim` | fastp — nazik kırpma (adapter + min-uzunluk; agresif kalite kapalı) |
-| m04 | `quant` | Hizalama/kantifikasyon (prok: Bowtie2 · ökaryot: Salmon) |
-| m05 | `counts` | featureCounts → gen × örnek sayım matrisi |
+| m01 | `validate` | Config + metadata + FASTQ doğrulama, platform + okuma-tipi tespiti, tasarım kapıları |
+| m02 | `qc` | kısa: FastQC · uzun: NanoPlot (teşhis; koşuyu asla durdurmaz) |
+| m03 | `trim` | kısa: fastp (nazik) · uzun: Pychopper+chopper (cDNA) / chopper (direct-RNA) |
+| m04 | `quant` | Hizalama (prok kısa: Bowtie2 · uzun: minimap2 · ökaryot: Salmon) |
+| m05 | `counts` | featureCounts (uzun-okumada `-L`) → gen × örnek sayım matrisi |
 | m06 | `de` | DESeq2 diferansiyel ekspresyon |
 | m07 | `figures` | PCA, volcano, MA, heatmap, dispersiyon, … (PNG 300dpi + SVG) |
-| m08 | `report` | Tek, kendi kendine yeten çift dilli HTML rapor |
+| m08 | `report` | Tek, kendi kendine yeten çift dilli HTML rapor (okuma-tipi farkında) |
 | m09 | `enrich` | GO aşırı-temsil (ORA), hipergeometrik + BH |
 | m10 | `kegg` | KEGG yolak ORA |
 | m11 | `gsea` | Sıralı gen listesinde GSEA (fgsea) |
 | m12 | `semantic` | GO terimlerinin REVIGO-benzeri semantik indirgemesi (+ MDS haritası) |
-| m13 | `amr` | AMR (CARD) + virülans (VFDB) genlerinin DE'ye overlay'i (abricate) |
+| m13 | `amr` | AMR (CARD + AMRFinderPlus) + virülans (VFDB) genlerinin DE'ye overlay'i |
 | m14 | `operon` | Operon tahmini (intergenik mesafe) + DE koordinasyonu |
 | m15 | `ppi` | STRING PPI alt-ağı + Louvain community modülleri |
+| m16 | `seqqc` | rRNA% (SortMeRNA) + strandedness (RSeQC) — WARN kapıları |
+| m17 | `alignqc` | insert-size + coverage + read-distribution (samtools/RSeQC) |
+| m18 | `multiqc` | koşu genelinde toplu MultiQC görünümü (en son) |
 
-Downstream analizler (m09–m15) organizma-agnostiktir ve bir koşuyu asla geçersiz kılmaz — verdict
-kalite kapılarından değişmeden taşınır.
+Downstream analizler (m09–m15) organizma- ve okuma-tipi-agnostiktir ve bir koşuyu asla geçersiz kılmaz —
+verdict kalite kapılarından değişmeden taşınır. QC ekleri (m16–m18) tanısaldır.
 
 ## Kurulum
 
@@ -70,8 +82,10 @@ Araç ortamları (bir kez kurulur, modüller tarafından kullanılır):
 conda env create -f envs/rnaforge-qc.yml           # FastQC, fastp
 conda env create -f envs/rnaforge-quant-prok.yml   # Bowtie2, samtools, featureCounts
 conda env create -f envs/rnaforge-quant-euk.yml    # Salmon
+conda env create -f envs/rnaforge-longread.yml     # minimap2, NanoPlot, Pychopper, chopper, samtools
 conda env create -f envs/rnaforge-de.yml           # R: DESeq2, ggplot2, fgsea
 conda env create -f envs/rnaforge-amr.yml          # abricate (CARD/VFDB)
+conda env create -f envs/rnaforge-seqqc.yml        # SortMeRNA, RSeQC, MultiQC (m16/m18)
 ```
 
 ## Kullanım
@@ -147,8 +161,13 @@ AMR/virülans (m13) abricate'in paketli CARD/VFDB veritabanlarını kullanır (a
 - **`organism_type` zorunlu ve varsayılanı yok** (`prokaryote` | `eukaryote`). Yalnız kantifikasyonu
   (m04/m05) yönlendirir; iki yol da aynı gen × örnek sayım matrisinde buluşur, böylece tüm downstream
   adımlar (m06–m15) organizma-agnostiktir.
-- **Yalnız Illumina (MVP).** ONT/PacBio girdileri tespit edilir ve yanlış yola sokulmak yerine net
-  hatayla reddedilir.
+- **İki yönlendirme boyutu: `organism_type` × okuma tipi.** Okuma tipi (kısa/uzun) m01'de FASTQ'tan
+  otomatik tespit edilir (Illumina → kısa; ONT/PacBio → uzun) ve m02–m05'i yönlendirir; `organism_type`
+  m04/m05'i yönlendirir. Tanımlanamayan platformlar yine net hatayla reddedilir (asla yanlış yola sessizce
+  sokulmaz).
+- **ONT uzun okumalar için `library.chemistry` zorunlu** (`cdna` | `direct_rna`) — FASTQ'tan tespit
+  edilemez ve m03 uzun-okuma ön-işlemesini seçer (cDNA → Pychopper+chopper; direct-RNA → yalnız chopper).
+  PacBio HiFi bunu gerektirmez.
 - **Kırpma bilinçli olarak nazik.** Agresif kalite kırpması ekspresyon tahminlerini bozar
   ([Williams ve ark. 2016](https://doi.org/10.1186/s12859-016-0956-2)); bozulmayı asgari-uzunluk
   filtresi engeller.

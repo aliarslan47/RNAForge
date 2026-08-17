@@ -1,9 +1,26 @@
 # PLAN.md
 
-**Version:** v1.3\
+**Version:** v1.4\
 **Status:** Active\
 **Purpose:** Single Source of Truth
 
+> **Changelog (v1.3 → v1.4)**
+> - **Uzun-okuma (ONT/PacBio) kolu TAMAMLANDI** (7 adım, hepsi TDD+merge). ONT/PacBio artık
+>   REDDEDİLMİYOR, **yönlendiriliyor**: yeni **read_type (short|long)** boyutu m02'den itibaren
+>   akışı dallandırır. Kısa: FastQC→fastp→Bowtie2. Uzun: NanoPlot→Pychopper+chopper→minimap2
+>   (`-ax map-ont`/`map-hifi`)→featureCounts `-L`. İki boyut (`organism_type × read_type`) aynı
+>   gen×örnek count matrisinde buluşur → m06+ değişmez. Yeni `library.chemistry` config
+>   (cdna|direct_rna; ONT-long için zorunlu, FASTQ'tan tespit edilemez). Yeni **`prokaryote_long`**
+>   kalite profili (bilinçli permissive + damgalı; alignment 0.50 FAIL, survival/assignment WARN).
+>   Rapor read_type-farkında (rozet + long araç/yöntem/atıflar). Bölüm 2.1, 4, 5, 11.
+> - **Downstream fonksiyonel analiz katmanı** (m09–m15) eklendi: GO ORA, KEGG ORA, GSEA (fgsea),
+>   REVIGO-benzeri semantik indirgeme, AMR/virülans (CARD+AMRFinderPlus/VFDB), operon, STRING PPI+
+>   community. Hepsi organizma/okuma-tipi agnostik, yeni FAIL kapısı YOK.
+> - **QC tamamlama** (m16 seqqc rRNA%/strandedness · m17 alignqc insert-size/coverage/read-dist ·
+>   m18 MultiQC) + TPM/FPKM + yazılım/veritabanı sürüm tabloları. Tümü tanısal.
+> - **Doğrulama:** kısa-okuma GSE300731 uçtan uca (konkordans r=0.972); uzun-okuma microbepore
+>   canlı smoke (araç zinciri doğrulandı; DE-sinyalli bakteri ONT seti henüz seçilmedi).
+>
 > **Changelog (v1.2 → v1.3)**
 > - Trimming varsayılanı testi netleştirildi: `min_length >= 1` iddiası **vacuous**'tu
 >   (config zaten `< 1`'de `ConfigError` atıyor, assertion asla düşemezdi). Williams 2016
@@ -73,11 +90,14 @@ süsler sonra eklenir.
     nazik trimming → **kantifikasyon (prokaryot | ökaryot yolu)** → gen-seviyesi
     count matrisi → DESeq2 → 3 temel figür (PCA, Volcano, Heatmap) → basit HTML
     rapor. Demo veride uçtan uca **koşmalı.**
--   **MVP sınırları:** Yalnızca **Illumina**. ONT/PacBio tespit edilir ve net bir
-    hatayla **reddedilir** (tespit etmek ≠ desteklemek). MultiQC, GO/KEGG, GSEA,
-    workflow diyagramı, dashboard ve PDF rapor MVP'de yoktur.
--   **Faz 2+:** ONT yolu (minimap2), MultiQC, GSEA, KEGG/GO (ORA), 11 figür/9 tablo
-    tam seti, otomatik workflow diyagramı, 9 modüllü dashboard, PDF rapor.
+-   **MVP sınırları (TARİHSEL):** MVP yalnız **Illumina** kısa-okumaydı; ONT/PacBio o aşamada
+    reddediliyordu. **v1.4'te bu değişti:** uzun-okuma (ONT/PacBio) kolu tamamlandı — artık
+    reddedilmiyor, read_type ile yönlendiriliyor (yukarıdaki changelog). Yalnız **tanımlanamayan**
+    platform reddedilir.
+-   **Faz 2+ (ÇOĞU TAMAMLANDI, v1.4):** ✅ ONT yolu (minimap2), ✅ MultiQC, ✅ GSEA, ✅ KEGG/GO (ORA),
+    ✅ genişletilmiş figür/tablo seti + downstream (AMR/operon/PPI/REVIGO). **KALAN:** ökaryot yolu
+    canlı doğrulaması (m04-euk salmon + m05-euk tximport), otomatik workflow diyagramı, interaktif
+    dashboard, PDF rapor.
 -   Kural: "Çalışan MVP" > "mükemmel plan". Her modül önce en basit çalışan
     haliyle bitirilir, sonra zenginleştirilir.
 
@@ -158,20 +178,20 @@ Gerçek kullanımda tüm analizler yalnızca müşterinin sağladığı veri
 ``` text
 Input FASTQ
 ↓
-Metadata Validation + Platform Detection (Illumina | ONT | PacBio)
-│   └─ ONT/PacBio → REJECT (MVP: Illumina only)
+Metadata Validation + Platform & read_type Detection (Illumina→short | ONT/PacBio→long)
+│   └─ tanımlanamayan platform → REJECT (yalnız unknown reddedilir; v1.4)
 ↓
-Quality Control (FastQC)
+Quality Control (short: FastQC · long: NanoPlot)
 ↓
-Read Trimming (fastp — nazik: adapter + min-length, agresif kalite trimming YOK)
+Read Trimming (short: fastp nazik · long: Pychopper+chopper / chopper)
 ↓
 ┌─────────────── organism_type ───────────────┐
 │                                             │
 prokaryote                                eukaryote
 │                                             │
-Alignment (bowtie2, genome index)         Quantification (Salmon, transcriptome index)
+Alignment (short: bowtie2 · long: minimap2) Quantification (Salmon, transcriptome index)
 │                                             │
-featureCounts (GFF/GTF)                   tximport + tx2gene (transcript → gene)
+featureCounts (GFF/GTF; long: -L)         tximport + tx2gene (transcript → gene)
 │                                             │
 └─────────────────┬───────────────────────────┘
 ↓
@@ -179,11 +199,11 @@ Count Matrix (gen × örnek — ortak sözleşme)
 ↓
 Differential Expression (DESeq2, esnek design formülü)
 ↓
-Functional Enrichment (GO/KEGG = ORA, GSEA)        [Faz 2+]
+Functional Enrichment (GO/KEGG ORA, GSEA, REVIGO, AMR/operon/PPI)  [✅ v1.4]
 ↓
-Visualization (MVP: PCA, Volcano, Heatmap)
+Visualization (PCA, Volcano, Heatmap, MA, dispersion, …)
 ↓
-MultiQC (tüm adımların QC'sini toplar)             [Faz 2+]
+MultiQC (tüm adımların QC'sini toplar)             [✅ v1.4]
 ↓
 Interactive Dashboard                              [Faz 2+]
 ↓
