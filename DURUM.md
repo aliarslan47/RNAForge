@@ -55,10 +55,23 @@
   hizaladı, oranlar **0.71–0.81** (ctrl1=0.7122 → 0.70 eşiğine sınırda = diagnostik kararı doğruladı); BAM'ler
   üretildi; `rnaforge counts` hâlâ dürüstçe durdu (m05 muhafızı). **NOT:** microbepore trimmed adları `_1`'siz
   (m03 zamanı); smoke metadata `_1`'siz symlink'lerle eşlendi.
-- **★ SIRADAKİ — ADIM 5+: m05-long (featureCounts `-L`) · long profil/kapılar (Step 6) · rapor read_type
-  rozeti + uçtan-uca canlı smoke (Step 7).** Her biri kendi planı (TDD+merge). m05-long: featureCounts `-L`
-  moduyla BAM'lerden gen-seviyesi sayım → ortak count matrisinde m06+ ile buluşur; m05'teki `require_short_read`
-  muhafızı Step 5'te kaldırılır. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 5 (m05-long featureCounts `-L`) TAMAM ve `main`'de (2026-08-17, 453 test).** Plan
+  `docs/superpowers/plans/2026-08-17-longread-step5-m05-featurecounts.md`, 3 görev TDD. Durable: (1)
+  `run_featurecounts(long_read=True)` → `-L` (ONT/PacBio tek-molekül; `-L`/`-p` bağdaşmaz, paired yok sayılır);
+  aynı binary (subread 2.1.1, `rnaforge-quant-prok`). (2) **m05 read_type dispatch** (m04 deseni): short→
+  `_counts_short` (featureCounts, assignment_rate FAIL kapısı korunur), long→`_counts_long` (`-L`, paired=False,
+  **DIAGNOSTIK — FAIL kapısı YOK**, long profil Step 6). counts.tsv + tpm/fpkm yazımı ortak `_write_count_outputs`
+  yardımcısında. (3) Step-1'in m05'teki `require_short_read` muhafızı KALDIRILDI — bu **uzun-okuma kolunun SON
+  Step-1 muhafızıydı**; long run artık uçtan uca count matrisine ulaşıyor. **Canlı smoke (mbp_smoke):**
+  featureCounts -L → **4308 gen × 4 örnek**, atama %6–16 (düşük = diagnostik kararını doğruladı; 0.50 eşiği
+  yanlış FAIL'lerdi), m05 gate YOK; **`rnaforge de` (m06 DESeq2) uzun-okuma matrisi üzerinde ÇALIŞTI** →
+  "0 significant / 4308 genes" (microbepore tek-koşul, ctrl/trt yapay → 0 beklenen). **Uzun-okuma kolu artık
+  m06+ ile birebir buluşuyor (kod değişmeden).**
+- **★ SIRADAKİ — ADIM 6: long-read kalite profili + kapıları.** `profiles/` içinde ONT/uzun-okuma eşikleri
+  (ONT kalite ~Q10-15, alignment/assignment eşikleri ONT'ye göre) → m02/m03/m04/m05 long dallarına FAIL/WARN
+  kapıları eklenir (şu an hepsi diagnostik). Sonra **ADIM 7:** rapor read_type rozeti + uçtan-uca canlı smoke.
+  Her biri kendi planı (TDD+merge). DE-sinyal için aday B (*E. coli* glucose-vs-pyruvate) hâlâ seçilebilir.
+  Tasarım `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
