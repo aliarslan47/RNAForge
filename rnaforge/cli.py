@@ -10,6 +10,7 @@ from rnaforge import __version__
 from rnaforge.config import ConfigError, load_config
 from rnaforge.gates import GateFailure
 from rnaforge.metadata import MetadataError
+from rnaforge.modules.m00_basecall import run_basecall
 from rnaforge.modules.m01_validate import run_validation
 from rnaforge.modules.m02_qc import run_qc
 from rnaforge.modules.m03_trim import run_trim
@@ -39,6 +40,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rnaforge", description="Bulk RNA-seq pipeline")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")
+
+    basecall = sub.add_parser(
+        "basecall", help="basecall raw signal (FAST5/POD5) to FASTQ with dorado GPU (m00)")
+    basecall.add_argument("--config", required=True, type=Path)
+    basecall.add_argument("--metadata", required=True, type=Path)
+    basecall.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    basecall.add_argument("--run-id", default="run")
+    basecall.add_argument(
+        "--force", action="store_true",
+        help="re-run even if this module already completed in this run directory",
+    )
 
     validate = sub.add_parser("validate", help="validate config, metadata and FASTQ inputs")
     validate.add_argument("--config", required=True, type=Path)
@@ -222,6 +234,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m08 already completed in this run directory",
     )
     return parser
+
+
+def _cmd_basecall(args) -> int:
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_basecall(config, args.metadata, run_dir, force=args.force)
+    if summary.get("resumed"):
+        print("m00_basecall already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    n_signal = sum(1 for v in summary["samples"].values() if v["input_kind"] != "fastq")
+    print(f"basecall OK: {summary['n_samples']} sample(s), {n_signal} basecalled from raw signal "
+          f"(model={summary['model']}, device={summary['device']})")
+    print(f"run directory: {run_dir}")
+    return 0
 
 
 def _cmd_validate(args) -> int:
@@ -613,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
         print("error: no command given (try: rnaforge validate --help)", file=sys.stderr)
         return 2
     try:
+        if args.command == "basecall":
+            return _cmd_basecall(args)
         if args.command == "qc":
             return _cmd_qc(args)
         if args.command == "trim":

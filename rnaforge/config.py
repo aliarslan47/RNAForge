@@ -20,7 +20,7 @@ REPORT_LANGUAGES = ("tr", "en")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
-    "quantification", "enrichment", "amr", "operon", "ppi",
+    "quantification", "enrichment", "amr", "operon", "ppi", "basecall",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -40,6 +40,16 @@ class Reference:
     annotation_gff: Path | None = None
     transcriptome_fasta: Path | None = None
     tx2gene: Path | None = None
+
+
+@dataclass(frozen=True)
+class Basecall:
+    # ONT ham-sinyal (FAST5/POD5) → FASTQ (m00). dorado GPU zorunlu (CPU pratik değil).
+    dorado_bin: str = "dorado"      # PATH'te değilse mutlak yol verilir
+    model: str = "hac"              # dorado kompleks; tam modeli POD5 metadata'sından seçer
+    device: str = "cuda:all"
+    env: str = "rnaforge-basecall"  # pod5 dönüşümü için
+    models_dir: str | None = None   # model önbelleği (yeniden indirmeyi önler)
 
 
 @dataclass(frozen=True)
@@ -153,6 +163,7 @@ class Config:
     amr: AMR = field(default_factory=AMR)
     operon: Operon = field(default_factory=Operon)
     ppi: PPI = field(default_factory=PPI)
+    basecall: Basecall = field(default_factory=Basecall)
 
 
 def _one_of(value, allowed, field: str):
@@ -246,6 +257,7 @@ def load_config(path: Path | str) -> Config:
     amr_raw = _section(raw, "amr")
     operon_raw = _section(raw, "operon")
     ppi_raw = _section(raw, "ppi")
+    basecall_raw = _section(raw, "basecall")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -318,6 +330,14 @@ def load_config(path: Path | str) -> Config:
             amrfinder_env=str(amr_raw.get("amrfinder_env", "ali-amrfinder")),
         ),
         operon=Operon(max_gap=_as_int(operon_raw.get("max_gap", 50), "operon.max_gap")),
+        basecall=Basecall(
+            dorado_bin=str(basecall_raw.get("dorado_bin", "dorado")),
+            model=str(basecall_raw.get("model", "hac")),
+            device=str(basecall_raw.get("device", "cuda:all")),
+            env=str(basecall_raw.get("env", "rnaforge-basecall")),
+            models_dir=(str(basecall_raw["models_dir"])
+                        if basecall_raw.get("models_dir") else None),
+        ),
         ppi=PPI(
             taxid=(str(ppi_raw["taxid"]) if ppi_raw.get("taxid") else None),
             string_dir=(Path(ppi_raw["string_dir"]) if ppi_raw.get("string_dir") else None),
