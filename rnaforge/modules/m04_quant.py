@@ -14,9 +14,10 @@ from rnaforge.bowtie2 import AlignmentResult, build_index, run_bowtie2
 from rnaforge.config import Config
 from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
+from rnaforge.minimap2 import minimap2_preset, run_minimap2
 from rnaforge.modules.m03_trim import trimmed_reads
 from rnaforge.quality import Profile, load_profile
-from rnaforge.routing import require_short_read
+from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
 
 MODULE_NAME = "m04_quant"
@@ -73,8 +74,25 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
             "m04 (quant) requires m03 (trim) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge trim` with the same --run-id, then re-run quant."
         )
-    require_short_read(run_dir, "quant")  # long-read align (minimap2) not built yet
+    # read_type yönlendirmesi (m02/m03 deseni): kısa → bowtie2, uzun → minimap2.
+    # Step-1'in `require_short_read` muhafızı bununla değiştirildi; muhafız m05'te kalır.
+    read_type = resolve_read_type(run_dir)
+    if read_type == "long":
+        summary = _quant_long(config, metadata_path, run_dir,
+                              quant_dir, stats_dir, logs_dir, state)
+    else:
+        summary = _quant_short(config, metadata_path, run_dir,
+                              quant_dir, stats_dir, logs_dir, state)
 
+    state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "quant.log")])
+    return summary
+
+
+def _quant_short(config: Config, metadata_path: Path, run_dir: Path,
+                 quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                 state: RunState) -> dict:
+    """Kısa-okuma hizalama (bowtie2). alignment_rate FAIL kapısı korunur."""
+    stats_path = stats_dir / "alignment_statistics.json"
     profile = load_profile(config.organism_type, config.quality)
     log_path = logs_dir / "quant.log"
     with log_path.open("w") as log_file:
@@ -100,6 +118,7 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
 
         gates = build_alignment_gates(results, profile)
         summary = {
+            "read_type": "short",
             "n_samples": len(samples), "samples": per_sample,
             "gate_counts": dict(Counter(g.status for g in gates)),
         }
@@ -109,6 +128,44 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
             log(f"gate {g.name}: {g.status} — {g.message}")
         raise_if_failed(gates)
         log(f"alignment statistics written: {stats_path}")
+    return summary
 
-    state.mark_done(MODULE_NAME, [str(stats_path), str(log_path)])
+
+def _quant_long(config: Config, metadata_path: Path, run_dir: Path,
+                quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                state: RunState) -> dict:
+    """Uzun-okuma hizalama (minimap2). Preset platformdan (ont→map-ont,
+    pacbio_hifi→map-hifi). Diagnostik — FAIL kapısı yok (long profil Step 6);
+    alignment_rate yalnız istatistik olarak kaydedilir."""
+    platform = resolve_platform(run_dir)
+    preset = minimap2_preset(platform)
+    stats_path = stats_dir / "alignment_statistics.json"
+    log_path = logs_dir / "quant.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        log(f"m04 minimap2 ({platform} → -ax {preset}): {len(samples)} sample(s)")
+        per_sample = {}
+        for sample in samples:
+            state.heartbeat()
+            t1, _ = trimmed_reads(run_dir, sample)   # ONT tek-uçlu
+            result = run_minimap2(config.reference.genome_fasta,
+                                  quant_dir / sample.sample_id, t1,
+                                  preset=preset, threads=config.resources.threads)
+            per_sample[sample.sample_id] = {
+                "alignment_rate": result.alignment_rate, "bam": str(result.bam),
+            }
+            log(f"{sample.sample_id}: alignment_rate={result.alignment_rate:.3f} (diagnostic)")
+
+        summary = {
+            "read_type": "long",
+            "platform": platform,
+            "n_samples": len(samples),
+            "samples": per_sample,
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+        log(f"alignment statistics written: {stats_path}")
     return summary
