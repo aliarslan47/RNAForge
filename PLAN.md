@@ -18,6 +18,10 @@
 >   community. Hepsi organizma/okuma-tipi agnostik, yeni FAIL kapısı YOK.
 > - **QC tamamlama** (m16 seqqc rRNA%/strandedness · m17 alignqc insert-size/coverage/read-dist ·
 >   m18 MultiQC) + TPM/FPKM + yazılım/veritabanı sürüm tabloları. Tümü tanısal.
+> - **m00 basecall (ham sinyal → FASTQ):** FAST5/POD5 girdisi artık desteklenir — `rnaforge basecall`
+>   dorado (GPU, `hac` model) ile FASTQ üretir, m01 çözülmüş metadata'yı devralır; FASTQ girdisinde
+>   atlanır. GPU zorunlu (RTX 4050 ile doğrulandı: POD5→FASTQ canlı). Yeni `rnaforge-basecall` env
+>   (pod5) + ayrı dorado binary. Bölüm 4.
 > - **Doğrulama:** kısa-okuma GSE300731 uçtan uca (konkordans r=0.972); uzun-okuma microbepore
 >   canlı smoke (araç zinciri doğrulandı; DE-sinyalli bakteri ONT seti henüz seçilmedi).
 >

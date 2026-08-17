@@ -46,6 +46,7 @@ bir güvence kartı yazar (`UNKNOWN`/`INVALID`/`SUSPECT`/`TRUSTWORTHY`).
 
 | Aşama | Subcommand | Ne yapar |
 |---|---|---|
+| m00 | `basecall` | ONT ham sinyal (FAST5/POD5) → FASTQ (dorado, GPU); opsiyonel, yalnız ham sinyal girdisinde |
 | m01 | `validate` | Config + metadata + FASTQ doğrulama, platform + okuma-tipi tespiti, tasarım kapıları |
 | m02 | `qc` | kısa: FastQC · uzun: NanoPlot (teşhis; koşuyu asla durdurmaz) |
 | m03 | `trim` | kısa: fastp (nazik) · uzun: Pychopper+chopper (cDNA) / chopper (direct-RNA) |
@@ -83,6 +84,7 @@ conda env create -f envs/rnaforge-qc.yml           # FastQC, fastp
 conda env create -f envs/rnaforge-quant-prok.yml   # Bowtie2, samtools, featureCounts
 conda env create -f envs/rnaforge-quant-euk.yml    # Salmon
 conda env create -f envs/rnaforge-longread.yml     # minimap2, NanoPlot, Pychopper, chopper, samtools
+conda env create -f envs/rnaforge-basecall.yml     # pod5, samtools (+ dorado binary, GPU) — ham sinyal m00
 conda env create -f envs/rnaforge-de.yml           # R: DESeq2, ggplot2, fgsea
 conda env create -f envs/rnaforge-amr.yml          # abricate (CARD/VFDB)
 conda env create -f envs/rnaforge-seqqc.yml        # SortMeRNA, RSeQC, MultiQC (m16/m18)
@@ -168,6 +170,10 @@ AMR/virülans (m13) abricate'in paketli CARD/VFDB veritabanlarını kullanır (a
 - **ONT uzun okumalar için `library.chemistry` zorunlu** (`cdna` | `direct_rna`) — FASTQ'tan tespit
   edilemez ve m03 uzun-okuma ön-işlemesini seçer (cDNA → Pychopper+chopper; direct-RNA → yalnız chopper).
   PacBio HiFi bunu gerektirmez.
+- **Ham sinyal (FAST5/POD5) m00 `basecall` ile desteklenir** — bir örneğin `fastq_1`'i POD5/FAST5
+  dosyası ya da dizini gösteriyorsa `rnaforge basecall` dorado'yu (GPU, `hac` model) çalıştırıp FASTQ
+  üretir, sonra pipeline değişmeden devam eder. FASTQ girdisinde m00 atlanır. dorado ayrı kurulan
+  GPU-only bir ONT binary'sidir (`basecall.dorado_bin`); GPU gerekir.
 - **Kırpma bilinçli olarak nazik.** Agresif kalite kırpması ekspresyon tahminlerini bozar
   ([Williams ve ark. 2016](https://doi.org/10.1186/s12859-016-0956-2)); bozulmayı asgari-uzunluk
   filtresi engeller.

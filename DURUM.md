@@ -9,6 +9,18 @@
 **Son güncelleme:** 2026-08-17
 
 ## Şu an nerede kaldık
+- **★★ m00 BASECALL (ham sinyal FAST5/POD5 → FASTQ) TAMAM ve `main`'de (2026-08-17, merge `e60d981`, 485 test).**
+  Ali: "FAST5/POD5 gelirse pipeline görsün, çözümlesin, başlatsın." **Fizibilite: GPU VAR (RTX 4050, 6GB, driver
+  566.14) → dorado GPU basecalling uygulanabilir** (CPU olmazdı). Plan `docs/superpowers/plans/2026-08-17-m00-basecall.md`.
+  Kuruldu: dorado 2.1.1 (`/home/ali/tools/dorado-2.1.1-linux-x64/`) + `rnaforge-basecall` env (pod5 0.3.44,
+  `envs/rnaforge-basecall.yml`). **Canlı spike GEÇTİ:** gerçek r10.4.1 POD5 → dorado hac (model otomatik indi,
+  cuda:0 RTX 4050) → FASTQ. Kod: `rnaforge/basecall.py` (`is_signal_input`/`convert_fast5_to_pod5`/`run_dorado`/
+  `basecalled_metadata_path`) + `modules/m00_basecall.py` (per-sample: FAST5→POD5→dorado→FASTQ, FASTQ passthrough,
+  **resolved metadata** yazar, diagnostik/kapı yok) + `config.basecall` (dorado_bin/model=hac/device=cuda:all/env/
+  models_dir) + CLI `basecall` (ilk aşama) + **m01 resolved metadata'yı otomatik devralır** (handoff sözleşmesi).
+  **Canlı e2e:** POD5 4 örnek → `rnaforge basecall` (GPU) → FASTQ → `rnaforge validate` resolved metadata'yı otomatik
+  kullandı → TRUSTWORTHY. **Bug (canlı e2e yakaladı+düzeltildi):** resolved metadata göreli yol yazınca load_metadata
+  ikiliyordu → mutlak yol yazılır. Böylece ham-sinyal ONT setleri (FASTQ olmasa bile) artık kullanılabilir.
 - **★★ UZUN-OKUMA (ONT/PacBio) YOLU — ADIM 1 (tespit→yönlendirme + `library.chemistry`) TAMAM ve `main`'de
   (2026-08-06, merge `a2acbca`, push).** Plan: `docs/superpowers/plans/2026-08-06-longread-step1-routing.md`.
   5 görev TDD, **423 test yeşil** (412→423). Yapılanlar: `platform.py` `read_type_for()` (illumina→short,

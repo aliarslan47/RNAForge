@@ -46,6 +46,7 @@ WARN. Every run also writes a confidence card (`UNKNOWN`/`INVALID`/`SUSPECT`/`TR
 
 | Stage | Subcommand | What it does |
 |---|---|---|
+| m00 | `basecall` | ONT raw signal (FAST5/POD5) → FASTQ via dorado (GPU); optional, only when input is raw signal |
 | m01 | `validate` | Config + metadata + FASTQ validation, platform + read-type detection, design gates |
 | m02 | `qc` | short: FastQC · long: NanoPlot (diagnostic; never stops the run) |
 | m03 | `trim` | short: fastp (gentle) · long: Pychopper+chopper (cDNA) / chopper (direct-RNA) |
@@ -83,6 +84,7 @@ conda env create -f envs/rnaforge-qc.yml           # FastQC, fastp
 conda env create -f envs/rnaforge-quant-prok.yml   # Bowtie2, samtools, featureCounts
 conda env create -f envs/rnaforge-quant-euk.yml    # Salmon
 conda env create -f envs/rnaforge-longread.yml     # minimap2, NanoPlot, Pychopper, chopper, samtools
+conda env create -f envs/rnaforge-basecall.yml     # pod5, samtools (+ dorado binary, GPU) — raw signal m00
 conda env create -f envs/rnaforge-de.yml           # R: DESeq2, ggplot2, fgsea
 conda env create -f envs/rnaforge-amr.yml          # abricate (CARD/VFDB)
 conda env create -f envs/rnaforge-seqqc.yml        # SortMeRNA, RSeQC, MultiQC (m16/m18)
@@ -168,6 +170,10 @@ AMR/virulence (m13) uses abricate's bundled CARD/VFDB databases (no separate dow
 - **`library.chemistry` is required for ONT long reads** (`cdna` | `direct_rna`) — it cannot be
   detected from the FASTQ and selects the m03 long-read preprocessing (cDNA → Pychopper+chopper;
   direct-RNA → chopper only). PacBio HiFi does not need it.
+- **Raw signal (FAST5/POD5) is supported via m00 `basecall`** — when a sample's `fastq_1` points to a
+  POD5/FAST5 file or directory, `rnaforge basecall` runs dorado (GPU, `hac` model) to produce FASTQ,
+  then the rest of the pipeline runs unchanged. FASTQ input skips m00 entirely. dorado is a GPU-only
+  ONT binary installed separately (set `basecall.dorado_bin`); a GPU is required.
 - **Trimming is deliberately gentle.** Aggressive quality trimming distorts expression estimates
   ([Williams et al. 2016](https://doi.org/10.1186/s12859-016-0956-2)); a minimum-length filter
   prevents the distortion.
