@@ -82,10 +82,23 @@
   --force):** kart **profile=prokaryote_long permissive=True**; **alignment PASS** (0.7122>0.50), **assignment PASS**
   (0.0635>0.05, kıl payı = floor doğru), verdict SUSPECT (m06 replicate_correlation WARN, yapay ctrl/trt → dürüst).
   Yalancı FAIL yok — Illumina eşikleri reddederdi, long profil geçirdi + damgaladı.
-- **★ SIRADAKİ — ADIM 7 (son): rapor read_type rozeti + uçtan-uca canlı smoke.** Rapora read_type/platform
-  rozeti + long-read yöntem/araç notları (minimap2/featureCounts-L/NanoPlot/Pychopper); tam uçtan-uca smoke.
-  DE-sinyal için aday B (*E. coli* glucose-vs-pyruvate) seçilebilir. Plan kendi (TDD+merge). Tasarım
-  `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 7 (rapor read_type rozeti + long-read notları) TAMAM ve `main`'de (2026-08-17, 469 test).
+  → UZUN-OKUMA (ONT/PacBio) KOLU KOMPLE (Adım 1-7).** Plan `docs/superpowers/plans/2026-08-17-longread-step7-report.md`.
+  Hepsi `report_html.py`: (1) `section_dataset`'e **read_type rozeti** (Okuma tipi: uzun/long, platform yanında;
+  kısa→kısa/short, uzun→uzun/long glossu). (2) `_SOFTWARE` platform araçlarına short/long `cond` + yeni long
+  girdileri (NanoPlot 1.47.1/Pychopper 2.7.10/chopper 0.13.0/minimap2 2.31); featureCounts "-L" notlu, paylaşımlı.
+  (3) `_METHODS_TEXT_LONG` (tr/en): NanoPlot→Pychopper+chopper→minimap2→featureCounts -L anlatısı + permissive
+  prokaryote_long notu; `section_methods(read_type=)`. (4) Referanslar read_type'a bölündü: base + `_REFERENCES_SHORT`
+  (FastQC/fastp/Bowtie2/Williams) + `_REFERENCES_LONG` (NanoPack2 btad311, minimap2 bty191, Pychopper repo) —
+  **kullanılmayan aracı atıflamaz (dürüstlük)**. render_report read_type'ı software flags + methods + refs'e geçirir.
+  **Canlı uçtan-uca (mbp_smoke ONT): figures→report OK**, rapor (582 KB) profile=prokaryote_long damgalı, read_type
+  rozeti + minimap2/NanoPlot/Pychopper + featureCounts -L + NanoPack2/minimap2 atıfları; **FastQC/Bowtie2 HİÇ geçmiyor**.
+- **★★ UZUN-OKUMA KOLU TAMAM ÖZET:** validate→route (chemistry) · m02 NanoPlot · m03 Pychopper+chopper · m04 minimap2 ·
+  m05 featureCounts -L · long profil+kapılar (align FAIL / survival+assign WARN, permissive+damgalı) · rapor read_type
+  farkında. Ortak count matrisinde m06+ ile **kod değişmeden** buluşuyor. **SIRADAKİ SEÇENEKLER (Ali seçecek):**
+  (a) DE-sinyalli gerçek ONT veri seti (aday B *E. coli* glucose-vs-pyruvate) ile biyolojik-anlamlı uçtan-uca doğrulama.
+  (b) Ökaryot yolu (m04-euk salmon + m05-euk tximport). (c) PacBio HiFi canlı doğrulama (`map-hifi` bağlı, veri yok).
+  (d) README/PLAN v1.4 dokümantasyon. Tasarım `docs/superpowers/specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
