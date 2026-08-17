@@ -8,7 +8,7 @@ import pytest
 
 from rnaforge.config import load_config
 from rnaforge.featurecounts import FeatureCountsResult
-from rnaforge.gates import FAIL, PASS, GateFailure
+from rnaforge.gates import FAIL, PASS, WARN, GateFailure
 from rnaforge.modules import m05_counts
 from rnaforge.modules.m05_counts import build_count_gates, run_counts
 from rnaforge.quality import load_profile
@@ -32,6 +32,14 @@ def test_below_threshold_fails():
     assert g.samples == ("s2",)
     assert g.measured == 0.10
     assert g.threshold == 0.50
+
+
+def test_build_count_gates_warn_only_is_warn_not_fail():
+    """Uzun-okuma: düşük atama ŞÜPHELİ (WARN), geçersiz DEĞİL (ONT CDS-only doğal düşük)."""
+    profile = load_profile("prokaryote_long")   # assignment_rate = 0.05
+    gates = build_count_gates({"s1": 0.02}, profile, warn_only=True)
+    assert gates[0].status == WARN
+    assert gates[0].samples == ("s1",)
 
 
 def test_override_marks_overridden():

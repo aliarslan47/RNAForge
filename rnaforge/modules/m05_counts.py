@@ -12,7 +12,7 @@ from pathlib import Path
 
 from rnaforge.config import Config
 from rnaforge.featurecounts import run_featurecounts, tpm_fpkm
-from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
+from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile
 from rnaforge.routing import resolve_platform, resolve_read_type
@@ -23,13 +23,15 @@ _GATE = "assignment_rate"
 
 
 def build_count_gates(assignment_rates: dict[str, float],
-                      profile: Profile) -> list[GateResult]:
+                      profile: Profile, warn_only: bool = False) -> list[GateResult]:
+    """assignment_rate kapısı. warn_only=True → eşiğin altı WARN (uzun-okuma: ONT
+    CDS-only sayımda düşük atama şüpheli ama geçersiz değil)."""
     threshold = profile.threshold(_GATE)
     offenders = sorted(sid for sid, r in assignment_rates.items() if r < threshold)
     lowest = min(assignment_rates.values(), default=1.0)
     overridden = _GATE in profile.overrides()
     if offenders:
-        status = FAIL
+        status = WARN if warn_only else FAIL
         message = (
             f"gene atama oranı eşiğin altında ({len(offenders)} örnek: "
             f"{', '.join(offenders)}); en düşük {lowest:.2f} < {threshold:.2f}. "

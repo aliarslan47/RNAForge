@@ -12,7 +12,7 @@ from pathlib import Path
 from rnaforge.chopper import run_chopper
 from rnaforge.config import CHEMISTRY, Config
 from rnaforge.fastp import FastpResult, run_fastp, trimmed_name
-from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_results
+from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata
 from rnaforge.pychopper import run_pychopper
 from rnaforge.quality import Profile, load_profile
@@ -32,13 +32,16 @@ def trimmed_reads(run_dir, sample: Sample) -> tuple[Path, Path | None]:
     return out1, out2
 
 
-def build_trim_gates(results: dict[str, FastpResult], profile: Profile) -> list[GateResult]:
+def build_trim_gates(survival_rates: dict[str, float], profile: Profile,
+                     warn_only: bool = False) -> list[GateResult]:
+    """survival_rate kapısı. warn_only=True → eşiğin altı WARN (uzun-okuma: Pychopper
+    tam-boy olmayanı atar, düşük survival şüpheli ama geçersiz değil)."""
     threshold = profile.threshold(_GATE)
-    offenders = sorted(sid for sid, r in results.items() if r.survival_rate < threshold)
-    lowest = min((r.survival_rate for r in results.values()), default=1.0)
+    offenders = sorted(sid for sid, r in survival_rates.items() if r < threshold)
+    lowest = min(survival_rates.values(), default=1.0)
     overridden = _GATE in profile.overrides()
     if offenders:
-        status = FAIL
+        status = WARN if warn_only else FAIL
         message = (
             f"trimming sonrası survival eşiğin altında ({len(offenders)} örnek: "
             f"{', '.join(offenders)}); en düşük {lowest:.2f} < {threshold:.2f}. "
@@ -125,7 +128,8 @@ def _trim_short(config: Config, metadata_path: Path, run_dir: Path,
             log(f"{sample.sample_id}: survival={result.survival_rate:.3f} "
                 f"({result.reads_after}/{result.reads_before})")
 
-        gates = build_trim_gates(results, profile)
+        gates = build_trim_gates(
+            {sid: r.survival_rate for sid, r in results.items()}, profile)
         # Sıra (m01 deseni): stats yaz → gates yaz → EN SON raise.
         summary = {
             "read_type": "short",
