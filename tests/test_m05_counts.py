@@ -238,10 +238,26 @@ def test_run_counts_long_dispatches_L_diagnostic(tmp_path, monkeypatch):
     assert summary["n_genes"] == 2
     matrix = (run_dir / "quantification" / "counts.tsv").read_text().splitlines()
     assert matrix[0] == "gene\tctrl1\tctrl2\ttrt1\ttrt2"   # common m06 contract
-    # diagnostic branch: NO gate written (long profile/gates = Step 6)
-    assert not (run_dir / "quality" / "gates.json").exists()
+    # Step 6: uzun-okuma assignment WARN kapısı (prokaryote_long, eşik 0.05); asla FAIL.
+    # 0.85 > 0.05 → PASS.
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    m05_gates = [g for g in gates if g["module"] == "m05_counts"]
+    assert any(g["name"] == "assignment_rate" for g in m05_gates)
+    assert all(g["status"] != "FAIL" for g in m05_gates)   # long assignment asla FAIL değil
     stats = json.loads((run_dir / "statistics" / "count_statistics.json").read_text())
     assert stats["read_type"] == "long"
+
+
+def test_run_counts_long_low_assignment_warns_not_fails(tmp_path, monkeypatch):
+    """ONT'de çok düşük atama ŞÜPHELİ (WARN) — koşuyu geçersiz kılmaz (FAIL değil)."""
+    cfg, meta = _long_config_meta(tmp_path)
+    run_dir = _seed_long_m04(tmp_path, "ont")
+    _fake_fc_capture(monkeypatch, rate=0.02, n_genes=2)   # 0.02 < 0.05 long floor
+    summary = run_counts(load_config(cfg), meta, run_dir)   # must NOT raise
+    assert summary["read_type"] == "long"
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m05_counts" and g["status"] == "WARN" for g in gates)
+    assert not any(g["module"] == "m05_counts" and g["status"] == "FAIL" for g in gates)
 
 
 def test_run_counts_long_empty_matrix_raises(tmp_path, monkeypatch):

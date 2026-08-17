@@ -14,7 +14,7 @@ from rnaforge.config import Config
 from rnaforge.featurecounts import run_featurecounts, tpm_fpkm
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
-from rnaforge.quality import Profile, load_profile
+from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
 
@@ -195,13 +195,22 @@ def _counts_long(config: Config, metadata_path: Path, run_dir: Path,
             result, sample_ids, quant_dir, log,
             config.quantification.feature_type, config.quantification.attribute)
 
+        # Step 6: uzun-okuma assignment WARN kapısı (prokaryote_long; asla FAIL — ONT
+        # CDS-only sayımda düşük atama şüpheli ama geçersiz değil).
+        profile = load_profile(profile_name_for(config.organism_type, "long"),
+                               config.quality)
+        gates = build_count_gates(assignment_by_sample, profile, warn_only=True)
         summary = {
             "read_type": "long",
             "platform": platform,
             "n_samples": len(samples), "n_genes": len(result.gene_ids),
             "samples": {sid: {"assignment_rate": assignment_by_sample[sid]} for sid in sample_ids},
+            "gate_counts": dict(Counter(g.status for g in gates)),
             "expression_values": ["tpm.tsv", "fpkm.tsv"],
         }
         stats_path.write_text(json.dumps(summary, indent=2))
+        write_gate_results(run_dir, gates)
+        for g in gates:
+            log(f"gate {g.name}: {g.status} — {g.message}")
         log(f"count statistics written: {stats_path}")
     return summary

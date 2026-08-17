@@ -16,7 +16,7 @@ from rnaforge.gates import FAIL, PASS, GateResult, raise_if_failed, write_gate_r
 from rnaforge.metadata import load_metadata
 from rnaforge.minimap2 import minimap2_preset, run_minimap2
 from rnaforge.modules.m03_trim import trimmed_reads
-from rnaforge.quality import Profile, load_profile
+from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
 
@@ -148,6 +148,7 @@ def _quant_long(config: Config, metadata_path: Path, run_dir: Path,
 
         samples = load_metadata(metadata_path)
         log(f"m04 minimap2 ({platform} → -ax {preset}): {len(samples)} sample(s)")
+        results = {}
         per_sample = {}
         for sample in samples:
             state.heartbeat()
@@ -155,17 +156,29 @@ def _quant_long(config: Config, metadata_path: Path, run_dir: Path,
             result = run_minimap2(config.reference.genome_fasta,
                                   quant_dir / sample.sample_id, t1,
                                   preset=preset, threads=config.resources.threads)
+            results[sample.sample_id] = result
             per_sample[sample.sample_id] = {
                 "alignment_rate": result.alignment_rate, "bam": str(result.bam),
             }
-            log(f"{sample.sample_id}: alignment_rate={result.alignment_rate:.3f} (diagnostic)")
+            log(f"{sample.sample_id}: alignment_rate={result.alignment_rate:.3f}")
 
+        # Step 6: uzun-okuma alignment FAIL kapısı (prokaryote_long, eşik 0.50).
+        # Yanlış referans/kontaminasyon her platformda GEÇERSİZ → FAIL (survival/assignment
+        # WARN'ken bu FAIL: katastrofik hizalama gerçek bir geçersizlik sinyali).
+        profile = load_profile(profile_name_for(config.organism_type, "long"),
+                               config.quality)
+        gates = build_alignment_gates(results, profile)
         summary = {
             "read_type": "long",
             "platform": platform,
             "n_samples": len(samples),
             "samples": per_sample,
+            "gate_counts": dict(Counter(g.status for g in gates)),
         }
         stats_path.write_text(json.dumps(summary, indent=2))
+        write_gate_results(run_dir, gates)
+        for g in gates:
+            log(f"gate {g.name}: {g.status} — {g.message}")
+        raise_if_failed(gates)   # FAIL varsa BURADA durur (stats+gates zaten diskte)
         log(f"alignment statistics written: {stats_path}")
     return summary

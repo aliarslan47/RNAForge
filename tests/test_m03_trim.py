@@ -172,7 +172,11 @@ def test_run_trim_long_cdna_pychopper_then_chopper(tmp_path, monkeypatch):
     assert summary["chemistry"] == "cdna"
     assert calls == ["pychopper", "chopper"]      # sıra önemli
     assert summary["samples"]["s1"]["reads_after"] == 57
-    assert not (run_dir / "quality" / "gates.json").exists()  # diagnostik, FAIL kapısı yok
+    # Step 6: uzun-okuma survival WARN kapısı yazılır (asla FAIL); burada eşiğin üstünde → PASS.
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    m03_gates = [g for g in gates if g["module"] == "m03_trim"]
+    assert any(g["name"] == "survival_rate" for g in m03_gates)
+    assert all(g["status"] != "FAIL" for g in m03_gates)   # long survival asla FAIL değil
     from rnaforge.modules.m03_trim import trimmed_reads
     from rnaforge.metadata import load_metadata
     out1, out2 = trimmed_reads(run_dir, load_metadata(meta)[0])

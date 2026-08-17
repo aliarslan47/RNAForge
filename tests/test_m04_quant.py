@@ -216,7 +216,7 @@ def _fake_minimap2(monkeypatch, rate=0.92):
     return calls
 
 
-def test_run_quant_long_dispatches_to_minimap2_diagnostic(tmp_path, monkeypatch):
+def test_run_quant_long_dispatches_to_minimap2(tmp_path, monkeypatch):
     config_path, metadata_path = _long_config(tmp_path, "cdna")
     run_dir = _seed_long(tmp_path, platform="ont")
     calls = _fake_minimap2(monkeypatch, rate=0.92)
@@ -231,10 +231,25 @@ def test_run_quant_long_dispatches_to_minimap2_diagnostic(tmp_path, monkeypatch)
     assert calls == ["map-ont", "map-ont"]        # preset per sample, from platform
     assert summary["samples"]["s1"]["alignment_rate"] == 0.92
     assert (run_dir / "quantification" / "s1" / "aligned.sorted.bam").exists()
-    # diagnostic branch: NO gate written (long profile/gates = Step 6)
-    assert not (run_dir / "quality" / "gates.json").exists()
+    # Step 6: uzun-okuma alignment FAIL kapısı yazılır (prokaryote_long, eşik 0.50);
+    # 0.92 > 0.50 → PASS. Kart prokaryote_long (permissive) damgalanır.
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    align = [g for g in gates if g["module"] == "m04_quant" and g["name"] == "alignment_rate"]
+    assert align and align[0]["status"] == "PASS"
     stats = json.loads((run_dir / "statistics" / "alignment_statistics.json").read_text())
     assert stats["read_type"] == "long"
+
+
+def test_run_quant_long_catastrophic_alignment_fails(tmp_path, monkeypatch):
+    """Yanlış referans → çok düşük hizalama long profilde de FAIL (sonuç geçersiz)."""
+    from rnaforge.gates import GateFailure
+    config_path, metadata_path = _long_config(tmp_path, "cdna")
+    run_dir = _seed_long(tmp_path, platform="ont")
+    _fake_minimap2(monkeypatch, rate=0.10)      # 0.10 < 0.50 long floor
+    with pytest.raises(GateFailure):
+        run_quant(load_config(config_path), metadata_path, run_dir)
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m04_quant" and g["status"] == "FAIL" for g in gates)
 
 
 def test_run_quant_long_pacbio_uses_hifi_preset(tmp_path, monkeypatch):

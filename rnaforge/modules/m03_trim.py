@@ -15,7 +15,7 @@ from rnaforge.fastp import FastpResult, run_fastp, trimmed_name
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata
 from rnaforge.pychopper import run_pychopper
-from rnaforge.quality import Profile, load_profile
+from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.routing import resolve_read_type
 from rnaforge.state import RunState
 
@@ -199,12 +199,22 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
                 "survival_rate": round(survival, 4),
             }
 
+        # Step 6: uzun-okuma survival WARN kapısı (prokaryote_long; asla FAIL —
+        # Pychopper tam-boy olmayanı atar, düşük survival şüpheli ama geçersiz değil).
+        profile = load_profile(profile_name_for(config.organism_type, "long"),
+                               config.quality)
+        survivals = {sid: v["survival_rate"] for sid, v in per_sample.items()}
+        gates = build_trim_gates(survivals, profile, warn_only=True)
         summary = {
             "read_type": "long",
             "chemistry": chemistry,
             "n_samples": len(samples),
             "samples": per_sample,
+            "gate_counts": dict(Counter(g.status for g in gates)),
         }
         stats_path.write_text(json.dumps(summary, indent=2))
+        write_gate_results(run_dir, gates)
+        for g in gates:
+            log(f"gate {g.name}: {g.status} — {g.message}")
         log(f"trimming statistics written: {stats_path}")
     return summary
