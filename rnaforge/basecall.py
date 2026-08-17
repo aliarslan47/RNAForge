@@ -13,6 +13,13 @@ class BasecallRunError(RuntimeError):
     """dorado/pod5 çalıştırılamadı ya da beklenen çıktıyı üretmedi."""
 
 
+def basecalled_metadata_path(run_dir: Path | str) -> Path:
+    """m00'ın yazdığı, fastq_1'i basecall edilmiş FASTQ'lara yeniden yönlendiren
+    çözülmüş metadata. m01 varsa bunu tercih eder (ham-sinyal → FASTQ handoff'un
+    TEK sözleşmesi; m00 yazar, m01 okur)."""
+    return Path(run_dir) / "basecalled" / "samples.resolved.tsv"
+
+
 def is_signal_input(path: Path | str) -> str | None:
     """Girdi ham sinyal mi? 'pod5' | 'fast5' | None (FASTQ/başka).
 

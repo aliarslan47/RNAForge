@@ -11,6 +11,7 @@ from pathlib import Path
 
 from rnaforge.config import REQUIRED_REFERENCE, Config
 from rnaforge.gates import raise_if_failed, write_gate_results
+from rnaforge.basecall import basecalled_metadata_path
 from rnaforge.metadata import Sample, load_metadata, validate_design
 from rnaforge.platform import PlatformInfo, detect_platform, read_type_for, require_supported
 from rnaforge.quality import load_profile
@@ -49,6 +50,11 @@ def run_validation(
     config: Config, metadata_path: Path, run_dir: Path, force: bool = False
 ) -> dict:
     run_dir = Path(run_dir)
+    # m00 (basecall) ham sinyali FASTQ'ya çevirdiyse çözülmüş metadata'yı tercih et
+    # (ham-sinyal → FASTQ handoff sözleşmesi). Yoksa kullanıcının metadata'sı (değişmez).
+    _resolved = basecalled_metadata_path(run_dir)
+    if _resolved.exists():
+        metadata_path = _resolved
     logs_dir = run_dir / "logs"
     stats_dir = run_dir / "statistics"
     logs_dir.mkdir(parents=True, exist_ok=True)
