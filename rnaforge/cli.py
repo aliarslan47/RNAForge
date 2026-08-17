@@ -18,10 +18,19 @@ from rnaforge.modules.m04_quant import run_quant
 from rnaforge.modules.m05_counts import run_counts
 from rnaforge.modules.m06_de import run_de
 from rnaforge.platform import UnsupportedPlatformError
+from rnaforge.basecall import basecalled_metadata_path
 from rnaforge.quality import load_profile, profile_name_for
 from rnaforge.report.confidence import write_confidence_card
 from rnaforge.routing import resolve_read_type
 from rnaforge.state import resolve_run_dir
+
+
+def _effective_metadata(metadata, run_dir):
+    """m00 basecall ham sinyali FASTQ'ya çevirdiyse çözülmüş metadata'yı kullan —
+    TÜM downstream aşamalar (m01–m18) için, yalnız m01 değil. basecall'ın KENDİSİ
+    orijinali kullanır (çözülmüş metadata'yı O üretir)."""
+    resolved = basecalled_metadata_path(run_dir)
+    return resolved if resolved.exists() else metadata
 
 
 def _load_run_profile(config, run_dir):
@@ -255,7 +264,7 @@ def _cmd_validate(args) -> int:
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
     try:
-        summary = run_validation(config, args.metadata, run_dir, force=args.force)
+        summary = run_validation(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     except GateFailure:
         # Kart FAIL yolunda da yazilmali: teshis raporu kosu basarisiz oldugunda
         # tam da bu veriye ihtiyac duyar (m01_validate kapilari enforce etmeden
@@ -291,7 +300,7 @@ def _cmd_qc(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_qc(config, args.metadata, run_dir, force=args.force)
+    summary = run_qc(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m02_qc already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -311,7 +320,7 @@ def _cmd_trim(args) -> int:
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
     try:
-        summary = run_trim(config, args.metadata, run_dir, force=args.force)
+        summary = run_trim(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     except GateFailure:
         # FAIL'de de güvence kartı yaz (gates.json diskte; verdict INVALID olur).
         write_confidence_card(run_dir, profile)
@@ -334,7 +343,7 @@ def _cmd_quant(args) -> int:
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
     try:
-        summary = run_quant(config, args.metadata, run_dir, force=args.force)
+        summary = run_quant(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     except GateFailure:
         write_confidence_card(run_dir, profile)
         raise
@@ -356,7 +365,7 @@ def _cmd_counts(args) -> int:
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
     try:
-        summary = run_counts(config, args.metadata, run_dir, force=args.force)
+        summary = run_counts(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     except GateFailure:
         write_confidence_card(run_dir, profile)
         raise
@@ -377,7 +386,7 @@ def _cmd_de(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_de(config, args.metadata, run_dir, force=args.force)
+    summary = run_de(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m06_de already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -397,7 +406,7 @@ def _cmd_figures(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_figures(config, args.metadata, run_dir, force=args.force)
+    summary = run_figures(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m07_figures already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -416,7 +425,7 @@ def _cmd_enrich(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_enrichment(config, args.metadata, run_dir, force=args.force)
+    summary = run_enrichment(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m09_enrichment already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -438,7 +447,7 @@ def _cmd_kegg(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_kegg(config, args.metadata, run_dir, force=args.force)
+    summary = run_kegg(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m10_kegg already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -460,7 +469,7 @@ def _cmd_gsea(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_gsea(config, args.metadata, run_dir, force=args.force)
+    summary = run_gsea(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m11_gsea already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -482,7 +491,7 @@ def _cmd_semantic(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_semantic(config, args.metadata, run_dir, force=args.force)
+    summary = run_semantic(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m12_semantic already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -504,7 +513,7 @@ def _cmd_amr(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_amr(config, args.metadata, run_dir, force=args.force)
+    summary = run_amr(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m13_amr already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -526,7 +535,7 @@ def _cmd_operon(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_operon(config, args.metadata, run_dir, force=args.force)
+    summary = run_operon(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m14_operon already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -547,7 +556,7 @@ def _cmd_ppi(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_ppi(config, args.metadata, run_dir, force=args.force)
+    summary = run_ppi(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m15_ppi already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -568,7 +577,7 @@ def _cmd_alignqc(args) -> int:
     from rnaforge.modules.m17_alignqc import run_alignqc
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
-    summary = run_alignqc(config, args.metadata, run_dir, force=args.force)
+    summary = run_alignqc(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m17_alignqc already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -583,7 +592,7 @@ def _cmd_multiqc(args) -> int:
     from rnaforge.modules.m18_multiqc import run_multiqc
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
-    summary = run_multiqc(config, args.metadata, run_dir, force=args.force)
+    summary = run_multiqc(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m18_multiqc already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -597,7 +606,7 @@ def _cmd_seqqc(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_seqqc(config, args.metadata, run_dir, force=args.force)
+    summary = run_seqqc(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m16_seqqc already completed in this run directory — reusing its result "
               "(use --force to re-run).")
@@ -619,7 +628,7 @@ def _cmd_report(args) -> int:
     config = load_config(args.config)
     run_dir = resolve_run_dir(args.runs_dir, args.run_id)
     profile = _load_run_profile(config, run_dir)
-    summary = run_report(config, args.metadata, run_dir, force=args.force)
+    summary = run_report(config, _effective_metadata(args.metadata, run_dir), run_dir, force=args.force)
     if summary.get("resumed"):
         print("m08_report already completed in this run directory — reusing its result "
               "(use --force to re-run).")

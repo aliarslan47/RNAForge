@@ -100,6 +100,17 @@ def test_ont_with_chemistry_records_long(tmp_path):
     assert summary["chemistry"] == "cdna"
 
 
+def test_config_platform_override_trusted_over_detection(tmp_path):
+    """Kısa cDNA (uzunluk-tabanlı tespitte illumina görünen) ONT okuma: config
+    platform=ont açıkça verilince tespit EZİLİR (Nano3P-seq gibi kısa cDNA için)."""
+    config_path, metadata_path = _setup(tmp_path, _illumina)   # kısa → tespit illumina
+    config_path.write_text(config_path.read_text()
+                           + '\nplatform: "ont"\nlibrary:\n  chemistry: "cdna"\n')
+    summary = run_validation(load_config(config_path), metadata_path, tmp_path / "run")
+    assert summary["platform"] == "ont"        # config'e güvenildi, tespit illumina değil
+    assert summary["read_type"] == "long"
+
+
 def test_ont_without_chemistry_is_rejected(tmp_path):
     config_path, metadata_path = _setup_ont_with_chemistry(tmp_path, None)
     with pytest.raises(ValueError) as exc:

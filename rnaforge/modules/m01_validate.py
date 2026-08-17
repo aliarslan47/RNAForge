@@ -109,18 +109,23 @@ def run_validation(
             log(f"{sample.sample_id}: platform={info.platform} "
                 f"mean_read_length={info.mean_read_length}")
 
-        if len(platforms) > 1:
-            raise ValueError(
-                f"samples come from mixed platforms: {', '.join(sorted(platforms))}. "
-                "A single run must use one platform."
-            )
-        platform = platforms.pop()
-
-        if config.platform != "auto" and config.platform != platform:
-            raise ValueError(
-                f"config says platform={config.platform!r} but the FASTQ files look like "
-                f"{platform!r}. Fix the config, or set platform: auto."
-            )
+        detected = sorted(platforms)
+        if config.platform != "auto":
+            # Kullanıcı platformu AÇIKÇA belirtti → ona güvenilir (tespit yalnız tanısal).
+            # Uzunluk-tabanlı tespit kısa ONT cDNA'yı (ör. Nano3P-seq 3'-uç yakalama)
+            # illumina sanabilir; açık config bu yanlış-sınıflamayı ezer (config = otorite,
+            # tespit = kolaylık). require_supported yine tanımlanamayanı örnek-başı reddeder.
+            platform = config.platform
+            if detected != [platform]:
+                log(f"platform: config={platform!r} (tespit {detected} — config'e güvenildi, "
+                    "kısa cDNA/amplikon okuma uzunluk-tabanlı tespiti yanıltabilir)")
+        else:
+            if len(platforms) > 1:
+                raise ValueError(
+                    f"samples come from mixed platforms: {', '.join(detected)}. "
+                    "A single run must use one platform, or set platform explicitly in config."
+                )
+            platform = platforms.pop()
 
         read_type = read_type_for(platform)
         chemistry = config.library.chemistry

@@ -45,6 +45,17 @@ def test_load_run_profile_short_uses_organism_profile(tmp_path):
     assert profile.name == "prokaryote"
 
 
+def test_effective_metadata_prefers_resolved(tmp_path):
+    """Basecall (m00) çözülmüş metadata yazdıysa tüm aşamalar onu kullanır."""
+    from rnaforge.cli import _effective_metadata
+    from rnaforge.basecall import basecalled_metadata_path
+    run_dir = tmp_path / "run"
+    orig = tmp_path / "orig.tsv"; orig.write_text("x")
+    assert _effective_metadata(orig, run_dir) == orig      # çözülmüş yok → orijinal
+    rm = basecalled_metadata_path(run_dir); rm.parent.mkdir(parents=True); rm.write_text("y")
+    assert _effective_metadata(orig, run_dir) == rm        # çözülmüş var → onu kullan
+
+
 def test_load_run_profile_pre_m01_falls_back_to_short(tmp_path):
     """raw_statistics yoksa (m01 öncesi) kısa profile düşer, çökmez."""
     from rnaforge.cli import _load_run_profile

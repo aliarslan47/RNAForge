@@ -93,9 +93,15 @@ def test_platform_defaults_to_auto(tmp_path):
 
 
 def test_invalid_platform_raises(tmp_path):
-    path = _write(tmp_path, PROK_BODY + '\nplatform: "ont"\n')
+    # ont/pacbio_hifi artık geçerli (uzun-okuma kolu); gerçekten bilinmeyen bir değer:
+    path = _write(tmp_path, PROK_BODY + '\nplatform: "solid"\n')
     with pytest.raises(ConfigError, match="platform"):
         load_config(path)
+
+
+def test_ont_platform_is_valid(tmp_path):
+    # Kullanıcı ONT platformunu açıkça bildirebilir (kısa cDNA yanlış-tespitini ezmek için).
+    assert load_config(_write(tmp_path, PROK_BODY + '\nplatform: "ont"\n')).platform == "ont"
 
 
 def test_invalid_strandedness_raises(tmp_path):

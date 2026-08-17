@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 ORGANISM_TYPES = ("prokaryote", "eukaryote")
-PLATFORMS = ("auto", "illumina")
+PLATFORMS = ("auto", "illumina", "ont", "pacbio_hifi")
 STRANDEDNESS = ("unstranded", "stranded", "reverse")
 SELECTIONS = ("rrna_depletion", "polya")
 CHEMISTRY = ("cdna", "direct_rna")
