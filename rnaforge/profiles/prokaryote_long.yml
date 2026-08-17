@@ -1,0 +1,19 @@
+name: prokaryote_long
+permissive: true
+description: >
+  Bakteriyel uzun-okuma (ONT/PacBio) RNA-seq. Eşikler BİLİNÇLİ olarak permissive ve
+  DAMGALIDIR: ONT okumaları doğası gereği Illumina'dan gürültülüdür (kalite ~Q10-15,
+  Q30 değil), Pychopper tam-boy olmayan okumaları tasarımı gereği atar, ve rRNA-zengin
+  ONT'de CDS-only sayım düşük atama verir. Yalnız KATASTROFİK sinyal (yanlış referans →
+  düşük hizalama) sonucu GEÇERSİZ (FAIL) kılar; ONT'de doğal olan düşük survival/assignment
+  ŞÜPHELİ (WARN) damgalanır, geçersiz kılmaz. Bu profille üretilen rapor "geniş toleranslı"
+  damgası taşır. Temsili bir ONT RNA-seq veri setine kalibre edilene dek sıkılaştırılmaz.
+thresholds:
+  read_depth: 100000
+  base_quality: 10
+  survival_rate: 0.20
+  alignment_rate: 0.50
+  assignment_rate: 0.05
+  rrna_fraction: 0.50
+  dedup_fraction: 0.30
+  replicate_correlation: 0.75

@@ -44,6 +44,13 @@ class Profile:
         return {g: self._thresholds[g] for g in sorted(self._overridden)}
 
 
+def profile_name_for(organism_type: str, read_type: str) -> str:
+    """read_type'a göre profil adı. Uzun okuma ONT-permissive profili kullanır
+    (`<organism_type>_long`); kısa okuma organizma profilini kullanır. read_type→profil
+    eşlemesinin TEK kaynağı (modüller + CLI aynı çözümü kullansın)."""
+    return f"{organism_type}_long" if read_type == "long" else organism_type
+
+
 def load_profile(organism_type: str, overrides: dict | None = None) -> Profile:
     path = PROFILE_DIR / f"{organism_type}.yml"
     if not path.exists():

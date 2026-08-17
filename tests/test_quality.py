@@ -21,6 +21,24 @@ def test_eukaryote_profile_is_marked_permissive():
     assert profile.threshold("alignment_rate") == 0.50
 
 
+def test_prokaryote_long_profile_is_permissive():
+    """ONT uzun-okuma profili bilinçli permissive + damgalı; yalnız katastrofik
+    hizalama (yanlış referans) FAIL, düşük survival/assignment WARN."""
+    profile = load_profile("prokaryote_long")
+    assert profile.name == "prokaryote_long"
+    assert profile.permissive is True
+    assert profile.threshold("alignment_rate") == 0.50    # katastrofik floor → FAIL
+    assert profile.threshold("survival_rate") == 0.20     # Pychopper doğal düşük → WARN
+    assert profile.threshold("assignment_rate") == 0.05   # ONT CDS-only düşük → WARN
+
+
+def test_profile_name_for_long_and_short():
+    from rnaforge.quality import profile_name_for
+    assert profile_name_for("prokaryote", "long") == "prokaryote_long"
+    assert profile_name_for("prokaryote", "short") == "prokaryote"
+    assert profile_name_for("eukaryote", "short") == "eukaryote"
+
+
 def test_override_changes_threshold_and_is_recorded():
     profile = load_profile("prokaryote", overrides={"alignment_rate": 0.30})
     assert profile.threshold("alignment_rate") == 0.30
