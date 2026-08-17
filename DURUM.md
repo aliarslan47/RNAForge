@@ -93,6 +93,15 @@
   **kullanılmayan aracı atıflamaz (dürüstlük)**. render_report read_type'ı software flags + methods + refs'e geçirir.
   **Canlı uçtan-uca (mbp_smoke ONT): figures→report OK**, rapor (582 KB) profile=prokaryote_long damgalı, read_type
   rozeti + minimap2/NanoPlot/Pychopper + featureCounts -L + NanoPack2/minimap2 atıfları; **FastQC/Bowtie2 HİÇ geçmiyor**.
+- **★ CİLA TURU TAMAM ve `main`'de (2026-08-17, 472 test).** Kalan küçük maddelerden 3'ü otonom kapatıldı:
+  (#8) **CLI `--help` çöküşü** — `cli.py:183` seqqc help'inde bare `%` (`rRNA%`) argparse'ı patlatıyordu →
+  `%%` escape (`20a8c86`); regresyon testi `tests/test_cli_help.py`. (#10) **m09 çift GFF-parse** —
+  `build_gene2go` artık `gene_symbol` de döndürüyor, m09'daki ikinci `parse_gff_go` kaldırıldı (`9d9b9d1`).
+  (#9) **README (EN+TR) + PLAN v1.4** — uzun-okuma kolu + downstream (m09-15) + QC (m16-18) + read_type
+  yönlendirme + `library.chemistry` + `prokaryote_long` profili belgelendi; PLAN "ONT reddedilir" →
+  "yönlendirilir" güncellendi (`8c7b272`). **KALAN (Ali kararı gerekir, kör-otonom değil):** #1 DE-sinyalli
+  bakteri ONT veri seti SEÇİMİ (kayıtlı "aday B" YANLIŞTI = maya/ökaryot; bakteri seti hâlâ seçilmedi),
+  #3-4 ökaryot kolu (kendi spec'i gerekir), #5-7 downstream ekleri (regulon/batch/pydeseq2).
 - **★★ UZUN-OKUMA KOLU TAMAM ÖZET:** validate→route (chemistry) · m02 NanoPlot · m03 Pychopper+chopper · m04 minimap2 ·
   m05 featureCounts -L · long profil+kapılar (align FAIL / survival+assign WARN, permissive+damgalı) · rapor read_type
   farkında. Ortak count matrisinde m06+ ile **kod değişmeden** buluşuyor. **SIRADAKİ SEÇENEKLER (Ali seçecek):**
