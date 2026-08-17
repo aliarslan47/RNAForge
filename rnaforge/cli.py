@@ -180,7 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m15 already completed in this run directory",
     )
 
-    seqqc = sub.add_parser("seqqc", help="rRNA% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
+    seqqc = sub.add_parser("seqqc", help="rRNA%% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
     seqqc.add_argument("--config", required=True, type=Path)
     seqqc.add_argument("--metadata", required=True, type=Path)
     seqqc.add_argument("--runs-dir", type=Path, default=Path("runs"))
