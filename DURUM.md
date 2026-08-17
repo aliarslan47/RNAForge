@@ -6,7 +6,7 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-05
+**Son güncelleme:** 2026-08-17
 
 ## Şu an nerede kaldık
 - **★★ UZUN-OKUMA (ONT/PacBio) YOLU — ADIM 1 (tespit→yönlendirme + `library.chemistry`) TAMAM ve `main`'de
@@ -40,10 +40,25 @@
   `float(Series)`) AMA çekirdek çıktı+stats tam → `run_pychopper` bu **bilinen çöküşü** (çıktı var + stderr'de
   `_plot_stats`) tolere eder (yüksek sesle uyarır), başka her hatada fırlatır. Canlı smoke (mbp_smoke cdna):
   survival 0.54-0.63, m04 hâlâ durdu.
-- **★ SIRADAKİ — ADIM 4+: m04-long (minimap2 hizalama `-ax map-ont`) · m05-long (featureCounts `-L`) ·
-  long profil/kapılar · rapor read_type rozeti + uçtan-uca canlı smoke.** Her biri kendi planı (TDD+merge).
-  m04-long: minimap2 ile MG1655 genomuna hizala (BAM), `alignment_rate` benzeri; sonra m05-long featureCounts
-  `-L` moduyla gen-seviyesi sayım → ortak count matrisinde m06+ ile buluşur. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
+- **★ UZUN-OKUMA ADIM 4 (m04-long minimap2 hizalama) TAMAM ve `main`'de (2026-08-17, merge `931c539`).**
+  Plan `~/.claude/plans/rosy-sleeping-lamport.md`, 4 görev TDD, **449 test** (435→449). Durable:
+  (1) `rnaforge/minimap2.py` = bowtie2.py deseni: `run_minimap2` (`minimap2 -ax <preset> -t <n> genome fastq
+  -o sam` → samtools sort/index; SAM dosyaya, belleğe değil) + `parse_flagstat_mapped` (hizalama oranı =
+  `samtools flagstat` **primary-mapped/primary**, minimap2 "overall alignment rate" yazmaz; yazdırılan %'e
+  değil SAYIMLARA bakar) + `minimap2_preset` (ont→map-ont, pacbio_hifi→map-hifi). (2) `routing.resolve_platform`
+  (raw_statistics.json'dan platform; resolve_read_type deseni) — preset seçimi için. (3) **m04 read_type
+  dispatch** (m02/m03 deseni): short→`_quant_short` (bowtie2 gövdesi aynen, alignment_rate FAIL kapısı korunur),
+  long→`_quant_long` (minimap2, preset platformdan). Step-1'in m04'teki `require_short_read` muhafızı dispatch'le
+  DEĞİŞTİ (m05'te kaldı). (4) **Long DIAGNOSTIK — FAIL kapısı YOK** (m03-long deseni): alignment_rate yalnız
+  istatistik; Illumina 0.70 eşiği ONT'yi yanlış FAIL'lerdi (long profil Step 6). Çıktı BAM `quantification/<sid>/
+  aligned.sorted.bam` (m05 sözleşmesi). **Canlı smoke** (mbp_smoke, 4 PCR-cDNA microbepore): minimap2 MG1655'e
+  hizaladı, oranlar **0.71–0.81** (ctrl1=0.7122 → 0.70 eşiğine sınırda = diagnostik kararı doğruladı); BAM'ler
+  üretildi; `rnaforge counts` hâlâ dürüstçe durdu (m05 muhafızı). **NOT:** microbepore trimmed adları `_1`'siz
+  (m03 zamanı); smoke metadata `_1`'siz symlink'lerle eşlendi.
+- **★ SIRADAKİ — ADIM 5+: m05-long (featureCounts `-L`) · long profil/kapılar (Step 6) · rapor read_type
+  rozeti + uçtan-uca canlı smoke (Step 7).** Her biri kendi planı (TDD+merge). m05-long: featureCounts `-L`
+  moduyla BAM'lerden gen-seviyesi sayım → ortak count matrisinde m06+ ile buluşur; m05'teki `require_short_read`
+  muhafızı Step 5'te kaldırılır. Tasarım `docs/.../specs/2026-08-05-longread-arm-design.md`.
 - **★ QC TAMAMLAMA (5 düşük-öncelik eksik) TAMAM ve `main`'de (2026-08-05, merge `4a9bd88`, push).** Ali
   "hepsini sırayla ekle, otonom" dedi. 5'i de eklendi, hepsi **diagnostik** (verdict'i asla FAIL ile bozmaz):
   - **F1 per-base baz kompozisyonu + duplikasyon** → m02: `fastqc.py` `parse_per_base_content` +
