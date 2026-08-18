@@ -9,6 +9,19 @@
 **Son güncelleme:** 2026-08-18
 
 ## Şu an nerede kaldık
+- **★★★ ÖKARYOT UZUN-OKUMA YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI — `main` `00bcad3`, 515 test (2026-08-18). → DÖRT KOL DA
+  BİYOLOJİK DOĞRULANDI.** Veri (2 ajan buluştu, bellek lead'iyle örtüştü): **PRJNA1231053** *S. cerevisiae* Glukoz vs
+  Galaktoz (Microorganisms 2025, ONT **PCR-cDNA SQK-PCB114.24**, 4 replika). Referans R64-1-1 cDNA (önden hazırdı) +
+  tx2gene başlıklardan. Koşu `runs/20260818_144112_yeast_carbon/`, raw `raw/yeast_carbon/` (4.7GB).
+  - **UÇTAN UCA:** validate→NanoPlot→**Pychopper**(survival 0.76-0.87 — SQK-PCB'de SSP/VNP var → Pychopper yolu gerçek
+    ONT-kit cDNA'da doğrulandı; Typhi dscDNA'nın aksine)→minimap2→**transkriptom** (mapping %86-96.5)→primer-sayım→tx2gene
+    →DESeq2. 6333 gen, **1425 DEG (673↑galaktoz/752↓)**.
+  - **★★ GAL REGULONU KONKORDANSI KUSURSUZ:** GAL7 +10.2, GAL10 +8.9, GAL2 +8.8, GAL1 +7.8 (hepsi padj<1e-20, galaktozda
+    UP), GCY1 +5.2, GAL80 +3.4; **GAL4 doğru şekilde DEĞİŞMİYOR** (post-translasyonel, aktivatör). Mayanın en ikonik
+    galaktoz indüksiyonu ham ONT cDNA'dan üretildi.
+  - **★ GERÇEK KOŞUNUN AÇTIĞI BUG + DÜZELTME (`00bcad3`):** `profile_name_for(eukaryote,long)`→`eukaryote_long` profili yoktu
+    (prokaryote_long vardı, eukaryote_long yoktu). Eklendi (permissive+damgalı, ONT eşikleri) + regresyon testi.
+  - **SIRADA:** cila / temizlik / yeni istek — dört kol tamam. [[reminder_rnaforge_eukaryote]]
 - **★★ ÖKARYOT UZUN-OKUMA YOLU (gen düzeyi, transkriptom-hizalama) İMPLEMENTE EDİLDİ — `main` `ec006ca`, 514 test (2026-08-18).**
   Spec `docs/superpowers/specs/2026-08-18-eukaryote-longread-design.md`, plan `.../plans/2026-08-18-eukaryote-longread.md`.
   Kararlar (onaylı): **gen düzeyi** (m06+ reuse), **transkriptoma minimap2** hizalama. m04/m05'te ökaryot dalı içine
