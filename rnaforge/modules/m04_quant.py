@@ -18,10 +18,18 @@ from rnaforge.minimap2 import minimap2_preset, run_minimap2
 from rnaforge.modules.m03_trim import trimmed_reads
 from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.routing import resolve_platform, resolve_read_type
+from rnaforge.salmon import build_salmon_index, run_salmon_quant
 from rnaforge.state import RunState
+from dataclasses import dataclass as _dataclass
 
 MODULE_NAME = "m04_quant"
 _GATE = "alignment_rate"
+
+
+@_dataclass
+class _MappingAdapter:
+    """build_alignment_gates .alignment_rate bekler; salmon mapping_rate'i uyarlar."""
+    alignment_rate: float
 
 
 def build_alignment_gates(results: dict[str, AlignmentResult],
@@ -65,24 +73,25 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
         summary["resumed"] = True
         return summary
 
-    if config.organism_type == "eukaryote":
-        raise NotImplementedError(
-            "m04 eukaryote (Salmon) path not yet implemented; prokaryote only for now."
-        )
     if not state.is_done("m03_trim"):
         raise ValueError(
             "m04 (quant) requires m03 (trim) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge trim` with the same --run-id, then re-run quant."
         )
-    # read_type yönlendirmesi (m02/m03 deseni): kısa → bowtie2, uzun → minimap2.
-    # Step-1'in `require_short_read` muhafızı bununla değiştirildi; muhafız m05'te kalır.
-    read_type = resolve_read_type(run_dir)
-    if read_type == "long":
-        summary = _quant_long(config, metadata_path, run_dir,
-                              quant_dir, stats_dir, logs_dir, state)
+    # ROUTER: önce organism_type (ökaryot → Salmon), sonra read_type (prokaryot: kısa
+    # bowtie2 / uzun minimap2). Ayrım YALNIZ m04/m05'te; m06+ agnostik. Step-1'in
+    # `require_short_read` muhafızı read_type dispatch'le değişti; muhafız m05'te kalır.
+    if config.organism_type == "eukaryote":
+        summary = _quant_euk(config, metadata_path, run_dir,
+                             quant_dir, stats_dir, logs_dir, state)
     else:
-        summary = _quant_short(config, metadata_path, run_dir,
-                              quant_dir, stats_dir, logs_dir, state)
+        read_type = resolve_read_type(run_dir)
+        if read_type == "long":
+            summary = _quant_long(config, metadata_path, run_dir,
+                                  quant_dir, stats_dir, logs_dir, state)
+        else:
+            summary = _quant_short(config, metadata_path, run_dir,
+                                   quant_dir, stats_dir, logs_dir, state)
 
     state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "quant.log")])
     return summary
@@ -119,6 +128,52 @@ def _quant_short(config: Config, metadata_path: Path, run_dir: Path,
         gates = build_alignment_gates(results, profile)
         summary = {
             "read_type": "short",
+            "n_samples": len(samples), "samples": per_sample,
+            "gate_counts": dict(Counter(g.status for g in gates)),
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+        write_gate_results(run_dir, gates)
+        for g in gates:
+            log(f"gate {g.name}: {g.status} — {g.message}")
+        raise_if_failed(gates)
+        log(f"alignment statistics written: {stats_path}")
+    return summary
+
+
+def _quant_euk(config: Config, metadata_path: Path, run_dir: Path,
+               quant_dir: Path, stats_dir: Path, logs_dir: Path,
+               state: RunState) -> dict:
+    """Ökaryot niceleme (Salmon, decoy-aware). mapping_rate → alignment_rate FAIL kapısı
+    (eukaryote.yml permissive). Trimlenmiş okuma → salmon quant -l A."""
+    stats_path = stats_dir / "alignment_statistics.json"
+    profile = load_profile(config.organism_type, config.quality)
+    log_path = logs_dir / "quant.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        index_dir = build_salmon_index(
+            config.reference.transcriptome_fasta, quant_dir / "_index",
+            genome_fasta=config.reference.genome_fasta,
+            threads=config.resources.threads, log=log)
+        log(f"m04 salmon: index ready, {len(samples)} sample(s)")
+        results = {}
+        per_sample = {}
+        for sample in samples:
+            state.heartbeat()
+            t1, t2 = trimmed_reads(run_dir, sample)
+            q = run_salmon_quant(index_dir, quant_dir / sample.sample_id, t1,
+                                 fastq_2=t2, threads=config.resources.threads)
+            results[sample.sample_id] = _MappingAdapter(q.mapping_rate)
+            per_sample[sample.sample_id] = {
+                "mapping_rate": q.mapping_rate, "quant_sf": str(q.quant_sf)}
+            log(f"{sample.sample_id}: mapping_rate={q.mapping_rate:.3f}")
+
+        gates = build_alignment_gates(results, profile)
+        summary = {
+            "read_type": "short", "organism_type": "eukaryote",
             "n_samples": len(samples), "samples": per_sample,
             "gate_counts": dict(Counter(g.status for g in gates)),
         }

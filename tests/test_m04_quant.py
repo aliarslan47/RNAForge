@@ -113,15 +113,6 @@ def test_run_quant_requires_m03_done(tmp_path, monkeypatch):
         run_quant(load_config(config_path), metadata_path, run_dir)
 
 
-def test_run_quant_eukaryote_not_implemented(tmp_path, monkeypatch):
-    _fake_bowtie2(monkeypatch)
-    config_path, metadata_path = _setup(tmp_path, organism_type="eukaryote")
-    run_dir = tmp_path / "run"
-    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
-    with pytest.raises(NotImplementedError, match="eukaryote"):
-        run_quant(load_config(config_path), metadata_path, run_dir)
-
-
 def test_run_quant_writes_bam_and_passes(tmp_path, monkeypatch):
     config_path, metadata_path = _setup(tmp_path)
     run_dir = tmp_path / "run"
@@ -284,3 +275,28 @@ def test_cli_quant_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsys
     capsys.readouterr()
     assert main(["quant", *common]) == 0
     assert "quality verdict" in capsys.readouterr().out
+
+
+def test_run_quant_eukaryote_runs_salmon_and_gates(tmp_path, monkeypatch):
+    import rnaforge.modules.m04_quant as m04
+    from rnaforge.salmon import SalmonQuant
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"; (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        '{"read_type":"short","platform":"illumina"}')
+    st = RunState(run_dir); st.mark_done("m01_validate", []); st.mark_done("m03_trim", [])
+    fq = tmp_path / "s1.fastq"; fq.write_text("@r\nACGT\n+\nIIII\n")
+    meta = tmp_path / "m.tsv"; meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+    monkeypatch.setattr(m04, "trimmed_reads", lambda rd, s: (fq, None))
+    monkeypatch.setattr(m04, "build_salmon_index", lambda *a, **k: tmp_path / "idx")
+    monkeypatch.setattr(m04, "run_salmon_quant",
+        lambda *a, **k: SalmonQuant(quant_sf=tmp_path / "q.sf", mapping_rate=0.9))
+    from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
+    cfg = Config(organism="human", organism_type="eukaryote", platform="illumina",
+        reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=tmp_path / "t2g.tsv"),
+        library=Library(), trimming=Trimming(), de=DE(), report=Report(), resources=Resources())
+    summary = m04.run_quant(cfg, meta, run_dir)
+    assert summary["organism_type"] == "eukaryote"
+    assert summary["samples"]["s1"]["mapping_rate"] == 0.9
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["name"] == "alignment_rate" for g in gates if g["module"] == "m04_quant")
