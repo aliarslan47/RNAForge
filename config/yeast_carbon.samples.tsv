@@ -1,0 +1,9 @@
+sample_id	condition	fastq_1	fastq_2	batch	subject
+glu_1	glucose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555675_1.fastq.gz
+glu_2	glucose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555658_1.fastq.gz
+glu_3	glucose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555663_1.fastq.gz
+glu_4	glucose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555674_1.fastq.gz
+gal_1	galactose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555669_1.fastq.gz
+gal_2	galactose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555671_1.fastq.gz
+gal_3	galactose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555668_1.fastq.gz
+gal_4	galactose	/home/ali/rnaforge-pipeline/raw/yeast_carbon/SRR32555670_1.fastq.gz

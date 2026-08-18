@@ -1,0 +1,19 @@
+name: eukaryote_long
+permissive: true
+description: >
+  Ökaryotik uzun-okuma (ONT/PacBio) RNA-seq. Eşikler BİLİNÇLİ olarak permissive ve
+  DAMGALIDIR: hem ökaryot (elde doğrulanmış set yok, gevşek tutuluyor) hem uzun-okuma
+  (ONT kalitesi ~Q10-15, Pychopper tam-boy olmayanı atar, transkriptom hizalaması
+  primer-sayımla gen'e toplanır) gerekçeleri birleşir. Yalnız KATASTROFİK sinyal
+  (yanlış referans → düşük hizalama) GEÇERSİZ (FAIL); ONT'de doğal düşük survival ŞÜPHELİ
+  (WARN). Bu profille üretilen rapor "geniş toleranslı" damgası taşır. Temsili bir ökaryot
+  ONT RNA-seq veri setine kalibre edilene dek sıkılaştırılmaz.
+thresholds:
+  read_depth: 100000
+  base_quality: 10
+  survival_rate: 0.20
+  alignment_rate: 0.50
+  assignment_rate: 0.05
+  rrna_fraction: 0.50
+  dedup_fraction: 0.30
+  replicate_correlation: 0.75

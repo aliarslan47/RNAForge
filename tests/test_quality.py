@@ -32,11 +32,21 @@ def test_prokaryote_long_profile_is_permissive():
     assert profile.threshold("assignment_rate") == 0.05   # ONT CDS-only düşük → WARN
 
 
+def test_eukaryote_long_profile_is_permissive():
+    """Ökaryot uzun-okuma profili de permissive + damgalı (ökaryot + ONT gerekçeleri birleşir)."""
+    profile = load_profile("eukaryote_long")
+    assert profile.name == "eukaryote_long"
+    assert profile.permissive is True
+    assert profile.threshold("alignment_rate") == 0.50
+    assert profile.threshold("survival_rate") == 0.20
+
+
 def test_profile_name_for_long_and_short():
     from rnaforge.quality import profile_name_for
     assert profile_name_for("prokaryote", "long") == "prokaryote_long"
     assert profile_name_for("prokaryote", "short") == "prokaryote"
     assert profile_name_for("eukaryote", "short") == "eukaryote"
+    assert profile_name_for("eukaryote", "long") == "eukaryote_long"
 
 
 def test_override_changes_threshold_and_is_recorded():

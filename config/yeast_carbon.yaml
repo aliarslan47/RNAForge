@@ -1,0 +1,33 @@
+# RNAForge — S. cerevisiae Glukoz vs Galaktoz (ökaryot UZUN-okuma cDNA doğrulaması).
+# Veri: PRJNA1231053 (Microorganisms 2025, doi:10.3390/microorganisms13040849). ONT PCR-cDNA
+# (SQK-PCB114.24), 4 biyolojik replika/koşul. Doğrulama: GAL regulonu (GAL1/2/7/10) galaktozda UP.
+organism: "Saccharomyces cerevisiae"
+organism_type: "eukaryote"
+platform: "ont"
+
+reference:
+  transcriptome_fasta: "references/scerevisiae_cdna/transcriptome.fa.gz"
+  tx2gene: "references/scerevisiae_cdna/tx2gene.tsv"
+
+library:
+  strandedness: "unstranded"
+  selection: "polya"
+  chemistry: "cdna"            # ONT PCR-cDNA (SQK-PCB) → strand-switch primerli
+  full_length_cdna: true       # ONT-kit cDNA → m03 Pychopper+chopper (Typhi dscDNA'nın aksine)
+
+trimming:
+  min_length: 100              # ONT junk elemesi
+  aggressive_quality: false
+
+de:
+  design: "~condition"
+  reference: "glucose"         # kontrast referansı = glukoz (kontrol)
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32
