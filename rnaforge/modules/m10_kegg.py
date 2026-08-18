@@ -62,13 +62,14 @@ def run_kegg(config: Config, metadata_path: Path, run_dir: Path,
 
     kegg_dir = _kegg_dir(config)                        # kegg_organism yoksa gürültülü hata
     links, names, genelist = _require_kegg_files(kegg_dir, config.enrichment.kegg_organism)
-    gff = config.reference.annotation_gff
+    gff = config.reference.annotation_gff                 # ökaryotta None
+    transcriptome = config.reference.transcriptome_fasta  # ökaryot sembol kaynağı
     deseq_tsv = de_dir / "deseq2_results.tsv"
 
     log_path = logs_dir / "kegg.log"
     with log_path.open("w") as log_file:
         gene2pathway, pathway_meta, gene_symbol, ann_stats = build_gene2pathway(
-            gff, links, names, genelist)
+            gff, links, names, genelist, transcriptome_fasta=transcriptome)
         _write_gene2pathway_tsv(out_dir / "gene2pathway.tsv", gene2pathway, pathway_meta)
         state.heartbeat()
 

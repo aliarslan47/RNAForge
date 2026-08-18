@@ -160,3 +160,56 @@ def test_build_gene2go_without_gaf_logs(tmp_path):
     g2go, meta, direct, sources, stats, gene_symbol = build_gene2go(gff, obo, gaf_path=None, log=msgs.append)
     assert stats["n_goa"] == 0
     assert any("GAF" in m for m in msgs)              # sessiz değil
+
+
+# --- Ökaryot: GFF'siz sembol köprüsü (transkriptom başlıkları) ---
+def test_parse_transcriptome_symbols_extracts_gene_and_symbol(tmp_path):
+    from rnaforge.go_annotation import parse_transcriptome_symbols
+    fa = tmp_path / "tx.fa"
+    fa.write_text(
+        ">ENST001.1 cdna chromosome:GRCh38:16 gene:ENSG00000103196.12 "
+        "gene_biotype:protein_coding transcript_biotype:protein_coding gene_symbol:CRISPLD2\n"
+        "ACGT\n"
+        ">ENST002.2 cdna gene:ENSG00000120129.5 gene_symbol:DUSP1\nGGGG\n"
+        ">ENST003.1 cdna gene:ENSG00000999999.1\nTTTT\n")   # sembolsüz -> atlanır
+    m = parse_transcriptome_symbols(fa)
+    assert m == {"ENSG00000103196.12": "CRISPLD2", "ENSG00000120129.5": "DUSP1"}
+
+
+def test_parse_transcriptome_symbols_gz(tmp_path):
+    import gzip
+    from rnaforge.go_annotation import parse_transcriptome_symbols
+    fa = tmp_path / "tx.fa.gz"
+    with gzip.open(fa, "wt") as fh:
+        fh.write(">ENST1 gene:ENSG1.1 gene_symbol:FKBP5\nACGT\n")
+    assert parse_transcriptome_symbols(fa) == {"ENSG1.1": "FKBP5"}
+
+
+def test_parse_annotation_symbols_dispatch(tmp_path):
+    from rnaforge.go_annotation import parse_annotation_symbols
+    # transkriptom yolu: boş gene2go + semboller
+    fa = tmp_path / "tx.fa"
+    fa.write_text(">ENST1 gene:ENSG1.1 gene_symbol:KLF15\nACGT\n")
+    g2go, meta, sym = parse_annotation_symbols(None, fa)
+    assert g2go == {} and meta == {} and sym == {"ENSG1.1": "KLF15"}
+    # ikisi de yoksa yüksek sesle hata
+    import pytest
+    with pytest.raises(ValueError):
+        parse_annotation_symbols(None, None)
+
+
+def test_build_gene2go_eukaryote_gaf_only(tmp_path):
+    # gff=None + transcriptome + GAF → GO tamamen GAF'tan, gene ID = ENSG
+    from rnaforge.go_annotation import build_gene2go, parse_obo
+    fa = tmp_path / "tx.fa"
+    fa.write_text(">ENST1 gene:ENSG00000103196.12 gene_symbol:CRISPLD2\nACGT\n")
+    gaf = tmp_path / "h.gaf"
+    gaf.write_text("UniProtKB\tP1\tCRISPLD2\t\tGO:0005576\t\t\t\tC\t\t\tprotein\n")
+    obo = tmp_path / "o.obo"
+    obo.write_text("[Term]\nid: GO:0005576\nname: extracellular region\n"
+                   "namespace: cellular_component\n")
+    g2go, meta, direct, sources, stats, sym = build_gene2go(
+        None, parse_obo(obo), gaf_path=gaf, transcriptome_fasta=fa)
+    assert "ENSG00000103196.12" in g2go
+    assert "GO:0005576" in g2go["ENSG00000103196.12"]
+    assert stats["n_gff"] == 0 and stats["n_goa"] == 1

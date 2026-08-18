@@ -51,7 +51,8 @@ def run_enrichment(config: Config, metadata_path: Path, run_dir: Path,
             "m09 (enrich) requires m06 (de) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge de` with the same --run-id, then re-run enrich.")
 
-    gff = config.reference.annotation_gff
+    gff = config.reference.annotation_gff              # ökaryotta None
+    transcriptome = config.reference.transcriptome_fasta  # ökaryot sembol kaynağı
     obo_path = _require_obo(config)          # eksikse yüksek sesle hata (sessiz skip yok)
     deseq_tsv = de_dir / "deseq2_results.tsv"
 
@@ -63,7 +64,8 @@ def run_enrichment(config: Config, metadata_path: Path, run_dir: Path,
         obo = parse_obo(obo_path)
         state.heartbeat()
         gene2go, go_meta, direct, sources, ann_stats, gene_symbol = build_gene2go(
-            gff, obo, gaf_path=config.enrichment.gaf, log=log)
+            gff, obo, gaf_path=config.enrichment.gaf,
+            transcriptome_fasta=transcriptome, log=log)
         _write_gene2go_tsv(enrich_dir / "gene2go.tsv", gene2go, direct, sources, go_meta)
         state.heartbeat()
 

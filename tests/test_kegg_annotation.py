@@ -64,3 +64,16 @@ def test_build_gene2pathway_drops_ambiguous_symbol(tmp_path):
     g2p, meta, sym, stats = build_gene2pathway(gff, links, names, genes)
     assert "LT_C" not in g2p and "LT_C2" not in g2p   # aceE belirsiz -> atıldı
     assert g2p["LT_A"] == {"eco00260"}                # thrA hâlâ benzersiz
+
+
+def test_build_gene2pathway_eukaryote_transcriptome_symbol_join(tmp_path):
+    # gff=None + transcriptome: KEGG sembol -> ENSG gen ID (transkriptom başlıklarından)
+    links, names, genes = _write3(tmp_path)
+    fa = tmp_path / "tx.fa"
+    fa.write_text(">ENST1 gene:ENSG_A.1 gene_symbol:thrA\nACGT\n"
+                  ">ENST2 gene:ENSG_B.2 gene_symbol:aceE\nGGGG\n")
+    g2p, meta, sym, stats = build_gene2pathway(None, links, names, genes,
+                                               transcriptome_fasta=fa)
+    assert g2p["ENSG_A.1"] == {"eco00260"}      # thrA -> ENSG_A (global eco01100 hariç)
+    assert g2p["ENSG_B.2"] == {"eco00010"}      # aceE -> ENSG_B
+    assert sym["ENSG_A.1"] == "thrA"

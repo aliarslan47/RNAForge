@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from rnaforge.go_annotation import _symbol_to_locus, parse_gff_go
+from rnaforge.go_annotation import _symbol_to_locus, parse_annotation_symbols, parse_gff_go
 
 # KEGG "Global and overview maps" — ORA'yı bozacak kadar geniş, dışlanır (numerik id, agnostik).
 GLOBAL_MAPS = frozenset({
@@ -81,9 +81,10 @@ def parse_kegg(links_path: Path, names_path: Path, genelist_path: Path):
     return symbol2pathways, pathway_meta
 
 
-def build_gene2pathway(gff_path: Path, links_path: Path, names_path: Path,
-                       genelist_path: Path):
-    """GFF sembolleriyle KEGG'i birleştir: gene(locus_tag) -> KEGG pathway set.
+def build_gene2pathway(gff_path: Path | None, links_path: Path, names_path: Path,
+                       genelist_path: Path, transcriptome_fasta: Path | None = None):
+    """GFF (prokaryot) veya transkriptom (ökaryot) sembolleriyle KEGG'i birleştir:
+    gene(locus_tag/gen ID) -> KEGG pathway set.
 
     Returns:
         gene2pathway: dict[locus_tag, set[pathway_id]]
@@ -92,7 +93,7 @@ def build_gene2pathway(gff_path: Path, links_path: Path, names_path: Path,
         stats: dict
     """
     symbol2pathways, pathway_meta = parse_kegg(links_path, names_path, genelist_path)
-    _, _, gene_symbol = parse_gff_go(gff_path)
+    _, _, gene_symbol = parse_annotation_symbols(gff_path, transcriptome_fasta)
     sym2lt = _symbol_to_locus(gene_symbol)      # belirsiz sembol ATILIR (yalancı yok)
 
     gene2pathway: dict[str, set[str]] = {}

@@ -6,6 +6,8 @@ Her GO kaydı kaynak-damgalı (GFF|GOA). Yalancı anotasyon üretmez (belirsizli
 """
 from __future__ import annotations
 
+import gzip
+import re
 from pathlib import Path
 
 # GFF go_process/go_function/go_component -> GO namespace kısaltması.
@@ -58,6 +60,52 @@ def parse_gff_go(gff_path: Path):
                 gid for gid in ids.split(",") if gid.startswith("GO:")
             )
     return gene2go, go_meta, gene_symbol
+
+
+def _open_text(path: Path):
+    """gz veya düz metin aç (transkriptom FASTA .fa/.fa.gz olabilir)."""
+    path = Path(path)
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt")
+    return path.open()
+
+
+def parse_transcriptome_symbols(fasta_path: Path) -> dict[str, str]:
+    """Ökaryot: transkriptom FASTA başlıklarından gen ID -> sembol.
+
+    Ensembl cDNA başlığı: '>ENST... gene:ENSG00000103196.12 ... gene_symbol:CRISPLD2 ...'.
+    Anahtar = gen ID (versiyonlu — tx2gene'in gen sütunu ve DE tablosuyla eşleşir).
+    gene_symbol yoksa gen atlanır (map'e girmez). İlk görülen kazanır."""
+    out: dict[str, str] = {}
+    gene_re = re.compile(r"\bgene:(\S+)")
+    sym_re = re.compile(r"\bgene_symbol:(\S+)")
+    with _open_text(fasta_path) as fh:
+        for line in fh:
+            if not line.startswith(">"):
+                continue
+            gm = gene_re.search(line)
+            sm = sym_re.search(line)
+            if gm and sm and gm.group(1) not in out:
+                out[gm.group(1)] = sm.group(1)
+    return out
+
+
+def parse_annotation_symbols(gff_path: Path | None,
+                             transcriptome_fasta: Path | None):
+    """Sembol/GO kaynağı dispatcher'ı (prokaryot GFF vs ökaryot transkriptom).
+
+    Returns (gene2go, meta, gene_symbol) — parse_gff_go ile aynı şekil.
+    - gff_path verilmişse: parse_gff_go (Ontology_term GO + sembol).
+    - yoksa transcriptome_fasta: boş gene2go/meta + transkriptom sembolleri (ökaryot;
+      GO'yu GAF dolduracak).
+    - ikisi de yoksa: yüksek sesle hata (sessiz boş anotasyon yok)."""
+    if gff_path is not None:
+        return parse_gff_go(gff_path)
+    if transcriptome_fasta is not None:
+        return {}, {}, parse_transcriptome_symbols(transcriptome_fasta)
+    raise ValueError(
+        "anotasyon için annotation_gff (prokaryot) veya transcriptome_fasta (ökaryot) "
+        "gerekli; ikisi de yok.")
 
 
 def parse_obo(obo_path: Path) -> dict[str, dict]:
@@ -171,8 +219,11 @@ def fill_from_gaf(gene2go: dict[str, set[str]], gene_symbol: dict[str, str],
     return additions, sources
 
 
-def build_gene2go(gff_path: Path, obo: dict, gaf_path: Path | None = None, log=None):
+def build_gene2go(gff_path: Path | None, obo: dict, gaf_path: Path | None = None,
+                  transcriptome_fasta: Path | None = None, log=None):
     """Tam annotation birleştirme: GFF otorite → GAF doldurma → propagation.
+    Ökaryot: gff_path=None + transcriptome_fasta verilir → sembol köprüsü transkriptomdan,
+    gene2go boş başlar, GAF birincil GO kaynağı olur.
 
     Returns:
         gene2go: dict[locus_tag, set[go_id]]  (propagate edilmiş)
@@ -183,7 +234,7 @@ def build_gene2go(gff_path: Path, obo: dict, gaf_path: Path | None = None, log=N
         gene_symbol: dict[locus_tag, symbol]  (GFF gene= alanı; GFF zaten burada parse
             edildiği için çağıran ikinci kez parse etmesin diye döndürülür)
     """
-    gene2go, gff_meta, gene_symbol = parse_gff_go(gff_path)
+    gene2go, gff_meta, gene_symbol = parse_annotation_symbols(gff_path, transcriptome_fasta)
     sources: dict[tuple[str, str], str] = {}
     for lt, gos in gene2go.items():
         for g in gos:
