@@ -6,9 +6,27 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-17
+**Son güncelleme:** 2026-08-18
 
 ## Şu an nerede kaldık
+- **★★★ UZUN-OKUMA KOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI (gerçek bakteri ONT cDNA) — `main` `44c2e06`, 492 test (2026-08-18).**
+  Uzun-okuma kolu şimdiye dek yalnız teknik doğrulanmıştı; ilk kez **yayınlanmış bir çalışmayla biyolojik konkordans**.
+  **Veri seçimi = bilimsel karar** (kör indirme yok): 2 paralel araştırma ajanı ENA+literatür taradı, ikisi de aynı sette
+  buluştu → **PRJNA1254696 · *S.* Typhi + rifampin** (Lee & Song, **eBioMedicine 2025**; 2 koşul × 3 gerçek replika, ONT
+  cDNA, GEO GSE295448). Elenen adaylar: NAR2025 ısı-stresi (replikalar birleştirilmiş n=1), microbepore (untreated-vs-TEX =
+  teknik), Nano3P (havuzlu/protokol). Referans **S. Typhi CT18** (GCF_000195995.1; Vi kapsül lokusu tvi/vex GO-anotasyonlu).
+  - **★ GERÇEK VERİNİN AÇTIĞI BOŞLUK + DÜZELTME:** bu kütüphane **rastgele-primer'lı dscDNA + native barcoding** (ONT-kit cDNA
+    DEĞİL) → SSP/VNP strand-switch primeri yok → **Pychopper 20k okumadan 429'unu tuttu (%2)**. Yeni **`library.full_length_cdna`**
+    bayrağı (varsayılan `true`, geriye uyumlu): `false` → cdna yolu **Pychopper'ı atlar, chopper-only** (yüksek sesle loglar).
+    TDD: config `_as_bool` + Library alanı + m03 dispatch + 4 test. **Gerçek veride survival 0.02 → 0.9974.** Commit `44c2e06`.
+  - **UÇTAN UCA (izole env'ler):** validate→NanoPlot→chopper→minimap2(map-ont)→featureCounts-L→DESeq2, hepsi TRUSTWORTHY,
+    profile=prokaryote_long. 5032 gen × 6 örnek; **174 anlamlı DEG (39 UP / 135 DOWN)**, ref=dmso.
+  - **★★ KONKORDANS ~KUSURSUZ (makale ana bulgusu):** makale "rifampin Vi biyosentez genlerini **ve** SPI-1 T3SS'i azalttı" +
+    RT-qPCR tviA/tviB. Bizde: **Vi kapsül tvi/vex 10/10 DOWN** (tviA −4.58 padj 9e-16; vexA −4.09 5e-11; 8/10 padj<0.05),
+    **SPI-1 T3SS 16/16 anlamlı DOWN** (invA −4.49 **2e-45**; hilA −4.87; sopE −5.66). Yön+anlamlılık birebir. RNAP-inhibitörü
+    baskın DOWN (yüksek-AT ada baskılanması, makaleyle tutarlı). Koşu: `runs/20260818_085055_typhi_rif/` (figürler+rapor üretildi).
+  - **SIRADA:** GO/KEGG downstream (Typhi obo/GAF+KEGG referans prep gerekir — opsiyonel, E.coli'de doğrulanmış) VEYA ökaryot yolu
+    VEYA PacBio HiFi canlı. Not: Nano3P seti (26GB) artık gereksiz, temizlenebilir. `enrichment.obo` config'e eklenmedi.
 - **★★ m00 BASECALL (ham sinyal FAST5/POD5 → FASTQ) TAMAM ve `main`'de (2026-08-17, merge `e60d981`, 485 test).**
   Ali: "FAST5/POD5 gelirse pipeline görsün, çözümlesin, başlatsın." **Fizibilite: GPU VAR (RTX 4050, 6GB, driver
   566.14) → dorado GPU basecalling uygulanabilir** (CPU olmazdı). Plan `docs/superpowers/plans/2026-08-17-m00-basecall.md`.
