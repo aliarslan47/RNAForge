@@ -16,9 +16,13 @@ FIGURE_SPECS: list[tuple[str, str, str]] = [
 ]
 
 
-def gene_name_map(gff_path: Path) -> dict[str, str]:
-    """CDS satırlarından locus_tag -> gene adı. gene= yoksa map'e girmez."""
+def gene_name_map(gff_path: Path | None) -> dict[str, str]:
+    """CDS satırlarından locus_tag -> gene adı. gene= yoksa map'e girmez.
+    gff_path None ise (ökaryot: GFF yok, transcriptome_fasta+tx2gene) boş map
+    döner → figürler gen kimliğiyle (ör. ENSG) etiketler."""
     out: dict[str, str] = {}
+    if gff_path is None:
+        return out
     for line in Path(gff_path).read_text().splitlines():
         if not line or line.startswith("#") or "\tCDS\t" not in line:
             continue

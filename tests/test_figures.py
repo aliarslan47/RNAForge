@@ -48,3 +48,14 @@ def test_build_manifest_ok_and_missing(tmp_path):
     import pytest
     with pytest.raises(FileNotFoundError):
         build_manifest(fig)
+
+
+def test_gene_name_map_none_gff_returns_empty(tmp_path):
+    # Ökaryot: annotation_gff yok → boş map, çökme yok (figürler ID'yle etiketler)
+    assert gene_name_map(None) == {}
+
+
+def test_write_gene_map_none_writes_header_only(tmp_path):
+    out = tmp_path / "gene_map.tsv"
+    write_gene_map(None, out)
+    assert out.read_text() == "locus_tag\tgene\n"

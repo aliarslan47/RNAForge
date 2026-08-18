@@ -1,0 +1,33 @@
+# RNAForge — İnsan hava yolu düz kas, deksametazon vs kontrol (ökaryot kısa-okuma doğrulaması).
+# Veri: PRJNA229998 / GSE52778 (Himes 2014, PLoS ONE). Bioconductor/DESeq2 kanonik seti.
+# 4 hücre hattı × untreated/Dex (paired tasarım). Doğrulama: CRISPLD2/DUSP1/KLF15/FKBP5 UP (GR yanıtı).
+organism: "Homo sapiens"
+organism_type: "eukaryote"
+platform: "illumina"
+
+reference:
+  transcriptome_fasta: "references/human_cdna/transcriptome.fa.gz"
+  tx2gene: "references/human_cdna/tx2gene.tsv"
+  # genome_fasta VERİLMEDİ → Salmon transkriptom-only (decoy yok). Bilinen-DEG doğrulaması
+  # için kabul edilebilir; en yüksek doğruluk için ileride genom decoy eklenebilir.
+
+library:
+  strandedness: "unstranded"   # salmon -l A zaten otomatik tespit eder (bu alan salmon yolunu etkilemez)
+  selection: "polya"
+
+trimming:
+  min_length: 36
+  aggressive_quality: false
+
+de:
+  design: "~batch + condition"     # hücre hattı (batch) eşleşmeli — Himes tasarımı (paired)
+  reference: "untreated"           # kontrast referansı = tedavi edilmemiş
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32

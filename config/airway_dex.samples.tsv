@@ -1,0 +1,9 @@
+sample_id	condition	fastq_1	fastq_2	batch	subject
+unt_c1	untreated	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039508_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039508_2.fastq.gz	c1
+dex_c1	dex	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039509_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039509_2.fastq.gz	c1
+unt_c2	untreated	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039512_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039512_2.fastq.gz	c2
+dex_c2	dex	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039513_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039513_2.fastq.gz	c2
+unt_c3	untreated	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039516_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039516_2.fastq.gz	c3
+dex_c3	dex	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039517_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039517_2.fastq.gz	c3
+unt_c4	untreated	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039520_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039520_2.fastq.gz	c4
+dex_c4	dex	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039521_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/airway_dex/SRR1039521_2.fastq.gz	c4
