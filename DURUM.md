@@ -9,6 +9,20 @@
 **Son güncelleme:** 2026-08-18
 
 ## Şu an nerede kaldık
+- **★★★ ÖKARYOT YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI (gerçek insan verisi) — `main` `9c398b1`, 505 test (2026-08-18).**
+  Veri seçimi = bilimsel karar (2 paralel ajan, ENA+literatür buluştu): **PRJNA229998 · insan hava yolu düz kas,
+  deksametazon vs kontrol** (Himes 2014, PLoS ONE — **Bioconductor/DESeq2 kanonik seti**). 4 hücre hattı × untreated/Dex,
+  paired, `~batch + condition` (hücre hattı=batch, Himes tasarımı). Referans: Ensembl release-110 GRCh38 cDNA (76MB) +
+  tx2gene başlıklardan türetildi (207k tx, versiyon eşleşmeli). Decoy YOK (transkriptom-only, bilinen-DEG için kabul).
+  Koşu `runs/20260818_110541_airway_dex/` (rapor+8 figür). raw `raw/airway_dex/` (21GB, gitignore).
+  - **UÇTAN UCA:** validate→FastQC→fastp→**salmon**(mapping %93.5–94.8)→**tximport**(207k tx→**38366 gen**, toplama çalıştı)
+    →DESeq2. **842 DEG (449↑/393↓)**, ref=untreated. profile=eukaryote (permissive, SUSPECT damgalı — 1 WARN dedup, normal).
+  - **★★ KONKORDANS KUSURSUZ:** 8/8 glukokortikoid-yanıt işaret geni Dex'te anlamlı **UP** — CRISPLD2 +2.59 (5e-40, Himes
+    başlık geni), DUSP1 +2.97, KLF15 +4.49, PER1 +2.98, FKBP5 +4.04, TSC22D3/GILZ +3.20, ZBTB16 +6.30 (1e-179), SPARCL1 +4.52.
+  - **★ GERÇEK VERİNİN AÇTIĞI BUG + DÜZELTME (`9c398b1`):** m07 `gene_name_map` `annotation_gff`'e güveniyordu; ökaryotta
+    None → `os.fspath(None)` çöküşü. None-güvenli yapıldı (boş gen-map, figürler ENSG ID'yle etiketler) + 2 regresyon testi.
+  - **SIRADA:** GO/KEGG downstream'i insan/ökaryotta koşma (hsa KEGG + insan GAF/GO prep gerekir — opsiyonel) VEYA ökaryot
+    UZUN-okuma (minimap2 splice-aware + izoform, yeni alt-sistem) VEYA temizlik. [[reminder_rnaforge_eukaryote]]
 - **★★★ ÖKARYOT KISA-OKUMA YOLU (Salmon + tximport) İMPLEMENTE EDİLDİ — `main` `b8f554a`, 503 test (2026-08-18).**
   MVP'nin ikinci ana kolu. Brainstorm→spec (`docs/superpowers/specs/2026-08-18-eukaryote-shortread-design.md`)→
   plan (`docs/superpowers/plans/2026-08-18-eukaryote-shortread.md`)→TDD 4 görev→main→push. Kararlar: kısa-okuma
