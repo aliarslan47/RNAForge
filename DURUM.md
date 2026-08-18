@@ -9,6 +9,19 @@
 **Son güncelleme:** 2026-08-18
 
 ## Şu an nerede kaldık
+- **★★ ÖKARYOT UZUN-OKUMA YOLU (gen düzeyi, transkriptom-hizalama) İMPLEMENTE EDİLDİ — `main` `ec006ca`, 514 test (2026-08-18).**
+  Spec `docs/superpowers/specs/2026-08-18-eukaryote-longread-design.md`, plan `.../plans/2026-08-18-eukaryote-longread.md`.
+  Kararlar (onaylı): **gen düzeyi** (m06+ reuse), **transkriptoma minimap2** hizalama. m04/m05'te ökaryot dalı içine
+  **read_type alt-dallanması** eklendi; m06+ DEĞİŞMEZ; referans mevcut (transcriptome_fasta+tx2gene), genom/GTF yok.
+  - **m04** `_quant_euk_long` (YENİ): minimap2 `-ax map-ont`/`map-hifi` (platform'dan) → **transkriptom** (transkript=hedef,
+    splice yok); `run_minimap2` reuse; mapping_rate **diagnostik, FAIL kapısı YOK** (tüm long yolları gibi).
+  - **m05** `_counts_euk_long` (YENİ): `minimap2.count_primary_alignments` (`samtools view -F 2308` = unmapped/secondary/
+    supplementary hariç, okuma başına tek primer) → `tximport.parse_tx2gene` ile **gen'e topla** (gen-içi izoform çoklu-eşleşme
+    doğal toplanır) → counts.tsv. Salmon-EM yok (ONT'a uygun). Diagnostik. Gen evreni = gözlenen genler birleşimi (eksik=0).
+  - TDD 4 görev; **gerçek samtools sayım testi geçti** (primer-only doğru sayıldı). Regresyon yok (ökaryot-short + prokaryot
+    yolları değişmedi).
+  - **SIRADA (bilimsel adım):** gerçek ökaryot ONT/PacBio cDNA seti ile uçtan-uca + konkordans (Typhi/airway disiplini,
+    kör indirme yok). [[reminder_rnaforge_eukaryote]]
 - **★★★ ÖKARYOT YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI (gerçek insan verisi) — `main` `9c398b1`, 505 test (2026-08-18).**
   Veri seçimi = bilimsel karar (2 paralel ajan, ENA+literatür buluştu): **PRJNA229998 · insan hava yolu düz kas,
   deksametazon vs kontrol** (Himes 2014, PLoS ONE — **Bioconductor/DESeq2 kanonik seti**). 4 hücre hattı × untreated/Dex,
