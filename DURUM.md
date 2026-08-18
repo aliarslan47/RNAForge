@@ -21,8 +21,15 @@
     başlık geni), DUSP1 +2.97, KLF15 +4.49, PER1 +2.98, FKBP5 +4.04, TSC22D3/GILZ +3.20, ZBTB16 +6.30 (1e-179), SPARCL1 +4.52.
   - **★ GERÇEK VERİNİN AÇTIĞI BUG + DÜZELTME (`9c398b1`):** m07 `gene_name_map` `annotation_gff`'e güveniyordu; ökaryotta
     None → `os.fspath(None)` çöküşü. None-güvenli yapıldı (boş gen-map, figürler ENSG ID'yle etiketler) + 2 regresyon testi.
-  - **SIRADA:** GO/KEGG downstream'i insan/ökaryotta koşma (hsa KEGG + insan GAF/GO prep gerekir — opsiyonel) VEYA ökaryot
-    UZUN-okuma (minimap2 splice-aware + izoform, yeni alt-sistem) VEYA temizlik. [[reminder_rnaforge_eukaryote]]
+  - **★ GO/KEGG/GSEA/REVIGO DOWNSTREAM ÖKARYOTTA KOŞTU + YOLAK KONKORDANSI (`ac263f0`, spec
+    `2026-08-18-eukaryote-enrichment-annotation-design.md`):** anotasyon katmanı GFF-tabanlıydı; insanda GFF-GO yok →
+    **transkriptom-sembol köprüsü** eklendi (`parse_transcriptome_symbols`+`parse_annotation_symbols`; gff=None→ENSG→sembol
+    FASTA başlıklarından, gene2go boş başlar, GAF/KEGG-by-symbol doldurur; m09/m10/m11/m12 transcriptome_fasta geçer;
+    imzalar geriye uyumlu). Referans: `goa_human.gaf` (EBI GOA 828k) + KEGG `hsa`. Config `enrichment: {obo, gaf, kegg_organism: hsa}`.
+    **Canlı (airway):** GO 82↑/477↓ (annotated 17568), KEGG 3↑/14↓ (hsa, 7824), GSEA go+136/-12, REVIGO indirgeme.
+    **Dex glukokortikoid imzası:** KEGG DOWN=Cytokine-cytokine receptor(5.6e-5)/TNF/chemokine/rheumatoid arthritis (anti-inflamatuar);
+    GO UP=response to hormone. 510 test.
+  - **SIRADA:** ökaryot UZUN-okuma (minimap2 splice-aware + izoform, yeni alt-sistem) VEYA temizlik. [[reminder_rnaforge_eukaryote]]
 - **★★★ ÖKARYOT KISA-OKUMA YOLU (Salmon + tximport) İMPLEMENTE EDİLDİ — `main` `b8f554a`, 503 test (2026-08-18).**
   MVP'nin ikinci ana kolu. Brainstorm→spec (`docs/superpowers/specs/2026-08-18-eukaryote-shortread-design.md`)→
   plan (`docs/superpowers/plans/2026-08-18-eukaryote-shortread.md`)→TDD 4 görev→main→push. Kararlar: kısa-okuma
