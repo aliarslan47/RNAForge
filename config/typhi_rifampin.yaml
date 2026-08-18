@@ -1,0 +1,40 @@
+# RNAForge — S. Typhi + rifampin (ONT cDNA) uzun-okuma DE doğrulaması.
+# Veri: PRJNA1254696 (Lee & Song, eBioMedicine 2025). 2 koşul × 3 replika.
+# Kütüphane: rastgele-primer'lı dscDNA + native barcoding (ONT-kit cDNA DEĞİL) →
+# SSP/VNP strand-switch primeri yok → Pychopper atlanır (full_length_cdna: false).
+organism: "Salmonella enterica serovar Typhi str. CT18"
+organism_type: "prokaryote"
+
+# Config platformu tespiti ezer (commit deba674): ONT olduğunu biliyoruz.
+platform: "ont"
+
+reference:
+  genome_fasta: "references/styphi_ct18/genome.fa"
+  annotation_gff: "references/styphi_ct18/genes.gff"
+
+library:
+  strandedness: "unstranded"        # rastgele-primer dscDNA → yönsüz
+  selection: "rrna_depletion"
+  chemistry: "cdna"                 # cDNA molekülü
+  full_length_cdna: false           # ONT-kit değil → Pychopper YOK, chopper-only
+
+trimming:
+  min_length: 100                   # ONT junk-contig elemesi (nano3p dersi)
+  aggressive_quality: false
+
+quantification:
+  feature_type: "CDS"               # prokaryot GFF: exon yok
+  attribute: "locus_tag"
+
+de:
+  design: "~condition"
+  reference: "dmso"                 # kontrast referansı = vehicle kontrol
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32

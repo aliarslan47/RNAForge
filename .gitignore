@@ -24,3 +24,6 @@ venv/
 .DS_Store
 *.swp
 .superpowers/
+
+# pychopper cwd'ye çökerken PDF bırakır (bilinen bug)
+pychopper.pdf

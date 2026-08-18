@@ -301,3 +301,19 @@ def test_library_chemistry_defaults_to_none(tmp_path):
 def test_library_chemistry_invalid_rejected(tmp_path):
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, PROK_BODY + '\nlibrary:\n  chemistry: "nanopore"\n'))
+
+
+def test_library_full_length_cdna_defaults_true(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).library.full_length_cdna is True
+
+
+def test_library_full_length_cdna_parsed_false(tmp_path):
+    cfg = load_config(_write(
+        tmp_path, PROK_BODY + '\nlibrary:\n  chemistry: "cdna"\n  full_length_cdna: false\n'))
+    assert cfg.library.full_length_cdna is False
+
+
+def test_library_full_length_cdna_invalid_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="full_length_cdna"):
+        load_config(_write(
+            tmp_path, PROK_BODY + '\nlibrary:\n  full_length_cdna: "maybe"\n'))

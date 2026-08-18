@@ -59,6 +59,12 @@ class Library:
     # Long-read only: cDNA needs Pychopper full-length orientation; direct-RNA does not.
     # NOT detectable from FASTQ (spec 2026-08-05). None = unset (fine for short reads).
     chemistry: str | None = None
+    # Long-read cDNA only: True (default) = ONT-kit cDNA with SSP/VNP strand-switch
+    # primers -> Pychopper orients/trims full-length. False = non-ONT-kit cDNA
+    # (random-primed dscDNA, native barcoding) that has NO strand-switch primers ->
+    # Pychopper would discard ~all reads, so skip it and run chopper-only. Ignored for
+    # direct_rna (already chopper-only) and short reads. NOT detectable from FASTQ.
+    full_length_cdna: bool = True
 
 
 @dataclass(frozen=True)
@@ -199,6 +205,14 @@ def _as_float(value, field: str) -> float:
         raise ConfigError(f"{field}: expected a number, got {value!r}") from None
 
 
+def _as_bool(value, field: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+        return value.strip().lower() == "true"
+    raise ConfigError(f"{field}: expected a boolean (true/false), got {value!r}")
+
+
 def _require_organism_type(raw: dict) -> str:
     value = raw.get("organism_type")
     if value is None:
@@ -282,6 +296,11 @@ def load_config(path: Path | str) -> Config:
                 _one_of(library_raw["chemistry"], CHEMISTRY, "library.chemistry")
                 if library_raw.get("chemistry") is not None
                 else None
+            ),
+            full_length_cdna=(
+                _as_bool(library_raw["full_length_cdna"], "library.full_length_cdna")
+                if library_raw.get("full_length_cdna") is not None
+                else True
             ),
         ),
         trimming=trimming,

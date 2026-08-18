@@ -129,13 +129,14 @@ def _seed_long(tmp_path, chemistry="cdna"):
     return run_dir
 
 
-def _long_cfg(chemistry="cdna"):
+def _long_cfg(chemistry="cdna", full_length_cdna=True):
     from rnaforge.config import (
         Config, Reference, Library, Trimming, DE, Report, Resources,
     )
     return Config(
         organism="E. coli", organism_type="prokaryote", platform="auto",
-        reference=Reference(), library=Library(chemistry=chemistry),
+        reference=Reference(),
+        library=Library(chemistry=chemistry, full_length_cdna=full_length_cdna),
         trimming=Trimming(), de=DE(), report=Report(), resources=Resources(),
     )
 
@@ -205,6 +206,35 @@ def test_run_trim_long_direct_rna_chopper_only(tmp_path, monkeypatch):
     summary = m03.run_trim(_long_cfg("direct_rna"), meta, run_dir)
     assert calls == ["chopper"]                   # direct-RNA'da pychopper yok
     assert summary["samples"]["s1"]["reads_after"] == 90
+
+
+def test_run_trim_long_cdna_no_full_length_skips_pychopper(tmp_path, monkeypatch):
+    # Non-ONT-kit cDNA (random-primed dscDNA): no SSP/VNP primers -> Pychopper would
+    # discard ~all reads, so full_length_cdna=False must skip it (chopper-only).
+    import rnaforge.modules.m03_trim as m03
+    run_dir = _seed_long(tmp_path, "cdna")
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("@r\n" + "ACGT" * 50 + "\n+\n" + "I" * 200 + "\n")
+    meta = tmp_path / "m.tsv"
+    meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+
+    calls = []
+    monkeypatch.setattr(m03, "run_pychopper",
+                        lambda *a, **k: calls.append("pychopper"))
+
+    def fake_chopper(in_fastq, out_fastq, **k):
+        calls.append("chopper")
+        Path(out_fastq).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_fastq).write_text("@r\nACGT\n+\nIIII\n")
+        return 88
+
+    monkeypatch.setattr(m03, "run_chopper", fake_chopper)
+    summary = m03.run_trim(_long_cfg("cdna", full_length_cdna=False), meta, run_dir)
+    assert calls == ["chopper"]                   # Pychopper atlandı
+    assert summary["chemistry"] == "cdna"
+    assert summary["full_length_cdna"] is False
+    assert summary["pychopper"] is False
+    assert summary["samples"]["s1"]["reads_after"] == 88
 
 
 def test_run_trim_low_survival_fails_and_records_gate(tmp_path, monkeypatch):

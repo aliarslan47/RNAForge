@@ -1,0 +1,7 @@
+sample_id	condition	fastq_1	fastq_2	batch	subject
+dmso_1	dmso	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286663_1.fastq.gz
+dmso_2	dmso	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286662_1.fastq.gz
+dmso_3	dmso	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286661_1.fastq.gz
+rif_1	rifampin	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286660_1.fastq.gz
+rif_2	rifampin	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286659_1.fastq.gz
+rif_3	rifampin	/home/ali/rnaforge-pipeline/raw/typhi_rifampin/SRR33286658_1.fastq.gz

@@ -164,6 +164,7 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
             f"long-read trim requires library.chemistry in {CHEMISTRY}, "
             f"got {chemistry!r} (m01 should have enforced this for ONT)."
         )
+    full_length_cdna = config.library.full_length_cdna
     stats_path = stats_dir / "trimming_statistics.json"
     log_path = logs_dir / "trim.log"
     min_len = config.trimming.min_length
@@ -174,6 +175,11 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
 
         samples = load_metadata(metadata_path)
         log(f"m03 long-read ({chemistry}): {len(samples)} sample(s)")
+        # Non-ONT-kit cDNA (random-primed dscDNA, native barcoding) has no SSP/VNP
+        # strand-switch primers -> Pychopper would discard ~all reads. Say so loudly.
+        if chemistry == "cdna" and not full_length_cdna:
+            log("library.full_length_cdna=false -> SKIPPING Pychopper "
+                "(no ONT strand-switch primers expected); chopper-only preprocessing.")
         per_sample: dict[str, dict] = {}
         for sample in samples:
             state.heartbeat()
@@ -181,14 +187,14 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
             out1.parent.mkdir(parents=True, exist_ok=True)
             reads_before = _count_fastx(sample.fastq_1)
 
-            if chemistry == "cdna":
+            if chemistry == "cdna" and full_length_cdna:
                 work = out1.parent / "pychopper_full_length.fastq"
                 stats_tsv = out1.parent / "pychopper_stats.tsv"
                 ps = run_pychopper(sample.fastq_1, work, stats_tsv)
                 reads_after = run_chopper(work, out1, min_len=min_len)
                 log(f"{sample.sample_id}: pychopper primers={ps.primers_found} "
                     f"rescue={ps.rescue} unusable={ps.unusable}; chopper kept {reads_after}")
-            else:  # direct_rna
+            else:  # direct_rna, or cdna without ONT strand-switch primers -> chopper only
                 reads_after = run_chopper(sample.fastq_1, out1, min_len=min_len)
                 log(f"{sample.sample_id}: chopper kept {reads_after}")
 
@@ -208,6 +214,8 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
         summary = {
             "read_type": "long",
             "chemistry": chemistry,
+            "full_length_cdna": full_length_cdna,
+            "pychopper": (chemistry == "cdna" and full_length_cdna),
             "n_samples": len(samples),
             "samples": per_sample,
             "gate_counts": dict(Counter(g.status for g in gates)),
