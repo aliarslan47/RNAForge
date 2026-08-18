@@ -25,8 +25,13 @@
     RT-qPCR tviA/tviB. Bizde: **Vi kapsül tvi/vex 10/10 DOWN** (tviA −4.58 padj 9e-16; vexA −4.09 5e-11; 8/10 padj<0.05),
     **SPI-1 T3SS 16/16 anlamlı DOWN** (invA −4.49 **2e-45**; hilA −4.87; sopE −5.66). Yön+anlamlılık birebir. RNAP-inhibitörü
     baskın DOWN (yüksek-AT ada baskılanması, makaleyle tutarlı). Koşu: `runs/20260818_085055_typhi_rif/` (figürler+rapor üretildi).
-  - **SIRADA:** GO/KEGG downstream (Typhi obo/GAF+KEGG referans prep gerekir — opsiyonel, E.coli'de doğrulanmış) VEYA ökaryot yolu
-    VEYA PacBio HiFi canlı. Not: Nano3P seti (26GB) artık gereksiz, temizlenebilir. `enrichment.obo` config'e eklenmedi.
+  - **★ GO+KEGG DOWNSTREAM DE TYPHI'DE KOŞTU + YOLAK-DÜZEYİ KONKORDANS (`2e9db51`):** KEGG `sty` referansı çekildi
+    (`references/kegg/sty/`, gitignore); config'e `enrichment.obo`+`kegg_organism: sty` eklendi. GO 35↑/62↓ (GFF Ontology_term
+    otorite, GAF yok), KEGG 1↑/3↓, GSEA (go +48/-14), REVIGO indirgeme. **GO DOWN**: `capsular polysaccharide transport`
+    (Vi kapsül). **KEGG DOWN**: `Bacterial invasion of epithelial cells` (padj 2e-6, sip/sop), `Salmonella infection` (2e-5),
+    `Flagellar assembly`, + nucleotide-sugars→tviB/tviC. Makalenin iki ana gen seti (Vi + SPI-1) yolak düzeyinde de DOWN.
+    Rapor `--force` yenilendi. AMR/operon/PPI KOŞULMADI (STRING taxid/abricate prep gerekir; opsiyonel, E.coli'de doğrulanmış).
+  - **SIRADA:** ökaryot yolu VEYA PacBio HiFi canlı VEYA temizlik (Nano3P 26GB gereksiz). 
 - **★★ m00 BASECALL (ham sinyal FAST5/POD5 → FASTQ) TAMAM ve `main`'de (2026-08-17, merge `e60d981`, 485 test).**
   Ali: "FAST5/POD5 gelirse pipeline görsün, çözümlesin, başlatsın." **Fizibilite: GPU VAR (RTX 4050, 6GB, driver
   566.14) → dorado GPU basecalling uygulanabilir** (CPU olmazdı). Plan `docs/superpowers/plans/2026-08-17-m00-basecall.md`.
