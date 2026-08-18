@@ -317,3 +317,29 @@ def test_library_full_length_cdna_invalid_rejected(tmp_path):
     with pytest.raises(ConfigError, match="full_length_cdna"):
         load_config(_write(
             tmp_path, PROK_BODY + '\nlibrary:\n  full_length_cdna: "maybe"\n'))
+
+
+EUK_BODY = """organism: "human"
+organism_type: "eukaryote"
+reference:
+  transcriptome_fasta: "ref/tx.fa"
+  tx2gene: "ref/t2g.tsv"
+de:
+  design: "~condition"
+"""
+
+
+def test_eukaryote_genome_fasta_optional(tmp_path):
+    cfg = load_config(_write(tmp_path, EUK_BODY))
+    assert cfg.reference.genome_fasta is None
+    assert cfg.reference.transcriptome_fasta is not None
+
+
+def test_eukaryote_genome_fasta_parsed_when_present(tmp_path):
+    body = EUK_BODY + '  genome_fasta: "ref/genome.fa"\n'
+    # not: son iki satır reference bloğunun altına gelmeli — reference alanları bitişik
+    body = ('organism: "human"\norganism_type: "eukaryote"\n'
+            'reference:\n  transcriptome_fasta: "ref/tx.fa"\n  tx2gene: "ref/t2g.tsv"\n'
+            '  genome_fasta: "ref/genome.fa"\nde:\n  design: "~condition"\n')
+    cfg = load_config(_write(tmp_path, body))
+    assert str(cfg.reference.genome_fasta) == "ref/genome.fa"
