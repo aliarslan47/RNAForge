@@ -43,3 +43,16 @@ def run_tximport(quant_sfs: dict[str, Path], tx2gene: Path, out_dir: Path,
         for sid, val in zip(header, parts[1:]):
             cols[sid].append(float(val))
     return TximportResult(gene_ids=gene_ids, counts=cols)
+
+
+def parse_tx2gene(path: Path) -> dict[str, str]:
+    """tx2gene TSV (tx_id<TAB>gene_id) -> dict. Ökaryot uzun-okuma sayım toplaması için
+    Python tarafında da okunur (tximport.R ile aynı dosya)."""
+    out: dict[str, str] = {}
+    for line in Path(path).read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            out[parts[0]] = parts[1]
+    return out

@@ -31,3 +31,10 @@ def test_run_tximport_raises_on_missing_output(tmp_path, monkeypatch):
     import pytest
     with pytest.raises(tx.TximportError):
         tx.run_tximport({"s1": tmp_path / "s1.sf"}, tmp_path / "t2g.tsv", out)
+
+
+def test_parse_tx2gene(tmp_path):
+    from rnaforge.tximport import parse_tx2gene
+    p = tmp_path / "t2g.tsv"
+    p.write_text("ENST1.1\tENSG1.1\nENST2.2\tENSG1.1\nENST3.1\tENSG2.4\n")
+    assert parse_tx2gene(p) == {"ENST1.1": "ENSG1.1", "ENST2.2": "ENSG1.1", "ENST3.1": "ENSG2.4"}

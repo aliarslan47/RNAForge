@@ -97,3 +97,27 @@ def test_run_minimap2_aligns_derived_reads(tmp_path):
     assert result.bam.exists()
     assert Path(str(result.bam) + ".bai").exists()
     assert result.alignment_rate > 0.90
+
+
+def _has_lr():
+    import subprocess
+    return subprocess.run(["conda", "run", "-n", "rnaforge-longread", "samtools", "--version"],
+                          capture_output=True, text=True).returncode == 0
+
+
+@__import__("pytest").mark.skipif(not _has_lr(), reason="rnaforge-longread yok")
+def test_count_primary_alignments(tmp_path):
+    import subprocess
+    from rnaforge.minimap2 import count_primary_alignments
+    sam = tmp_path / "a.sam"
+    sam.write_text(
+        "@HD\tVN:1.6\tSO:coordinate\n@SQ\tSN:tx1\tLN:100\n@SQ\tSN:tx2\tLN:100\n"
+        "r1\t0\ttx1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\n"
+        "r2\t0\ttx1\t5\t60\t4M\t*\t0\t0\tACGT\tIIII\n"
+        "r3\t0\ttx2\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\n"
+        "r3\t256\ttx1\t1\t0\t4M\t*\t0\t0\tACGT\tIIII\n"
+        "r4\t4\t*\t0\t0\t*\t*\t0\t0\tACGT\tIIII\n")
+    bam = tmp_path / "a.bam"
+    subprocess.run(["conda", "run", "-n", "rnaforge-longread", "bash", "-c",
+                    f"samtools sort -o {bam} {sam} && samtools index {bam}"], check=True)
+    assert count_primary_alignments(bam) == {"tx1": 2, "tx2": 1}
