@@ -14,6 +14,7 @@ dependencies:
   - bioconductor-delayedarray=0.36.0
   - bioconductor-deseq2=1.50.2
   - bioconductor-fgsea=1.36.2
+  - bioconductor-tximport
   - bioconductor-genomicranges=1.62.1
   - bioconductor-iranges=2.44.0
   - bioconductor-matrixgenerics=1.22.0

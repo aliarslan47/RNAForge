@@ -298,3 +298,33 @@ def test_cli_counts_returns_zero_and_prints_verdict(tmp_path, monkeypatch, capsy
     capsys.readouterr()
     assert main(["counts", *common]) == 0
     assert "quality verdict" in capsys.readouterr().out
+
+
+def test_run_counts_eukaryote_writes_counts_tsv(tmp_path, monkeypatch):
+    import rnaforge.modules.m05_counts as m05
+    from rnaforge.tximport import TximportResult
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"; (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        '{"read_type":"short","platform":"illumina"}')
+    st = RunState(run_dir); st.mark_done("m04_quant", [])
+    qd = run_dir / "quantification"
+    for sid in ("s1", "s2"):
+        (qd / sid).mkdir(parents=True); (qd / sid / "quant.sf").write_text("Name\n")
+    a = tmp_path / "a.fq"; a.write_text("@r\nACGT\n+\nIIII\n")
+    b = tmp_path / "b.fq"; b.write_text("@r\nACGT\n+\nIIII\n")
+    meta = tmp_path / "m.tsv"
+    meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{a}\ns2\ttrt\t{b}\n")
+    monkeypatch.setattr(m05, "run_tximport",
+        lambda *a, **k: TximportResult(gene_ids=["g1", "g2"],
+                                       counts={"s1": [10.0, 0.0], "s2": [20.0, 5.0]}))
+    from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
+    cfg = Config(organism="human", organism_type="eukaryote", platform="illumina",
+        reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=tmp_path / "t2g.tsv"),
+        library=Library(), trimming=Trimming(), de=DE(), report=Report(), resources=Resources())
+    summary = m05.run_counts(cfg, meta, run_dir)
+    matrix = (qd / "counts.tsv").read_text().splitlines()
+    assert matrix[0] == "gene\ts1\ts2"
+    assert matrix[1] == "g1\t10\t20"
+    assert summary["organism_type"] == "eukaryote"
+    assert summary["n_genes"] == 2

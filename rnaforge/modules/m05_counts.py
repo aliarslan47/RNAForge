@@ -17,6 +17,7 @@ from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
+from rnaforge.tximport import run_tximport
 
 MODULE_NAME = "m05_counts"
 _GATE = "assignment_rate"
@@ -70,16 +71,20 @@ def run_counts(config: Config, metadata_path: Path, run_dir: Path,
             "m05 (counts) requires m04 (quant) to have completed in this run directory "
             f"first: {run_dir}. Run `rnaforge quant` with the same --run-id, then re-run counts."
         )
-    # read_type yönlendirmesi (m04 deseni): kısa → featureCounts (kapılı),
-    # uzun → featureCounts -L (diagnostik). Step-1'in `require_short_read` muhafızı
-    # bununla değiştirildi — uzun-okuma kolunun SON Step-1 muhafızıydı.
-    read_type = resolve_read_type(run_dir)
-    if read_type == "long":
-        summary = _counts_long(config, metadata_path, run_dir,
+    # ROUTER: önce organism_type (ökaryot → tximport), sonra read_type (prokaryot: kısa
+    # featureCounts kapılı / uzun featureCounts -L diagnostik). Step-1'in `require_short_read`
+    # muhafızı read_type dispatch'le değişti — uzun-okuma kolunun SON Step-1 muhafızıydı.
+    if config.organism_type == "eukaryote":
+        summary = _counts_euk(config, metadata_path, run_dir,
                               quant_dir, stats_dir, logs_dir, state)
     else:
-        summary = _counts_short(config, metadata_path, run_dir,
-                              quant_dir, stats_dir, logs_dir, state)
+        read_type = resolve_read_type(run_dir)
+        if read_type == "long":
+            summary = _counts_long(config, metadata_path, run_dir,
+                                  quant_dir, stats_dir, logs_dir, state)
+        else:
+            summary = _counts_short(config, metadata_path, run_dir,
+                                  quant_dir, stats_dir, logs_dir, state)
 
     state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "counts.log")])
     return summary
@@ -117,6 +122,46 @@ def _write_count_outputs(result, sample_ids: list[str], quant_dir: Path,
                     fh.write(gene + "\t" + "\t".join(f'{mat[c][i]:g}' for c in _cols) + "\n")
         log("expression matrices written: tpm.tsv, fpkm.tsv")
     return assignment_by_sample
+
+
+def _counts_euk(config: Config, metadata_path: Path, run_dir: Path,
+                quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                state: RunState) -> dict:
+    """Ökaryot sayım (tximport, lengthScaledTPM). counts.tsv sözleşmesi.
+    Salmon zaten hizalamada atadı → assignment FAIL kapısı yok (diagnostik)."""
+    stats_path = stats_dir / "count_statistics.json"
+    log_path = logs_dir / "counts.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        quant_sfs = {s.sample_id: quant_dir / s.sample_id / "quant.sf" for s in samples}
+        missing = [sid for sid, p in quant_sfs.items() if not p.exists()]
+        if missing:
+            raise ValueError(
+                f"m05 eukaryote: quant.sf eksik örnek(ler): {missing} "
+                "(m04 salmon koştu mu?)")
+        state.heartbeat()
+        res = run_tximport(quant_sfs, config.reference.tx2gene, quant_dir)
+        if not res.gene_ids:
+            raise ValueError("tximport 0 gen döndürdü (tx2gene eşleşmedi mi?)")
+        sample_ids = [s.sample_id for s in samples]
+        matrix_path = quant_dir / "counts.tsv"
+        with matrix_path.open("w") as fh:
+            fh.write("gene\t" + "\t".join(sample_ids) + "\n")
+            for i, gene in enumerate(res.gene_ids):
+                row = [f"{int(round(res.counts[sid][i]))}" for sid in sample_ids]
+                fh.write(gene + "\t" + "\t".join(row) + "\n")
+        log(f"count matrix written: {matrix_path} ({len(res.gene_ids)} genes)")
+        summary = {
+            "read_type": "short", "organism_type": "eukaryote",
+            "n_samples": len(samples), "n_genes": len(res.gene_ids),
+            "gate_counts": {},
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+    return summary
 
 
 def _counts_short(config: Config, metadata_path: Path, run_dir: Path,

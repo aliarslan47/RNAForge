@@ -1,9 +1,9 @@
-"""m04 — Quantification ROUTER (prokaryot: bowtie2 genom hizalama).
+"""m04 — Quantification ROUTER.
 
-organism_type'a göre dallanır (PLAN §5). Şimdilik yalnız prokaryot yolu bağlı;
-eukaryote (Salmon) net NotImplementedError verir. Veri kapısı `alignment_rate`:
-bowtie2 overall alignment rate profil eşiğinin altındaysa FAIL — düşük hizalama
-güvenilmez count matrisi üretir (PLAN §3)."""
+organism_type'a göre dallanır (PLAN §5): prokaryot → bowtie2 (kısa) / minimap2 (uzun);
+eukaryote → Salmon (decoy-aware transkriptom niceleme). Veri kapısı `alignment_rate`:
+prokaryot-kısa bowtie2 overall rate / ökaryot salmon mapping_rate profil eşiğinin
+altındaysa FAIL — düşük hizalama güvenilmez count matrisi üretir (PLAN §3)."""
 from __future__ import annotations
 
 import json
