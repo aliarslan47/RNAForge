@@ -15,9 +15,10 @@ from rnaforge.featurecounts import run_featurecounts, tpm_fpkm
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile, profile_name_for
+from rnaforge.minimap2 import count_primary_alignments
 from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
-from rnaforge.tximport import run_tximport
+from rnaforge.tximport import parse_tx2gene, run_tximport
 
 MODULE_NAME = "m05_counts"
 _GATE = "assignment_rate"
@@ -75,8 +76,13 @@ def run_counts(config: Config, metadata_path: Path, run_dir: Path,
     # featureCounts kapılı / uzun featureCounts -L diagnostik). Step-1'in `require_short_read`
     # muhafızı read_type dispatch'le değişti — uzun-okuma kolunun SON Step-1 muhafızıydı.
     if config.organism_type == "eukaryote":
-        summary = _counts_euk(config, metadata_path, run_dir,
-                              quant_dir, stats_dir, logs_dir, state)
+        read_type = resolve_read_type(run_dir)
+        if read_type == "long":
+            summary = _counts_euk_long(config, metadata_path, run_dir,
+                                       quant_dir, stats_dir, logs_dir, state)
+        else:
+            summary = _counts_euk(config, metadata_path, run_dir,
+                                  quant_dir, stats_dir, logs_dir, state)
     else:
         read_type = resolve_read_type(run_dir)
         if read_type == "long":
@@ -159,6 +165,60 @@ def _counts_euk(config: Config, metadata_path: Path, run_dir: Path,
             "read_type": "short", "organism_type": "eukaryote",
             "n_samples": len(samples), "n_genes": len(res.gene_ids),
             "gate_counts": {},
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+    return summary
+
+
+def _counts_euk_long(config: Config, metadata_path: Path, run_dir: Path,
+                     quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                     state: RunState) -> dict:
+    """Ökaryot uzun-okuma sayımı: transkriptom-hizalı BAM'den primer-hizalama sayımı →
+    tx2gene ile gen'e topla (gen-içi izoform çoklu-eşleşmesi aynı gene toplanır).
+    counts.tsv ortak sözleşme. Diagnostik (kapı yok — hizalama zaten eledi)."""
+    stats_path = stats_dir / "count_statistics.json"
+    log_path = logs_dir / "counts.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        tx2gene = parse_tx2gene(config.reference.tx2gene)
+        per_sample_gene: dict[str, dict[str, int]] = {}
+        genes_seen: set[str] = set()
+        for sample in samples:
+            state.heartbeat()
+            bam = quant_dir / sample.sample_id / "aligned.sorted.bam"
+            if not bam.exists():
+                raise ValueError(
+                    f"m05 eukaryote-long: BAM eksik: {bam} (m04 salmon değil minimap2 koştu mu?)")
+            txc = count_primary_alignments(bam)
+            gc: dict[str, int] = {}
+            for tx, c in txc.items():
+                g = tx2gene.get(tx) or tx2gene.get(tx.split(".")[0])   # versiyonsuz yedek
+                if g is None:
+                    continue
+                gc[g] = gc.get(g, 0) + c
+            per_sample_gene[sample.sample_id] = gc
+            genes_seen.update(gc)
+            log(f"{sample.sample_id}: {sum(txc.values())} primer okuma → {len(gc)} gen")
+        if not genes_seen:
+            raise ValueError(
+                "m05 eukaryote-long: 0 gen (tx2gene eşleşmedi / hizalama boş?). "
+                "tx2gene transkript ID'leri BAM referans adlarıyla (transkriptom FASTA) eşleşmeli.")
+        sample_ids = [s.sample_id for s in samples]
+        genes = sorted(genes_seen)
+        matrix_path = quant_dir / "counts.tsv"
+        with matrix_path.open("w") as fh:
+            fh.write("gene\t" + "\t".join(sample_ids) + "\n")
+            for g in genes:
+                fh.write(g + "\t" + "\t".join(
+                    str(per_sample_gene[s].get(g, 0)) for s in sample_ids) + "\n")
+        log(f"count matrix written: {matrix_path} ({len(genes)} genes)")
+        summary = {
+            "read_type": "long", "organism_type": "eukaryote",
+            "n_samples": len(samples), "n_genes": len(genes), "gate_counts": {},
         }
         stats_path.write_text(json.dumps(summary, indent=2))
     return summary

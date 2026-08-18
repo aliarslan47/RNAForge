@@ -328,3 +328,31 @@ def test_run_counts_eukaryote_writes_counts_tsv(tmp_path, monkeypatch):
     assert matrix[1] == "g1\t10\t20"
     assert summary["organism_type"] == "eukaryote"
     assert summary["n_genes"] == 2
+
+
+def test_run_counts_eukaryote_long_aggregates_tx_to_gene(tmp_path, monkeypatch):
+    import rnaforge.modules.m05_counts as m05
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"; (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text('{"read_type":"long","platform":"ont"}')
+    st = RunState(run_dir); st.mark_done("m04_quant", [])
+    qd = run_dir / "quantification"
+    for sid in ("s1", "s2"):
+        (qd / sid).mkdir(parents=True); (qd / sid / "aligned.sorted.bam").write_text("")
+    t2g = tmp_path / "t2g.tsv"; t2g.write_text("ENST1.1\tENSG1\nENST2.2\tENSG1\nENST3.1\tENSG2\n")
+    a = tmp_path / "a.fq"; a.write_text("@r\nA\n+\nI\n"); b = tmp_path / "b.fq"; b.write_text("@r\nA\n+\nI\n")
+    meta = tmp_path / "m.tsv"; meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{a}\ns2\ttrt\t{b}\n")
+    cnts = {"s1": {"ENST1.1": 3, "ENST3.1": 1}, "s2": {"ENST2.2": 5}}
+    monkeypatch.setattr(m05, "count_primary_alignments",
+                        lambda bam, **k: cnts["s1" if "s1" in str(bam) else "s2"])
+    from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
+    cfg = Config(organism="human", organism_type="eukaryote", platform="ont",
+        reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=t2g),
+        library=Library(), trimming=Trimming(), de=DE(), report=Report(), resources=Resources())
+    summary = m05.run_counts(cfg, meta, run_dir)
+    lines = (qd / "counts.tsv").read_text().splitlines()
+    assert lines[0] == "gene\ts1\ts2"
+    d = {l.split("\t")[0]: l.split("\t")[1:] for l in lines[1:]}
+    assert d["ENSG1"] == ["3", "5"] and d["ENSG2"] == ["1", "0"]
+    assert summary["read_type"] == "long" and summary["organism_type"] == "eukaryote"
+    assert summary["n_genes"] == 2
