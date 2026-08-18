@@ -112,6 +112,7 @@ def _resolve_collections(config: Config, log):
     """Hazır gen-seti koleksiyonlarını çöz. obo/kegg konfigüre ama dosyası eksikse gürültülü hata;
     hiç konfigüre değilse atla (log)."""
     gff = config.reference.annotation_gff
+    transcriptome = config.reference.transcriptome_fasta   # ökaryot sembol kaynağı
     e = config.enrichment
     planned = []
 
@@ -121,7 +122,8 @@ def _resolve_collections(config: Config, log):
                 f"m11 (gsea): GO requested but go-basic.obo not found at {e.obo}. "
                 "Download it (see m09) or unset enrichment.obo.")
         obo = parse_obo(e.obo)
-        gene2go, go_meta, _, _, _, _ = build_gene2go(gff, obo, gaf_path=e.gaf, log=log)
+        gene2go, go_meta, _, _, _, _ = build_gene2go(
+            gff, obo, gaf_path=e.gaf, transcriptome_fasta=transcriptome, log=log)
         planned.append(("go", gene2go, go_meta, "GSEA — Gene Ontology"))
     else:
         log("m11: enrichment.obo yok -> GO koleksiyonu atlandı")
@@ -135,7 +137,7 @@ def _resolve_collections(config: Config, log):
                 f"{kegg_dir}: {', '.join(missing)} (see m10 for download).")
         g2p, p_meta, _, _ = build_gene2pathway(
             gff, kegg_dir / "pathway_links.tsv", kegg_dir / "pathway_names.tsv",
-            kegg_dir / "gene_list.tsv")
+            kegg_dir / "gene_list.tsv", transcriptome_fasta=transcriptome)
         planned.append(("kegg", g2p, p_meta, "GSEA — KEGG"))
     else:
         log("m11: enrichment.kegg_organism yok -> KEGG koleksiyonu atlandı")

@@ -25,6 +25,11 @@ de:
   fdr_threshold: 0.05
   log2fc_threshold: 1.0
 
+enrichment:
+  obo: "references/go/go-basic.obo"
+  gaf: "references/go/goa_human.gaf"   # EBI GOA insan — ökaryotta GO'nun tek kaynağı (GFF yok)
+  kegg_organism: "hsa"                 # KEGG insan; kegg_dir varsayılan references/kegg/hsa
+
 report:
   language: "tr"
 
