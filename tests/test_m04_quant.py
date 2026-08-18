@@ -300,3 +300,31 @@ def test_run_quant_eukaryote_runs_salmon_and_gates(tmp_path, monkeypatch):
     assert summary["samples"]["s1"]["mapping_rate"] == 0.9
     gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
     assert any(g["name"] == "alignment_rate" for g in gates if g["module"] == "m04_quant")
+
+
+def test_run_quant_eukaryote_long_minimap2_diagnostic(tmp_path, monkeypatch):
+    import rnaforge.modules.m04_quant as m04
+    from rnaforge.bowtie2 import AlignmentResult
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"; (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text(
+        '{"read_type":"long","platform":"ont","chemistry":"cdna"}')
+    st = RunState(run_dir); st.mark_done("m01_validate", []); st.mark_done("m03_trim", [])
+    fq = tmp_path / "s1.fastq"; fq.write_text("@r\nACGT\n+\nIIII\n")
+    meta = tmp_path / "m.tsv"; meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{fq}\n")
+    monkeypatch.setattr(m04, "trimmed_reads", lambda rd, s: (fq, None))
+    bam = tmp_path / "b.bam"; bam.write_text("")
+    monkeypatch.setattr(m04, "run_minimap2",
+        lambda *a, **k: AlignmentResult(alignment_rate=0.55, bam=bam))
+    from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
+    cfg = Config(organism="human", organism_type="eukaryote", platform="ont",
+        reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=tmp_path / "t2g.tsv"),
+        library=Library(chemistry="cdna"), trimming=Trimming(), de=DE(), report=Report(),
+        resources=Resources())
+    summary = m04.run_quant(cfg, meta, run_dir)
+    assert summary["organism_type"] == "eukaryote" and summary["read_type"] == "long"
+    assert summary["samples"]["s1"]["mapping_rate"] == 0.55
+    gpath = run_dir / "quality" / "gates.json"
+    if gpath.exists():
+        gates = json.loads(gpath.read_text())["gates"]
+        assert all(g.get("status") != "FAIL" for g in gates)   # diagnostik, FAIL yok

@@ -82,8 +82,13 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
     # bowtie2 / uzun minimap2). Ayrım YALNIZ m04/m05'te; m06+ agnostik. Step-1'in
     # `require_short_read` muhafızı read_type dispatch'le değişti; muhafız m05'te kalır.
     if config.organism_type == "eukaryote":
-        summary = _quant_euk(config, metadata_path, run_dir,
-                             quant_dir, stats_dir, logs_dir, state)
+        read_type = resolve_read_type(run_dir)
+        if read_type == "long":
+            summary = _quant_euk_long(config, metadata_path, run_dir,
+                                      quant_dir, stats_dir, logs_dir, state)
+        else:
+            summary = _quant_euk(config, metadata_path, run_dir,
+                                 quant_dir, stats_dir, logs_dir, state)
     else:
         read_type = resolve_read_type(run_dir)
         if read_type == "long":
@@ -182,6 +187,44 @@ def _quant_euk(config: Config, metadata_path: Path, run_dir: Path,
         for g in gates:
             log(f"gate {g.name}: {g.status} — {g.message}")
         raise_if_failed(gates)
+        log(f"alignment statistics written: {stats_path}")
+    return summary
+
+
+def _quant_euk_long(config: Config, metadata_path: Path, run_dir: Path,
+                    quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                    state: RunState) -> dict:
+    """Ökaryot uzun-okuma: minimap2 → TRANSKRİPTOM (transkript=hedef, intron yok → splice
+    gerekmez). Preset platformdan (ont→map-ont, pacbio_hifi→map-hifi). DIAGNOSTİK — FAIL
+    kapısı YOK (tüm long yolları gibi; ONT düşük oranı yanlış FAIL'lemesin). m05 tx2gene ile
+    gen'e toplar."""
+    platform = resolve_platform(run_dir)
+    preset = minimap2_preset(platform)
+    stats_path = stats_dir / "alignment_statistics.json"
+    log_path = logs_dir / "quant.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        log(f"m04 eukaryote long minimap2 ({platform} → -ax {preset}) → transcriptome: "
+            f"{len(samples)} sample(s)")
+        per_sample = {}
+        for sample in samples:
+            state.heartbeat()
+            t1, _ = trimmed_reads(run_dir, sample)   # ONT tek-uçlu
+            result = run_minimap2(config.reference.transcriptome_fasta,
+                                  quant_dir / sample.sample_id, t1, preset,
+                                  threads=config.resources.threads)
+            per_sample[sample.sample_id] = {
+                "mapping_rate": result.alignment_rate, "bam": str(result.bam)}
+            log(f"{sample.sample_id}: mapping_rate={result.alignment_rate:.3f} (diagnostik)")
+        summary = {
+            "read_type": "long", "organism_type": "eukaryote",
+            "n_samples": len(samples), "samples": per_sample, "gate_counts": {},
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
         log(f"alignment statistics written: {stats_path}")
     return summary
 
