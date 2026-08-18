@@ -9,6 +9,25 @@
 **Son güncelleme:** 2026-08-18
 
 ## Şu an nerede kaldık
+- **★★★ ÖKARYOT KISA-OKUMA YOLU (Salmon + tximport) İMPLEMENTE EDİLDİ — `main` `b8f554a`, 503 test (2026-08-18).**
+  MVP'nin ikinci ana kolu. Brainstorm→spec (`docs/superpowers/specs/2026-08-18-eukaryote-shortread-design.md`)→
+  plan (`docs/superpowers/plans/2026-08-18-eukaryote-shortread.md`)→TDD 4 görev→main→push. Kararlar: kısa-okuma
+  önce (uzun sonra), Salmon **decoy-aware** (genom opsiyonel), tximport **`countsFromAbundance="lengthScaledTPM"`**
+  (uzunluk-düzeltilmiş sayım → m06 DESeq2 offset gerektirmez, **m06+ agnostik korunur, DEĞİŞMEDİ**).
+  - **m04-euk** (`rnaforge/salmon.py` + m04 router dalı): `organism_type==eukaryote` → Salmon; eski
+    `NotImplementedError` KALDIRILDI. Index: genome_fasta varsa gentrome+decoys.txt decoy-aware, yoksa
+    transkriptom-only + yüksek sesle not. `salmon quant -l A` (paired destekli). mapping_rate → alignment_rate
+    FAIL kapısı (eukaryote.yml permissive; `_MappingAdapter` ile `build_alignment_gates` yeniden kullanılır).
+    Env `rnaforge-quant-euk` (salmon 2.3.4 kuruluydu). **Gerçek salmon entegrasyon testi GEÇTİ** (index+quant).
+  - **m05-euk** (`rnaforge/tximport.py` + `scripts/tximport.R` + m05 router dalı): quant.sf×örnek + tx2gene →
+    gen matrisi; `counts.tsv` (`gene\t<sid>`) ortak sözleşme. `bioconductor-tximport` `rnaforge-de` env'ine
+    kuruldu (`envs/rnaforge-de.yml`; ikinci R env yok). assignment FAIL kapısı yok (salmon zaten atadı, diagnostik).
+  - **config:** `Reference.genome_fasta` ökaryotta opsiyonel (alanlar zaten vardı); `REQUIRED_REFERENCE[eukaryote]`
+    = (transcriptome_fasta, tx2gene) DEĞİŞMEDİ.
+  - **SIRADA (bilimsel adım, kör indirme yok):** Typhi disiplini — yayınlanmış DEG'li gerçek ökaryot Illumina seti
+    seç (insan/fare/maya/Arabidopsis; ≥3 replika; GENCODE/Ensembl transkriptom + tx2gene) → uçtan uca + konkordans.
+    ([[reminder_rnaforge_eukaryote]])
+
 - **★★★ UZUN-OKUMA KOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI (gerçek bakteri ONT cDNA) — `main` `44c2e06`, 492 test (2026-08-18).**
   Uzun-okuma kolu şimdiye dek yalnız teknik doğrulanmıştı; ilk kez **yayınlanmış bir çalışmayla biyolojik konkordans**.
   **Veri seçimi = bilimsel karar** (kör indirme yok): 2 paralel araştırma ajanı ENA+literatür taradı, ikisi de aynı sette
