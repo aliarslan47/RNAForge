@@ -32,6 +32,10 @@ de:
   fdr_threshold: 0.05
   log2fc_threshold: 1.0
 
+enrichment:
+  obo: "references/go/go-basic.obo"   # GO propagation (GFF Ontology_term otorite; GAF yok)
+  kegg_organism: "sty"               # S. Typhi CT18 (KEGG); kegg_dir varsayılan references/kegg/sty
+
 report:
   language: "tr"
 
