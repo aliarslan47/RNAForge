@@ -6,7 +6,7 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-19 13:55 (+03)
+**Son güncelleme:** 2026-08-19 14:15 (+03)
 
 ## Şu an nerede kaldık
 - **★★★ ÖKARYOT UZUN-OKUMA YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI — `main` `00bcad3`, 515 test (2026-08-18). → DÖRT KOL DA
@@ -30,7 +30,13 @@
   m00–m03 ortak trunk → organizma kararı (m04/m05 prok↔ökaryot dallanma) → m06'da birleşme → agnostik downstream
   (m07/m08 + m09-m12 zenginleştirme + m15 PPI) + prokaryot-özel örtü (m13 AMR/m14 operon) + tanı bandı (m16/m17/m18).
   21 kart/sayfa, 28 kenar, 0 bozuk karakter. Artifact yayımlandı. [[feedback_pipeline_dag_style]] üslubunda; VirusForge/BacForge ile aynı aile.
-- **SIRADA:** yeni istek — dört kol tamam + kod temiz + DAG şeması hazır. [[reminder_rnaforge_eukaryote]]
+- **★★ DAG YENİDEN-TASARIM + AİLE STANDARDI + PipelineForge (2026-08-19) — `main` `13cc3bd`.** DAG gerçek `run()`
+  bağımlılıklarıyla yeniden çizildi (hub-and-spoke, m06 hub; 21 kart/23 kenar). **Üç Forge projesi (RNA/Virus/Bac)
+  aynı iskelete standartlaştırıldı** (aynı CSS/bölüm/başlık, Bağımlılık sütunu, TR+EN, projeye-özgü palet). **Repolar
+  public → GitHub Pages CANLI:** `aliarslan47.github.io/RNAForge/pipeline_architecture.html` (+ VirusForge/BacForge);
+  README rozet/linkleri Pages'e bağlı. **PipelineForge üreticisi kuruldu** (`github.com/aliarslan47/PipelineForge`,
+  spec→HTML). Detay [[feedback_pipeline_dag_style]].
+- **SIRADA:** yeni istek — dört kol tamam + kod temiz + DAG/Pages/PipelineForge hazır. [[reminder_rnaforge_eukaryote]]
 - **★★ ÖKARYOT UZUN-OKUMA YOLU (gen düzeyi, transkriptom-hizalama) İMPLEMENTE EDİLDİ — `main` `ec006ca`, 514 test (2026-08-18).**
   Spec `docs/superpowers/specs/2026-08-18-eukaryote-longread-design.md`, plan `.../plans/2026-08-18-eukaryote-longread.md`.
   Kararlar (onaylı): **gen düzeyi** (m06+ reuse), **transkriptoma minimap2** hizalama. m04/m05'te ökaryot dalı içine
