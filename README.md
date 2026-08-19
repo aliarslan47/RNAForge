@@ -78,29 +78,43 @@ the verdict carries over unchanged from the quality gates. The QC add-ons (m16�
 
 ## Install
 
-```bash
-conda env create -f envs/rnaforge-core.yml     # orchestration (Python) + networkx/numpy/scipy
-conda activate rnaforge-core
-pip install -e .
-```
-
-Tool environments (created once, referenced by the modules):
+One command creates all conda environments and installs the package editable:
 
 ```bash
-conda env create -f envs/rnaforge-qc.yml           # FastQC, fastp
-conda env create -f envs/rnaforge-quant-prok.yml   # Bowtie2, samtools, featureCounts
-conda env create -f envs/rnaforge-quant-euk.yml    # Salmon
-conda env create -f envs/rnaforge-longread.yml     # minimap2, NanoPlot, Pychopper, chopper, samtools
-conda env create -f envs/rnaforge-basecall.yml     # pod5, samtools (+ dorado binary, GPU) — raw signal m00
-conda env create -f envs/rnaforge-de.yml           # R: DESeq2, ggplot2, fgsea
-conda env create -f envs/rnaforge-amr.yml          # abricate (CARD/VFDB)
-conda env create -f envs/rnaforge-seqqc.yml        # SortMeRNA, RSeQC, MultiQC (m16/m18)
+bash install.sh
+conda run -n rnaforge-core rnaforge doctor    # verify every required env exists
 ```
+
+`install.sh` is idempotent (skips envs that already exist). The nine tool environments
+it creates (`envs/*.yml`, pinned to exact versions for reproducibility): `rnaforge-core`
+(orchestration + networkx/scipy), `rnaforge-qc` (FastQC, fastp), `rnaforge-quant-prok`
+(Bowtie2, samtools, featureCounts), `rnaforge-quant-euk` (Salmon), `rnaforge-longread`
+(minimap2, NanoPlot, Pychopper, chopper), `rnaforge-basecall` (pod5 + external dorado GPU
+binary — raw-signal m00), `rnaforge-de` (R: DESeq2, ggplot2, fgsea, tximport), `rnaforge-amr`
+(abricate CARD/VFDB), `rnaforge-seqqc` (SortMeRNA, RSeQC, MultiQC).
+
+> `dorado` (ONT raw-signal basecalling, m00) is a GPU-only binary installed **outside** conda;
+> `install.sh` does not fetch it. Install it separately and set `basecall.dorado_bin` only if you
+> feed FAST5/POD5 input. FASTQ input skips m00 entirely.
 
 ## Usage
 
+The whole pipeline in one command (stop-on-FAIL, resumable — re-run the same command after
+a crash and completed stages are skipped):
+
 ```bash
-# core chain (same --run-id throughout)
+rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo
+# add optional stages before the report:
+rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo \
+             --include enrich,kegg,gsea,seqqc,alignqc,multiqc
+# or run a slice of the core chain:
+rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo --from trim --to counts
+```
+
+Or drive each stage by hand (same `--run-id` throughout):
+
+```bash
+# core chain
 rnaforge validate --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge qc       --config config/config.yaml --metadata samples.tsv --run-id demo
 rnaforge trim     --config config/config.yaml --metadata samples.tsv --run-id demo
@@ -142,28 +156,21 @@ rnaforge report   --config config/config.yaml --metadata samples.tsv --run-id de
 
 ## Reference data (one-time prep, git-ignored)
 
-The functional analyses read local reference files under `references/` (never committed). Download
-once for your organism (examples for *E. coli* K-12):
+The functional analyses read local reference files under `references/` (never committed). A
+parameterized script fetches them once for your organism (each block is skipped if its argument is
+omitted; every download gets a `.sha256` stamp for reproducibility):
 
 ```bash
-# GO ontology (m09/m12) + organism GO annotation (EBI-GOA)
-curl -L -o references/go/go-basic.obo http://purl.obolibrary.org/obo/go/go-basic.obo
-curl -L https://ftp.ebi.ac.uk/pub/databases/GO/goa/proteomes/18.E_coli_MG1655.goa \
-     -o references/ecoli_bw25113/ecoli.gaf
-
-# KEGG (m10) — per-organism REST files
-curl -s https://rest.kegg.jp/link/pathway/eco > references/kegg/eco/pathway_links.tsv
-curl -s https://rest.kegg.jp/list/pathway/eco > references/kegg/eco/pathway_names.tsv
-curl -s https://rest.kegg.jp/list/eco        > references/kegg/eco/gene_list.tsv
-
-# STRING (m15) — per-taxon network
-curl -s https://stringdb-downloads.org/download/protein.info.v12.0/511145.protein.info.v12.0.txt.gz \
-     -o references/string/511145/protein.info.txt.gz
-curl -s https://stringdb-downloads.org/download/protein.links.v12.0/511145.protein.links.v12.0.txt.gz \
-     -o references/string/511145/protein.links.txt.gz
+# example for E. coli K-12 (KEGG code eco, STRING taxid 511145)
+bash prepare_references.sh \
+     --kegg-org eco \
+     --string-taxid 511145 \
+     --goa-url https://ftp.ebi.ac.uk/pub/databases/GO/goa/proteomes/18.E_coli_MG1655.goa
 ```
 
-AMR/virulence (m13) uses abricate's bundled CARD/VFDB databases (no separate download).
+Blocked-source note: QuickGO downloads are blocked on some networks; the script therefore takes the
+GO annotation (GAF) from the **EBI-GOA FTP proteome** file via `--goa-url` (the documented fallback),
+not QuickGO. AMR/virulence (m13) uses abricate's bundled CARD/VFDB databases (no separate download).
 
 ## Key design decisions
 

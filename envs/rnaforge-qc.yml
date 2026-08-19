@@ -2,6 +2,8 @@ name: rnaforge-qc
 channels:
   - conda-forge
   - bioconda
+# Kesin sürüm pin'i (tekrarlanabilirlik): floating >= iki makinede farklı QC/trim
+# sürümü verip trimlenmiş çıktıyı → sayımları değiştirebiliyordu.
 dependencies:
-  - fastqc>=0.12
-  - fastp>=0.23
+  - fastqc=0.12.1
+  - fastp=1.3.6

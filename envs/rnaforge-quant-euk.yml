@@ -2,5 +2,6 @@ name: rnaforge-quant-euk
 channels:
   - conda-forge
   - bioconda
+# Kesin sürüm pin'i (tekrarlanabilirlik): Salmon sürümü quant çıktısını etkiler.
 dependencies:
-  - salmon>=1.10
+  - salmon=2.3.4

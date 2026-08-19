@@ -2,7 +2,9 @@ name: rnaforge-quant-prok
 channels:
   - conda-forge
   - bioconda
+# Kesin sürüm pin'i (tekrarlanabilirlik): aligner/quantifier sürümü doğrudan
+# sayımları etkiler; floating >= byte-aynı tekrar üretimi garanti etmezdi.
 dependencies:
-  - bowtie2>=2.5
-  - samtools>=1.19
-  - subread>=2.0
+  - bowtie2=2.5.5
+  - samtools=1.24
+  - subread=2.1.1
