@@ -6,7 +6,7 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-19 11:45 (+03)
+**Son güncelleme:** 2026-08-19 12:16 (+03)
 
 ## Şu an nerede kaldık
 - **★★★ ÖKARYOT UZUN-OKUMA YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI — `main` `00bcad3`, 515 test (2026-08-18). → DÖRT KOL DA
@@ -24,8 +24,13 @@
 - **★ CİLA / TEMİZLİK GEÇİŞİ (2026-08-19 11:45) — 515 test yeşil doğrulandı.** Statik tarama: 9324 satırda yalnız 3 önemsiz
   sorun (2 kullanılmayan import: `kegg_annotation.parse_gff_go`, `m03_trim.FastpResult`; 1 gereksiz f-string
   `go_annotation.py:252`) → ruff ile düzeltildi, davranış değişmedi. `pyproject.toml`'a minimal ruff yapılandırması eklendi
-  (`ruff check rnaforge`, select F+E9) → tekrarlanabilir cila. TODO/FIXME=0, geçici dosya=0. **SIRADA:** yeni istek — dört
-  kol tamam + kod temiz. [[reminder_rnaforge_eukaryote]]
+  (`ruff check rnaforge`, select F+E9) → tekrarlanabilir cila. TODO/FIXME=0, geçici dosya=0.
+- **★ PIPELINE DAG ŞEMASI (2026-08-19 12:16) — `main` `cc78b61`.** `docs/pipeline_architecture.html`: profesyonel node-graph
+  (inline SVG, port+eğri ok+karar düğümü), TR/EN toggle, 4 kategori renk (ortak/prokaryot/ökaryot/tanı). Topoloji:
+  m00–m03 ortak trunk → organizma kararı (m04/m05 prok↔ökaryot dallanma) → m06'da birleşme → agnostik downstream
+  (m07/m08 + m09-m12 zenginleştirme + m15 PPI) + prokaryot-özel örtü (m13 AMR/m14 operon) + tanı bandı (m16/m17/m18).
+  21 kart/sayfa, 28 kenar, 0 bozuk karakter. Artifact yayımlandı. [[feedback_pipeline_dag_style]] üslubunda; VirusForge/BacForge ile aynı aile.
+- **SIRADA:** yeni istek — dört kol tamam + kod temiz + DAG şeması hazır. [[reminder_rnaforge_eukaryote]]
 - **★★ ÖKARYOT UZUN-OKUMA YOLU (gen düzeyi, transkriptom-hizalama) İMPLEMENTE EDİLDİ — `main` `ec006ca`, 514 test (2026-08-18).**
   Spec `docs/superpowers/specs/2026-08-18-eukaryote-longread-design.md`, plan `.../plans/2026-08-18-eukaryote-longread.md`.
   Kararlar (onaylı): **gen düzeyi** (m06+ reuse), **transkriptoma minimap2** hizalama. m04/m05'te ökaryot dalı içine
