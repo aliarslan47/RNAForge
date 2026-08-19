@@ -31,7 +31,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;padding:30px 22px 38px}
-  .wrap{max-width:1060px;margin:0 auto}
+  .wrap{max-width:1120px;margin:0 auto}
   .toggle{display:flex;justify-content:flex-end;margin-bottom:14px}
   .toggle .grp{display:inline-flex;border:1px solid var(--bd);border-radius:999px;overflow:hidden;background:var(--card)}
   .langbtn{border:0;background:transparent;color:var(--mut);font:600 12.5px system-ui;
@@ -40,7 +40,7 @@
   .langbtn:focus-visible{outline:2px solid var(--sh);outline-offset:2px}
   header{margin-bottom:22px}
   h1{font-size:26px;margin:0 0 6px;letter-spacing:-.4px;text-wrap:balance}
-  .sub{color:var(--mut);font-size:13.5px;margin:0;max-width:70ch}
+  .sub{color:var(--mut);font-size:13.5px;margin:0;max-width:74ch}
   .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
   h2{font-size:15.5px;margin:32px 0 12px;letter-spacing:-.2px}
   .page[hidden]{display:none}
@@ -55,11 +55,12 @@
   .chips{display:flex;gap:12px;font-size:11.5px;flex-wrap:wrap}
   .chips span{display:inline-flex;align-items:center;gap:6px;color:var(--mut)}
   .chips i{width:11px;height:11px;border-radius:3px;display:inline-block;border:1.4px solid}
+  .chips i.dash{border-style:dashed}
   .i-sh{background:var(--sh-bg);border-color:var(--sh)}
   .i-prok{background:var(--prok-bg);border-color:var(--prok)}
   .i-euk{background:var(--euk-bg);border-color:var(--euk)}
   .i-diag{background:var(--diag-bg);border-color:var(--diag)}
-  svg.dag{display:block;min-width:940px}
+  svg.dag{display:block;min-width:1080px}
   .node{fill:var(--node)}
   .n-sh{stroke:var(--sh);stroke-width:1.6}
   .n-prok{stroke:var(--prok);stroke-width:1.6}
@@ -68,7 +69,7 @@
   .chip-sh{fill:var(--sh)} .chip-prok{fill:var(--prok)} .chip-euk{fill:var(--euk)} .chip-diag{fill:var(--diag)}
   .chip-t{fill:#fff;font-family:ui-monospace,monospace;font-weight:700;font-size:11px}
   .nname{fill:var(--ink);font-size:12.5px;font-weight:600}
-  .ntool{fill:var(--mut);font-size:10px;font-family:ui-monospace,monospace}
+  .ntool{fill:var(--mut);font-size:9.5px;font-family:ui-monospace,monospace}
   .port-sh{fill:var(--sh);stroke:var(--node);stroke-width:1.5}
   .port-prok{fill:var(--prok);stroke:var(--node);stroke-width:1.5}
   .port-euk{fill:var(--euk);stroke:var(--node);stroke-width:1.5}
@@ -79,6 +80,7 @@
   .decision{fill:var(--node);stroke:var(--dec);stroke-width:1.6}
   .dec-t{fill:var(--dec);font-size:11px;font-weight:700;font-family:ui-monospace,monospace}
   .dec-s{fill:var(--mut);font-size:9.5px}
+  .hublbl{fill:var(--mut);font-size:9.5px;font-style:italic}
 
   .tbl-wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:12px;background:var(--card);margin-top:12px}
   table{width:100%;border-collapse:collapse;min-width:660px}
@@ -88,6 +90,7 @@
   tbody tr:last-child td{border-bottom:none}
   td.code{font-family:ui-monospace,monospace;font-weight:700;color:var(--sh);white-space:nowrap}
   td.mod{font-weight:600;white-space:nowrap}
+  td.dep{font-family:ui-monospace,monospace;font-size:12px;color:var(--mut);white-space:nowrap}
   .na{color:var(--na-tx);font-style:italic}
   .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;
     background:var(--sh-bg);color:var(--sh)}
@@ -113,11 +116,12 @@
   <div class="page" data-lang="tr">
     <header>
       <h1>RNAForge Pipeline DAG</h1>
-      <p class="sub">İki dik eksen tek grafta. <span class="mono">m00</span>–<span class="mono">m03</span> ortak trunk;
-        organizma kararından sonra niceleme ve sayım (<span class="mono">m04</span>–<span class="mono">m05</span>)
-        prokaryot ve ökaryot dallarına ayrılır, <span class="mono">m06</span> diferansiyel ifadede birleşir.
-        <span class="mono">m06</span> ve sonrası tümü agnostiktir. Okuma tipi (kısa/uzun) buna dik ayrı eksendir:
-        her modül kendi içinde kısa/uzun araçlarına dallanır.</p>
+      <p class="sub">Gerçek <span class="mono">run()</span> bağımlılık grafiği. Doğrusal omurga
+        <span class="mono">m00→m01→m03→m04→m05→m06</span>; okuma QC (<span class="mono">m02</span>) doğrulamadan ayrı bir
+        daldır. Niceleme ve sayım (<span class="mono">m04–m05</span>) organizmaya göre prokaryot/ökaryot ayrışır,
+        <span class="mono">m06</span> diferansiyel ifadede birleşir. <span class="mono">m06</span> merkez hub'dır:
+        figürler, GO/KEGG/GSEA/semantik, PPI ve prokaryot-özel AMR/operon ondan dallanır. Tanı modülleri
+        (<span class="mono">m16/m17/m18</span>) nicelemeden sonra koşar. Okuma tipi (kısa/uzun) araç düzeyinde dik eksendir.</p>
     </header>
 
     <figure style="margin:0">
@@ -132,106 +136,113 @@
           <span><i class="i-sh"></i> ortak</span>
           <span><i class="i-prok"></i> prokaryot</span>
           <span><i class="i-euk"></i> ökaryot</span>
-          <span><i class="i-diag"></i> tanı</span>
+          <span><i class="i-diag dash"></i> tanı (kesikli)</span>
         </span>
       </div>
-      <svg class="dag" viewBox="0 0 960 1300" role="img" aria-label="RNAForge pipeline DAG. Ortak trunk m00-m03. Organizma karar düğümü prokaryot ve ökaryot dallarına ayrılır; niceleme m04 ve sayım m05 dallarda ayrışır, m06 diferansiyel ifadede birleşir. Sonrası agnostik: figürler, rapor, GO/KEGG/GSEA/semantik, PPI; prokaryot-özel AMR ve operon; tanı modülleri seqQC, alignQC ve MultiQC.">
+      <svg class="dag" viewBox="0 0 1140 1240" role="img" aria-label="RNAForge pipeline DAG, gerçek run bağımlılıklarından. Omurga m00 m01 m03 m04 m05 m06. m01'den ayrıca okuma QC m02. m04 ve m05 prokaryot ve ökaryot lanelerine ayrılır, m06'da birleşir. m06 merkez hub: figürler m07 (rapor m08'e), GO m09, KEGG m10, GSEA m11 (semantik m12'ye), PPI m15, prokaryot-özel AMR m13 ve operon m14. Tanı m16 m17 m18 m04'ten dallanır.">
         <defs>
           <pattern id="grid-tr" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="var(--grid)"/></pattern>
           <marker id="ah-tr" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="context-stroke"/></marker>
         </defs>
-        <rect x="0" y="0" width="960" height="1300" fill="url(#grid-tr)"/>
+        <rect x="0" y="0" width="1140" height="1240" fill="url(#grid-tr)"/>
 
-        <!-- kenarlar -->
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 82 C480 92 480 99 480 106"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 164 C480 174 480 181 480 188"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 246 C480 256 480 263 480 270"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 328 C480 336 480 342 480 348"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M436 380 C300 398 170 408 170 452"/>
-        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M524 380 C660 398 790 408 790 452"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M170 510 C170 519 170 524 170 534"/>
-        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M790 510 C790 519 790 524 790 534"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M170 592 C170 614 470 606 480 628"/>
-        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M790 592 C790 614 490 606 480 628"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M170 592 C170 640 170 690 170 724"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M170 782 C170 791 170 798 170 806"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 686 C480 700 480 712 480 724"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 782 C480 900 480 985 480 1088"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 686 C620 698 760 706 790 724"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 686 C650 745 790 782 790 806"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 686 C675 800 790 862 790 888"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M480 686 C560 870 790 1000 790 1052"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M790 946 C790 956 790 962 790 970"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M790 782 C902 822 902 928 790 970"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M790 1028 C650 1072 560 1082 480 1088"/>
-        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M790 1110 C700 1116 630 1117 580 1117"/>
-        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M170 864 C170 1010 300 1112 380 1117"/>
-        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M480 1146 C480 1162 480 1182 480 1200"/>
-        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M350 1229 L382 1229"/>
-        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M610 1229 L578 1229"/>
-        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M70 481 C36 520 36 1170 250 1200"/>
-        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M890 481 C924 520 924 1170 710 1200"/>
+        <!-- omurga + dallanma -->
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 80 C570 90 570 99 570 108"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 164 C570 176 570 184 570 200"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 164 C470 178 360 184 360 200"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 256 C570 262 570 267 570 272"/>
+        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M524 304 C440 330 360 350 360 384"/>
+        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M616 304 C700 330 800 350 800 384"/>
+        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M360 440 C360 450 360 460 360 470"/>
+        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M800 440 C800 450 800 460 800 470"/>
+        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M360 526 C360 552 560 548 570 566"/>
+        <path class="edge e-euk" marker-end="url(#ah-tr)" d="M800 526 C800 552 580 548 570 566"/>
+        <!-- m06 hub fan -->
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 622 C570 636 570 648 570 662"/>
+        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M570 622 C420 636 150 638 150 662"/>
+        <path class="edge e-prok" marker-end="url(#ah-tr)" d="M570 622 C380 664 150 704 150 748"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 622 C640 650 695 680 705 690"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 622 C625 700 695 766 705 776"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 622 C610 760 695 852 705 862"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 622 C590 830 695 1024 705 1034"/>
+        <!-- yapraklar -->
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M570 718 C570 860 570 980 570 1090"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M800 890 C800 900 800 910 800 920"/>
+        <path class="edge e-sh" marker-end="url(#ah-tr)" d="M895 690 C1090 760 1090 880 895 948"/>
+        <!-- tanı (m04'ten) -->
+        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M895 412 L915 412"/>
+        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M895 412 C904 445 909 472 915 498"/>
+        <path class="edge e-diag" marker-end="url(#ah-tr)" d="M895 412 C904 495 909 552 915 594"/>
 
-        <!-- düğümler -->
-        <g><rect class="node n-sh" x="380" y="24" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="34" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="47" text-anchor="middle">m00</text><text class="nname" x="442" y="48">Basecalling</text><text class="ntool" x="392" y="70">Dorado/Guppy · yalnız ONT</text><circle class="port-sh" cx="480" cy="82" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="106" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="116" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="129" text-anchor="middle">m01</text><text class="nname" x="442" y="130">Doğrulama</text><text class="ntool" x="392" y="152">girdi + platform tespiti</text><circle class="port-sh" cx="480" cy="106" r="4"/><circle class="port-sh" cx="480" cy="164" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="188" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="198" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="211" text-anchor="middle">m02</text><text class="nname" x="442" y="212">Okuma QC</text><text class="ntool" x="392" y="234">FastQC · NanoPlot</text><circle class="port-sh" cx="480" cy="188" r="4"/><circle class="port-sh" cx="480" cy="246" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="270" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="280" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="293" text-anchor="middle">m03</text><text class="nname" x="442" y="294">Trimming</text><text class="ntool" x="392" y="316">fastp · chopper/Pychopper</text><circle class="port-sh" cx="480" cy="270" r="4"/><circle class="port-sh" cx="480" cy="328" r="4"/></g>
+        <!-- düğümler: omurga -->
+        <g><rect class="node n-sh" x="475" y="24" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="34" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="47" text-anchor="middle">m00</text><text class="nname" x="533" y="48">Basecalling</text><text class="ntool" x="487" y="69">Dorado/Guppy · ONT</text><circle class="port-sh" cx="570" cy="80" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="108" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="118" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="131" text-anchor="middle">m01</text><text class="nname" x="533" y="132">Doğrulama</text><text class="ntool" x="487" y="153">girdi + platform</text><circle class="port-sh" cx="570" cy="108" r="4"/><circle class="port-sh" cx="570" cy="164" r="4"/></g>
+        <g><rect class="node n-sh" x="265" y="200" width="190" height="56" rx="11"/><rect class="chip-sh" x="275" y="210" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="223" text-anchor="middle">m02</text><text class="nname" x="323" y="224">Okuma QC</text><text class="ntool" x="277" y="245">FastQC · NanoPlot</text><circle class="port-sh" cx="360" cy="200" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="200" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="210" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="223" text-anchor="middle">m03</text><text class="nname" x="533" y="224">Trimming</text><text class="ntool" x="487" y="245">fastp · chopper/Pychopper</text><circle class="port-sh" cx="570" cy="200" r="4"/><circle class="port-sh" cx="570" cy="256" r="4"/></g>
 
-        <g><path class="decision" d="M480 348 L524 380 L480 412 L436 380 Z"/><text class="dec-t" x="480" y="377" text-anchor="middle">organizma</text><text class="dec-s" x="480" y="392" text-anchor="middle">prokaryot · ökaryot</text></g>
+        <g><path class="decision" d="M570 272 L616 304 L570 336 L524 304 Z"/><text class="dec-t" x="570" y="301" text-anchor="middle">organizma</text><text class="dec-s" x="570" y="316" text-anchor="middle">prokaryot · ökaryot</text></g>
 
-        <g><rect class="node n-prok" x="70" y="452" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="462" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="475" text-anchor="middle">m04</text><text class="nname" x="132" y="476">Niceleme</text><text class="ntool" x="82" y="498">bowtie2 · minimap2</text><circle class="port-prok" cx="170" cy="452" r="4"/><circle class="port-prok" cx="170" cy="510" r="4"/></g>
-        <g><rect class="node n-prok" x="70" y="534" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="544" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="557" text-anchor="middle">m05</text><text class="nname" x="132" y="558">Sayım</text><text class="ntool" x="82" y="580">featureCounts (-L)</text><circle class="port-prok" cx="170" cy="534" r="4"/><circle class="port-prok" cx="170" cy="592" r="4"/></g>
-        <g><rect class="node n-euk" x="690" y="452" width="200" height="58" rx="11"/><rect class="chip-euk" x="700" y="462" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="475" text-anchor="middle">m04</text><text class="nname" x="752" y="476">Niceleme</text><text class="ntool" x="702" y="498">Salmon · minimap2→tx</text><circle class="port-euk" cx="790" cy="452" r="4"/><circle class="port-euk" cx="790" cy="510" r="4"/></g>
-        <g><rect class="node n-euk" x="690" y="534" width="200" height="58" rx="11"/><rect class="chip-euk" x="700" y="544" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="557" text-anchor="middle">m05</text><text class="nname" x="752" y="558">Sayım</text><text class="ntool" x="702" y="580">tximport · tx2gene</text><circle class="port-euk" cx="790" cy="534" r="4"/><circle class="port-euk" cx="790" cy="592" r="4"/></g>
+        <!-- niceleme / sayım laneleri -->
+        <g><rect class="node n-prok" x="265" y="384" width="190" height="56" rx="11"/><rect class="chip-prok" x="275" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="407" text-anchor="middle">m04</text><text class="nname" x="323" y="408">Niceleme</text><text class="ntool" x="277" y="429">bowtie2 · minimap2</text><circle class="port-prok" cx="360" cy="384" r="4"/><circle class="port-prok" cx="360" cy="440" r="4"/></g>
+        <g><rect class="node n-euk" x="705" y="384" width="190" height="56" rx="11"/><rect class="chip-euk" x="715" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="407" text-anchor="middle">m04</text><text class="nname" x="763" y="408">Niceleme</text><text class="ntool" x="717" y="429">Salmon · minimap2→tx</text><circle class="port-euk" cx="800" cy="384" r="4"/><circle class="port-euk" cx="800" cy="440" r="4"/><circle class="port-euk" cx="895" cy="412" r="4"/></g>
+        <g><rect class="node n-prok" x="265" y="470" width="190" height="56" rx="11"/><rect class="chip-prok" x="275" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="493" text-anchor="middle">m05</text><text class="nname" x="323" y="494">Sayım</text><text class="ntool" x="277" y="515">featureCounts (-L)</text><circle class="port-prok" cx="360" cy="470" r="4"/><circle class="port-prok" cx="360" cy="526" r="4"/></g>
+        <g><rect class="node n-euk" x="705" y="470" width="190" height="56" rx="11"/><rect class="chip-euk" x="715" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="493" text-anchor="middle">m05</text><text class="nname" x="763" y="494">Sayım</text><text class="ntool" x="717" y="515">tximport · tx2gene</text><circle class="port-euk" cx="800" cy="470" r="4"/><circle class="port-euk" cx="800" cy="526" r="4"/></g>
 
-        <g><rect class="node n-sh" x="380" y="628" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="638" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="651" text-anchor="middle">m06</text><text class="nname" x="442" y="652">Diferansiyel İfade</text><text class="ntool" x="392" y="674">DESeq2 · agnostik</text><circle class="port-sh" cx="480" cy="628" r="4"/><circle class="port-sh" cx="480" cy="686" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="724" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="747" text-anchor="middle">m07</text><text class="nname" x="442" y="748">Figürler</text><text class="ntool" x="392" y="770">PCA·Volcano·Heatmap·MA</text><circle class="port-sh" cx="480" cy="724" r="4"/><circle class="port-sh" cx="480" cy="782" r="4"/></g>
+        <!-- hub -->
+        <g><rect class="node n-sh" x="475" y="566" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="576" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="589" text-anchor="middle">m06</text><text class="nname" x="533" y="590">Diferansiyel İfade</text><text class="ntool" x="487" y="611">DESeq2 · agnostik hub</text><circle class="port-sh" cx="570" cy="566" r="4"/><circle class="port-sh" cx="570" cy="622" r="4"/></g>
 
-        <g><rect class="node n-sh" x="690" y="724" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="747" text-anchor="middle">m09</text><text class="nname" x="752" y="748">GO Zenginleştirme</text><text class="ntool" x="702" y="770">GO ORA</text><circle class="port-sh" cx="790" cy="724" r="4"/><circle class="port-sh" cx="790" cy="782" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="806" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="816" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="829" text-anchor="middle">m10</text><text class="nname" x="752" y="830">KEGG</text><text class="ntool" x="702" y="852">pathway ORA + dot-plot</text><circle class="port-sh" cx="790" cy="806" r="4"/><circle class="port-sh" cx="790" cy="864" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="888" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="898" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="911" text-anchor="middle">m11</text><text class="nname" x="752" y="912">GSEA</text><text class="ntool" x="702" y="934">fgsea · sıralı stat</text><circle class="port-sh" cx="790" cy="888" r="4"/><circle class="port-sh" cx="790" cy="946" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="970" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="980" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="993" text-anchor="middle">m12</text><text class="nname" x="752" y="994">Semantik İndirgeme</text><text class="ntool" x="702" y="1016">REVIGO-benzeri (Lin)</text><circle class="port-sh" cx="790" cy="970" r="4"/><circle class="port-sh" cx="790" cy="1028" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="1052" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="1062" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="1075" text-anchor="middle">m15</text><text class="nname" x="752" y="1076">PPI Ağı</text><text class="ntool" x="702" y="1098">STRING + Louvain</text><circle class="port-sh" cx="790" cy="1052" r="4"/><circle class="port-sh" cx="790" cy="1110" r="4"/></g>
+        <!-- core: figürler → rapor -->
+        <g><rect class="node n-sh" x="475" y="662" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="685" text-anchor="middle">m07</text><text class="nname" x="533" y="686">Figürler</text><text class="ntool" x="487" y="707">PCA·Volcano·Heatmap·MA</text><circle class="port-sh" cx="570" cy="662" r="4"/><circle class="port-sh" cx="570" cy="718" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="1090" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="1100" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="1113" text-anchor="middle">m08</text><text class="nname" x="533" y="1114">Rapor</text><text class="ntool" x="487" y="1135">toplar: m07 + m09–m15</text><circle class="port-sh" cx="570" cy="1090" r="4"/></g>
 
-        <g><rect class="node n-prok" x="70" y="724" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="747" text-anchor="middle">m13</text><text class="nname" x="132" y="748">AMR &amp; Virülans</text><text class="ntool" x="82" y="770">abricate + AMRFinderPlus</text><circle class="port-prok" cx="170" cy="724" r="4"/><circle class="port-prok" cx="170" cy="782" r="4"/></g>
-        <g><rect class="node n-prok" x="70" y="806" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="816" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="829" text-anchor="middle">m14</text><text class="nname" x="132" y="830">Operon</text><text class="ntool" x="82" y="852">intergenik + operon DE</text><circle class="port-prok" cx="170" cy="806" r="4"/><circle class="port-prok" cx="170" cy="864" r="4"/></g>
+        <!-- fonksiyonel zenginleştirme lane -->
+        <g><rect class="node n-sh" x="705" y="662" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="685" text-anchor="middle">m09</text><text class="nname" x="763" y="686">GO Zenginleştirme</text><text class="ntool" x="717" y="707">GO ORA</text><circle class="port-sh" cx="705" cy="690" r="4"/><circle class="port-sh" cx="895" cy="690" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="748" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="758" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="771" text-anchor="middle">m10</text><text class="nname" x="763" y="772">KEGG</text><text class="ntool" x="717" y="793">pathway ORA</text><circle class="port-sh" cx="705" cy="776" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="834" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="844" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="857" text-anchor="middle">m11</text><text class="nname" x="763" y="858">GSEA</text><text class="ntool" x="717" y="879">fgsea · sıralı stat</text><circle class="port-sh" cx="705" cy="862" r="4"/><circle class="port-sh" cx="800" cy="890" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="920" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="930" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="943" text-anchor="middle">m12</text><text class="nname" x="763" y="944">Semantik İndirgeme</text><text class="ntool" x="717" y="965">REVIGO-benzeri (Lin)</text><circle class="port-sh" cx="800" cy="920" r="4"/><circle class="port-sh" cx="895" cy="948" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="1006" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="1016" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="1029" text-anchor="middle">m15</text><text class="nname" x="763" y="1030">PPI Ağı</text><text class="ntool" x="717" y="1051">STRING + Louvain</text><circle class="port-sh" cx="705" cy="1034" r="4"/></g>
 
-        <g><rect class="node n-sh" x="380" y="1088" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="1098" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="1111" text-anchor="middle">m08</text><text class="nname" x="442" y="1112">Rapor</text><text class="ntool" x="392" y="1134">self-contained HTML</text><circle class="port-sh" cx="480" cy="1088" r="4"/><circle class="port-sh" cx="480" cy="1146" r="4"/></g>
+        <!-- prokaryot-özel örtü -->
+        <g><rect class="node n-prok" x="55" y="662" width="190" height="56" rx="11"/><rect class="chip-prok" x="65" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="85" y="685" text-anchor="middle">m13</text><text class="nname" x="113" y="686">AMR &amp; Virülans</text><text class="ntool" x="67" y="707">abricate + AMRFinderPlus</text><circle class="port-prok" cx="150" cy="662" r="4"/></g>
+        <g><rect class="node n-prok" x="55" y="748" width="190" height="56" rx="11"/><rect class="chip-prok" x="65" y="758" width="40" height="18" rx="5"/><text class="chip-t" x="85" y="771" text-anchor="middle">m14</text><text class="nname" x="113" y="772">Operon</text><text class="ntool" x="67" y="793">intergenik + operon DE</text><circle class="port-prok" cx="150" cy="748" r="4"/></g>
 
-        <g><rect class="node n-diag" x="150" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="160" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="181" y="1223" text-anchor="middle">m16</text><text class="nname" x="212" y="1224">Sekans QC</text><text class="ntool" x="162" y="1246">SortMeRNA · RSeQC</text><circle class="port-diag" cx="250" cy="1200" r="4"/></g>
-        <g><rect class="node n-diag" x="380" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="390" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="1223" text-anchor="middle">m18</text><text class="nname" x="442" y="1224">MultiQC</text><text class="ntool" x="392" y="1246">toplu görünüm · kapstone</text><circle class="port-diag" cx="480" cy="1200" r="4"/></g>
-        <g><rect class="node n-diag" x="610" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="620" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="641" y="1223" text-anchor="middle">m17</text><text class="nname" x="672" y="1224">Hizalama QC</text><text class="ntool" x="622" y="1246">samtools stats</text><circle class="port-diag" cx="710" cy="1200" r="4"/></g>
+        <!-- tanı kümesi -->
+        <g><rect class="node n-diag" x="915" y="384" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="407" text-anchor="middle">m16</text><text class="nname" x="973" y="408">Sekans QC</text><text class="ntool" x="927" y="429">SortMeRNA · RSeQC</text><circle class="port-diag" cx="915" cy="412" r="4"/></g>
+        <g><rect class="node n-diag" x="915" y="470" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="493" text-anchor="middle">m17</text><text class="nname" x="973" y="494">Hizalama QC</text><text class="ntool" x="927" y="515">samtools stats</text><circle class="port-diag" cx="915" cy="498" r="4"/></g>
+        <g><rect class="node n-diag" x="915" y="566" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="576" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="589" text-anchor="middle">m18</text><text class="nname" x="973" y="590">MultiQC</text><text class="ntool" x="927" y="611">kapstone · tüm koşu</text><circle class="port-diag" cx="915" cy="594" r="4"/></g>
+
+        <text class="hublbl" x="570" y="646" text-anchor="middle">hub → 7 dal</text>
       </svg>
     </div>
-    <figcaption class="sub" style="margin:10px 2px 0">Kesikli mor kenarlar tanı akışını gösterir: <span class="mono">m16</span>/<span class="mono">m17</span> nicelemeden (<span class="mono">m04</span>) sonra diagnostik olarak koşar, <span class="mono">m18</span> tüm koşuyu tarar.</figcaption>
+    <figcaption class="sub" style="margin:10px 2px 0">Renkli düz oklar gerçek <span class="mono">run()</span> bağımlılıklarıdır (kod <span class="mono">state.is_done</span> kontrollerinden çıkarıldı). Kesikli mor oklar tanı akışını gösterir: <span class="mono">m16/m17/m18</span> nicelemeden (<span class="mono">m04</span>) sonra, organizmadan bağımsız koşar. Rapor (<span class="mono">m08</span>) sert bağımlılık olarak yalnız <span class="mono">m07</span>'yi ister, mevcutsa <span class="mono">m09–m15</span> çıktılarını toplar.</figcaption>
     </figure>
 
-    <h2>Modül matrisi — araçlar</h2>
+    <h2>Modül matrisi — araçlar &amp; bağımlılık</h2>
     <div class="tbl-wrap"><table>
-      <thead><tr><th style="width:52px">Kod</th><th style="width:180px">Modül</th><th>Prokaryot yolu</th><th class="euk">Ökaryot yolu</th></tr></thead>
+      <thead><tr><th style="width:52px">Kod</th><th style="width:150px">Modül</th><th style="width:88px">Bağımlılık</th><th>Prokaryot yolu</th><th class="euk">Ökaryot yolu</th></tr></thead>
       <tbody>
-        <tr><td class="code">m00</td><td class="mod">Basecalling <span class="tag">ORTAK</span></td><td colspan="2">ONT ham sinyal (FAST5/POD5) → FASTQ (Dorado/Guppy) — yalnız uzun-okuma ONT</td></tr>
-        <tr><td class="code">m01</td><td class="mod">Doğrulama <span class="tag">ORTAK</span></td><td colspan="2">Girdi doğrulama + platform / organizma / okuma-tipi tespiti</td></tr>
-        <tr><td class="code">m02</td><td class="mod">Okuma QC <span class="tag">ORTAK</span></td><td colspan="2">FastQC (kısa) · NanoPlot (uzun) · MultiQC toplaması</td></tr>
-        <tr><td class="code">m03</td><td class="mod">Trimming <span class="tag">ORTAK</span></td><td colspan="2">fastp (kısa) · chopper + Pychopper (uzun, tam-boy cDNA)</td></tr>
-        <tr><td class="code">m04</td><td class="mod">Niceleme</td><td>bowtie2 (kısa) · minimap2 (uzun) — <span class="mono">alignment_rate</span> kapısı</td><td>Salmon decoy-aware (kısa) · minimap2 → transkriptom (uzun)</td></tr>
-        <tr><td class="code">m05</td><td class="mod">Sayım</td><td>featureCounts (uzun: <span class="mono">-L</span>) — <span class="mono">assignment_rate</span> kapısı</td><td>tximport lengthScaledTPM (kısa) · tx2gene primer-sayım (uzun)</td></tr>
-        <tr><td class="code">m06</td><td class="mod">Diferansiyel İfade <span class="tag">ORTAK</span></td><td colspan="2">DESeq2 — <span class="mono">m06</span> ve sonrası organizma / okuma-tipi agnostik (ortak sözleşme)</td></tr>
-        <tr><td class="code">m07</td><td class="mod">Figürler <span class="tag">ORTAK</span></td><td colspan="2">PCA · Volcano · Heatmap · MA (4 statik figür)</td></tr>
-        <tr><td class="code">m08</td><td class="mod">Rapor <span class="tag">ORTAK</span></td><td colspan="2">Tek self-contained <span class="mono">report.html</span> (tablolar + figürler + provenance)</td></tr>
-        <tr><td class="code">m09</td><td class="mod">GO Zenginleştirme <span class="tag">ORTAK</span></td><td colspan="2">GO ORA — artan/azalan DEG; ökaryotta transkriptom-sembol köprüsü</td></tr>
-        <tr><td class="code">m10</td><td class="mod">KEGG <span class="tag">ORTAK</span></td><td colspan="2">KEGG pathway ORA + dot-plot (organizma KEGG kodu)</td></tr>
-        <tr><td class="code">m11</td><td class="mod">GSEA <span class="tag">ORTAK</span></td><td colspan="2">fgsea — sıralı DESeq2 istatistiğinden gen-seti zenginleştirme</td></tr>
-        <tr><td class="code">m12</td><td class="mod">Semantik İndirgeme <span class="tag">ORTAK</span></td><td colspan="2">REVIGO-benzeri Lin semantik indirgeme (m09 + m11 GO terimleri)</td></tr>
-        <tr><td class="code">m13</td><td class="mod">AMR &amp; Virülans</td><td>abricate (CARD/VFDB) + AMRFinderPlus — koordinatla overlay</td><td class="na">N/A — bakteri-özel</td></tr>
-        <tr><td class="code">m14</td><td class="mod">Operon</td><td>GFF intergenik mesafe + operon-düzeyi DE koordinasyonu</td><td class="na">N/A — prokaryot operon yapısı</td></tr>
-        <tr><td class="code">m15</td><td class="mod">PPI Ağı <span class="tag">ORTAK</span></td><td colspan="2">STRING alt-ağı + Louvain community (DEG'ler arası)</td></tr>
-        <tr><td class="code">m16</td><td class="mod">Sekans QC <span class="tag diag">TANI</span></td><td colspan="2">SortMeRNA rRNA% + RSeQC strandedness (iki WARN kapısı) — m04 sonrası</td></tr>
-        <tr><td class="code">m17</td><td class="mod">Hizalama QC <span class="tag diag">TANI</span></td><td colspan="2">samtools stats insert-size dağılımı (diagnostik) — hizalama sonrası</td></tr>
-        <tr><td class="code">m18</td><td class="mod">MultiQC <span class="tag diag">TANI</span></td><td colspan="2">MultiQC toplu görünüm — koşu dizinini tarar (kapstone)</td></tr>
+        <tr><td class="code">m00</td><td class="mod">Basecalling <span class="tag">ORTAK</span></td><td class="dep">—</td><td colspan="2">ONT ham sinyal (FAST5/POD5) → FASTQ (Dorado/Guppy) — yalnız uzun-okuma ONT</td></tr>
+        <tr><td class="code">m01</td><td class="mod">Doğrulama <span class="tag">ORTAK</span></td><td class="dep">m00*</td><td colspan="2">Girdi doğrulama + platform / organizma / okuma-tipi tespiti</td></tr>
+        <tr><td class="code">m02</td><td class="mod">Okuma QC <span class="tag">ORTAK</span></td><td class="dep">m01</td><td colspan="2">FastQC (kısa) · NanoPlot (uzun) — MultiQC'ye toplanan yaprak dal</td></tr>
+        <tr><td class="code">m03</td><td class="mod">Trimming <span class="tag">ORTAK</span></td><td class="dep">m01</td><td colspan="2">fastp (kısa) · chopper + Pychopper (uzun, tam-boy cDNA)</td></tr>
+        <tr><td class="code">m04</td><td class="mod">Niceleme</td><td class="dep">m03</td><td>bowtie2 (kısa) · minimap2 (uzun) — <span class="mono">alignment_rate</span> kapısı</td><td>Salmon decoy-aware (kısa) · minimap2 → transkriptom (uzun)</td></tr>
+        <tr><td class="code">m05</td><td class="mod">Sayım</td><td class="dep">m04</td><td>featureCounts (uzun: <span class="mono">-L</span>) — <span class="mono">assignment_rate</span> kapısı</td><td>tximport lengthScaledTPM (kısa) · tx2gene primer-sayım (uzun)</td></tr>
+        <tr><td class="code">m06</td><td class="mod">Diferansiyel İfade <span class="tag">HUB</span></td><td class="dep">m05</td><td colspan="2">DESeq2 — merkez hub; <span class="mono">m06</span> ve sonrası organizma / okuma-tipi agnostik (ortak sözleşme)</td></tr>
+        <tr><td class="code">m07</td><td class="mod">Figürler <span class="tag">ORTAK</span></td><td class="dep">m06</td><td colspan="2">PCA · Volcano · Heatmap · MA (4 statik figür)</td></tr>
+        <tr><td class="code">m08</td><td class="mod">Rapor <span class="tag">ORTAK</span></td><td class="dep">m07 (+m09–m15)</td><td colspan="2">Tek self-contained <span class="mono">report.html</span>; m07 sert bağımlılık, diğer çıktıları mevcutsa toplar</td></tr>
+        <tr><td class="code">m09</td><td class="mod">GO Zenginleştirme <span class="tag">ORTAK</span></td><td class="dep">m06</td><td colspan="2">GO ORA — artan/azalan DEG; ökaryotta transkriptom-sembol köprüsü</td></tr>
+        <tr><td class="code">m10</td><td class="mod">KEGG <span class="tag">ORTAK</span></td><td class="dep">m06</td><td colspan="2">KEGG pathway ORA + dot-plot (organizma KEGG kodu)</td></tr>
+        <tr><td class="code">m11</td><td class="mod">GSEA <span class="tag">ORTAK</span></td><td class="dep">m06</td><td colspan="2">fgsea — sıralı DESeq2 istatistiğinden gen-seti zenginleştirme</td></tr>
+        <tr><td class="code">m12</td><td class="mod">Semantik İndirgeme <span class="tag">ORTAK</span></td><td class="dep">m09 / m11</td><td colspan="2">REVIGO-benzeri Lin semantik indirgeme (m09 ORA ve/veya m11 GSEA GO terimleri)</td></tr>
+        <tr><td class="code">m13</td><td class="mod">AMR &amp; Virülans</td><td class="dep">m06</td><td>abricate (CARD/VFDB) + AMRFinderPlus — koordinatla overlay</td><td class="na">N/A — bakteri-özel</td></tr>
+        <tr><td class="code">m14</td><td class="mod">Operon</td><td class="dep">m06</td><td>GFF intergenik mesafe + operon-düzeyi DE koordinasyonu</td><td class="na">N/A — prokaryot operon yapısı</td></tr>
+        <tr><td class="code">m15</td><td class="mod">PPI Ağı <span class="tag">ORTAK</span></td><td class="dep">m06</td><td colspan="2">STRING alt-ağı + Louvain community (DEG'ler arası)</td></tr>
+        <tr><td class="code">m16</td><td class="mod">Sekans QC <span class="tag diag">TANI</span></td><td class="dep">m04</td><td colspan="2">SortMeRNA rRNA% + RSeQC strandedness (iki WARN kapısı)</td></tr>
+        <tr><td class="code">m17</td><td class="mod">Hizalama QC <span class="tag diag">TANI</span></td><td class="dep">m04</td><td colspan="2">samtools stats insert-size dağılımı (diagnostik)</td></tr>
+        <tr><td class="code">m18</td><td class="mod">MultiQC <span class="tag diag">TANI</span></td><td class="dep">m04</td><td colspan="2">MultiQC toplu görünüm — koşu dizinini tarar (kapstone)</td></tr>
       </tbody>
     </table></div>
+    <p class="sub" style="margin-top:8px"><span class="mono">*</span> <span class="mono">m00</span> çalıştıysa <span class="mono">m01</span> çözülmüş metadata'yı kullanır; aksi hâlde <span class="mono">m00</span> atlanır (yalnız ONT ham sinyal girişinde gerekir).</p>
 
     <h2>İzole conda ortamları</h2>
     <div class="envs">
@@ -240,18 +251,19 @@
       <span class="env"><b>rnaforge-amr</b></span><span class="env"><b>rnaforge-longread</b></span><span class="env"><b>rnaforge-basecall</b></span>
     </div>
     <footer>RNAForge · Bulk RNA-seq analiz platformu · github.com/aliarslan47/RNAForge<br>
-      Değişmez: organizma × okuma-tipi ayrımı yalnız <span class="mono">m04</span>/<span class="mono">m05</span>'te; <span class="mono">m06</span> ve sonrası tümü agnostiktir. Okuma tipi ⟂ organizma.</footer>
+      Kenarlar gerçek <span class="mono">run()</span> bağımlılıklarından çıkarıldı. Organizma × okuma-tipi ayrımı yalnız <span class="mono">m04</span>/<span class="mono">m05</span>'te; <span class="mono">m06</span> merkez hub'dır ve sonrası tümü agnostiktir. Tanı modülleri <span class="mono">m04</span>'e bağlı, organizmadan bağımsız. Okuma tipi ⟂ organizma.</footer>
   </div>
 
   <!-- ==================== ENGLISH ==================== -->
   <div class="page" data-lang="en" hidden>
     <header>
       <h1>RNAForge Pipeline DAG</h1>
-      <p class="sub">Two orthogonal axes in one graph. <span class="mono">m00</span>–<span class="mono">m03</span> form the
-        shared trunk; after the organism decision, quantification and counting
-        (<span class="mono">m04</span>–<span class="mono">m05</span>) split into prokaryote and eukaryote branches and
-        rejoin at <span class="mono">m06</span> differential expression. <span class="mono">m06</span> onward is fully
-        agnostic. Read type (short/long) is a separate orthogonal axis: each module branches internally on short/long tools.</p>
+      <p class="sub">The real <span class="mono">run()</span> dependency graph. Linear spine
+        <span class="mono">m00→m01→m03→m04→m05→m06</span>; read QC (<span class="mono">m02</span>) is a branch off validation.
+        Quantification and counting (<span class="mono">m04–m05</span>) split into prokaryote / eukaryote by organism and
+        rejoin at <span class="mono">m06</span> differential expression. <span class="mono">m06</span> is the central hub:
+        figures, GO/KEGG/GSEA/semantic, PPI and prokaryote-only AMR/operon branch from it. Diagnostic modules
+        (<span class="mono">m16/m17/m18</span>) run after quantification. Read type (short/long) is an orthogonal, tool-level axis.</p>
     </header>
 
     <figure style="margin:0">
@@ -266,104 +278,102 @@
           <span><i class="i-sh"></i> shared</span>
           <span><i class="i-prok"></i> prokaryote</span>
           <span><i class="i-euk"></i> eukaryote</span>
-          <span><i class="i-diag"></i> diagnostic</span>
+          <span><i class="i-diag dash"></i> diagnostic (dashed)</span>
         </span>
       </div>
-      <svg class="dag" viewBox="0 0 960 1300" role="img" aria-label="RNAForge pipeline DAG. Shared trunk m00-m03. An organism decision node splits into prokaryote and eukaryote branches; quantification m04 and counting m05 diverge on the branches and rejoin at m06 differential expression. Downstream is agnostic: figures, report, GO/KEGG/GSEA/semantic, PPI; prokaryote-only AMR and operon; diagnostic modules seqQC, alignQC and MultiQC.">
+      <svg class="dag" viewBox="0 0 1140 1240" role="img" aria-label="RNAForge pipeline DAG from real run dependencies. Spine m00 m01 m03 m04 m05 m06. Read QC m02 branches off m01. m04 and m05 split into prokaryote and eukaryote lanes and rejoin at m06. m06 is the central hub: figures m07 (to report m08), GO m09, KEGG m10, GSEA m11 (to semantic m12), PPI m15, prokaryote-only AMR m13 and operon m14. Diagnostics m16 m17 m18 branch from m04.">
         <defs>
           <pattern id="grid-en" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="var(--grid)"/></pattern>
           <marker id="ah-en" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="context-stroke"/></marker>
         </defs>
-        <rect x="0" y="0" width="960" height="1300" fill="url(#grid-en)"/>
+        <rect x="0" y="0" width="1140" height="1240" fill="url(#grid-en)"/>
 
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 82 C480 92 480 99 480 106"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 164 C480 174 480 181 480 188"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 246 C480 256 480 263 480 270"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 328 C480 336 480 342 480 348"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M436 380 C300 398 170 408 170 452"/>
-        <path class="edge e-euk" marker-end="url(#ah-en)" d="M524 380 C660 398 790 408 790 452"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M170 510 C170 519 170 524 170 534"/>
-        <path class="edge e-euk" marker-end="url(#ah-en)" d="M790 510 C790 519 790 524 790 534"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M170 592 C170 614 470 606 480 628"/>
-        <path class="edge e-euk" marker-end="url(#ah-en)" d="M790 592 C790 614 490 606 480 628"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M170 592 C170 640 170 690 170 724"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M170 782 C170 791 170 798 170 806"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 686 C480 700 480 712 480 724"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 782 C480 900 480 985 480 1088"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 686 C620 698 760 706 790 724"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 686 C650 745 790 782 790 806"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 686 C675 800 790 862 790 888"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M480 686 C560 870 790 1000 790 1052"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M790 946 C790 956 790 962 790 970"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M790 782 C902 822 902 928 790 970"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M790 1028 C650 1072 560 1082 480 1088"/>
-        <path class="edge e-sh" marker-end="url(#ah-en)" d="M790 1110 C700 1116 630 1117 580 1117"/>
-        <path class="edge e-prok" marker-end="url(#ah-en)" d="M170 864 C170 1010 300 1112 380 1117"/>
-        <path class="edge e-diag" marker-end="url(#ah-en)" d="M480 1146 C480 1162 480 1182 480 1200"/>
-        <path class="edge e-diag" marker-end="url(#ah-en)" d="M350 1229 L382 1229"/>
-        <path class="edge e-diag" marker-end="url(#ah-en)" d="M610 1229 L578 1229"/>
-        <path class="edge e-diag" marker-end="url(#ah-en)" d="M70 481 C36 520 36 1170 250 1200"/>
-        <path class="edge e-diag" marker-end="url(#ah-en)" d="M890 481 C924 520 924 1170 710 1200"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 80 C570 90 570 99 570 108"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 164 C570 176 570 184 570 200"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 164 C470 178 360 184 360 200"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 256 C570 262 570 267 570 272"/>
+        <path class="edge e-prok" marker-end="url(#ah-en)" d="M524 304 C440 330 360 350 360 384"/>
+        <path class="edge e-euk" marker-end="url(#ah-en)" d="M616 304 C700 330 800 350 800 384"/>
+        <path class="edge e-prok" marker-end="url(#ah-en)" d="M360 440 C360 450 360 460 360 470"/>
+        <path class="edge e-euk" marker-end="url(#ah-en)" d="M800 440 C800 450 800 460 800 470"/>
+        <path class="edge e-prok" marker-end="url(#ah-en)" d="M360 526 C360 552 560 548 570 566"/>
+        <path class="edge e-euk" marker-end="url(#ah-en)" d="M800 526 C800 552 580 548 570 566"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 622 C570 636 570 648 570 662"/>
+        <path class="edge e-prok" marker-end="url(#ah-en)" d="M570 622 C420 636 150 638 150 662"/>
+        <path class="edge e-prok" marker-end="url(#ah-en)" d="M570 622 C380 664 150 704 150 748"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 622 C640 650 695 680 705 690"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 622 C625 700 695 766 705 776"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 622 C610 760 695 852 705 862"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 622 C590 830 695 1024 705 1034"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M570 718 C570 860 570 980 570 1090"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M800 890 C800 900 800 910 800 920"/>
+        <path class="edge e-sh" marker-end="url(#ah-en)" d="M895 690 C1090 760 1090 880 895 948"/>
+        <path class="edge e-diag" marker-end="url(#ah-en)" d="M895 412 L915 412"/>
+        <path class="edge e-diag" marker-end="url(#ah-en)" d="M895 412 C904 445 909 472 915 498"/>
+        <path class="edge e-diag" marker-end="url(#ah-en)" d="M895 412 C904 495 909 552 915 594"/>
 
-        <g><rect class="node n-sh" x="380" y="24" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="34" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="47" text-anchor="middle">m00</text><text class="nname" x="442" y="48">Basecalling</text><text class="ntool" x="392" y="70">Dorado/Guppy · ONT only</text><circle class="port-sh" cx="480" cy="82" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="106" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="116" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="129" text-anchor="middle">m01</text><text class="nname" x="442" y="130">Validate</text><text class="ntool" x="392" y="152">input + platform detect</text><circle class="port-sh" cx="480" cy="106" r="4"/><circle class="port-sh" cx="480" cy="164" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="188" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="198" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="211" text-anchor="middle">m02</text><text class="nname" x="442" y="212">Read QC</text><text class="ntool" x="392" y="234">FastQC · NanoPlot</text><circle class="port-sh" cx="480" cy="188" r="4"/><circle class="port-sh" cx="480" cy="246" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="270" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="280" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="293" text-anchor="middle">m03</text><text class="nname" x="442" y="294">Trimming</text><text class="ntool" x="392" y="316">fastp · chopper/Pychopper</text><circle class="port-sh" cx="480" cy="270" r="4"/><circle class="port-sh" cx="480" cy="328" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="24" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="34" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="47" text-anchor="middle">m00</text><text class="nname" x="533" y="48">Basecalling</text><text class="ntool" x="487" y="69">Dorado/Guppy · ONT</text><circle class="port-sh" cx="570" cy="80" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="108" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="118" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="131" text-anchor="middle">m01</text><text class="nname" x="533" y="132">Validate</text><text class="ntool" x="487" y="153">input + platform</text><circle class="port-sh" cx="570" cy="108" r="4"/><circle class="port-sh" cx="570" cy="164" r="4"/></g>
+        <g><rect class="node n-sh" x="265" y="200" width="190" height="56" rx="11"/><rect class="chip-sh" x="275" y="210" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="223" text-anchor="middle">m02</text><text class="nname" x="323" y="224">Read QC</text><text class="ntool" x="277" y="245">FastQC · NanoPlot</text><circle class="port-sh" cx="360" cy="200" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="200" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="210" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="223" text-anchor="middle">m03</text><text class="nname" x="533" y="224">Trimming</text><text class="ntool" x="487" y="245">fastp · chopper/Pychopper</text><circle class="port-sh" cx="570" cy="200" r="4"/><circle class="port-sh" cx="570" cy="256" r="4"/></g>
 
-        <g><path class="decision" d="M480 348 L524 380 L480 412 L436 380 Z"/><text class="dec-t" x="480" y="377" text-anchor="middle">organism</text><text class="dec-s" x="480" y="392" text-anchor="middle">prokaryote · eukaryote</text></g>
+        <g><path class="decision" d="M570 272 L616 304 L570 336 L524 304 Z"/><text class="dec-t" x="570" y="301" text-anchor="middle">organism</text><text class="dec-s" x="570" y="316" text-anchor="middle">prokaryote · eukaryote</text></g>
 
-        <g><rect class="node n-prok" x="70" y="452" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="462" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="475" text-anchor="middle">m04</text><text class="nname" x="132" y="476">Quantify</text><text class="ntool" x="82" y="498">bowtie2 · minimap2</text><circle class="port-prok" cx="170" cy="452" r="4"/><circle class="port-prok" cx="170" cy="510" r="4"/></g>
-        <g><rect class="node n-prok" x="70" y="534" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="544" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="557" text-anchor="middle">m05</text><text class="nname" x="132" y="558">Counts</text><text class="ntool" x="82" y="580">featureCounts (-L)</text><circle class="port-prok" cx="170" cy="534" r="4"/><circle class="port-prok" cx="170" cy="592" r="4"/></g>
-        <g><rect class="node n-euk" x="690" y="452" width="200" height="58" rx="11"/><rect class="chip-euk" x="700" y="462" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="475" text-anchor="middle">m04</text><text class="nname" x="752" y="476">Quantify</text><text class="ntool" x="702" y="498">Salmon · minimap2→tx</text><circle class="port-euk" cx="790" cy="452" r="4"/><circle class="port-euk" cx="790" cy="510" r="4"/></g>
-        <g><rect class="node n-euk" x="690" y="534" width="200" height="58" rx="11"/><rect class="chip-euk" x="700" y="544" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="557" text-anchor="middle">m05</text><text class="nname" x="752" y="558">Counts</text><text class="ntool" x="702" y="580">tximport · tx2gene</text><circle class="port-euk" cx="790" cy="534" r="4"/><circle class="port-euk" cx="790" cy="592" r="4"/></g>
+        <g><rect class="node n-prok" x="265" y="384" width="190" height="56" rx="11"/><rect class="chip-prok" x="275" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="407" text-anchor="middle">m04</text><text class="nname" x="323" y="408">Quantify</text><text class="ntool" x="277" y="429">bowtie2 · minimap2</text><circle class="port-prok" cx="360" cy="384" r="4"/><circle class="port-prok" cx="360" cy="440" r="4"/></g>
+        <g><rect class="node n-euk" x="705" y="384" width="190" height="56" rx="11"/><rect class="chip-euk" x="715" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="407" text-anchor="middle">m04</text><text class="nname" x="763" y="408">Quantify</text><text class="ntool" x="717" y="429">Salmon · minimap2→tx</text><circle class="port-euk" cx="800" cy="384" r="4"/><circle class="port-euk" cx="800" cy="440" r="4"/><circle class="port-euk" cx="895" cy="412" r="4"/></g>
+        <g><rect class="node n-prok" x="265" y="470" width="190" height="56" rx="11"/><rect class="chip-prok" x="275" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="295" y="493" text-anchor="middle">m05</text><text class="nname" x="323" y="494">Counts</text><text class="ntool" x="277" y="515">featureCounts (-L)</text><circle class="port-prok" cx="360" cy="470" r="4"/><circle class="port-prok" cx="360" cy="526" r="4"/></g>
+        <g><rect class="node n-euk" x="705" y="470" width="190" height="56" rx="11"/><rect class="chip-euk" x="715" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="493" text-anchor="middle">m05</text><text class="nname" x="763" y="494">Counts</text><text class="ntool" x="717" y="515">tximport · tx2gene</text><circle class="port-euk" cx="800" cy="470" r="4"/><circle class="port-euk" cx="800" cy="526" r="4"/></g>
 
-        <g><rect class="node n-sh" x="380" y="628" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="638" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="651" text-anchor="middle">m06</text><text class="nname" x="442" y="652">Differential Expr.</text><text class="ntool" x="392" y="674">DESeq2 · agnostic</text><circle class="port-sh" cx="480" cy="628" r="4"/><circle class="port-sh" cx="480" cy="686" r="4"/></g>
-        <g><rect class="node n-sh" x="380" y="724" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="747" text-anchor="middle">m07</text><text class="nname" x="442" y="748">Figures</text><text class="ntool" x="392" y="770">PCA·Volcano·Heatmap·MA</text><circle class="port-sh" cx="480" cy="724" r="4"/><circle class="port-sh" cx="480" cy="782" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="566" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="576" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="589" text-anchor="middle">m06</text><text class="nname" x="533" y="590">Differential Expr.</text><text class="ntool" x="487" y="611">DESeq2 · agnostic hub</text><circle class="port-sh" cx="570" cy="566" r="4"/><circle class="port-sh" cx="570" cy="622" r="4"/></g>
 
-        <g><rect class="node n-sh" x="690" y="724" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="747" text-anchor="middle">m09</text><text class="nname" x="752" y="748">GO Enrichment</text><text class="ntool" x="702" y="770">GO ORA</text><circle class="port-sh" cx="790" cy="724" r="4"/><circle class="port-sh" cx="790" cy="782" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="806" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="816" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="829" text-anchor="middle">m10</text><text class="nname" x="752" y="830">KEGG</text><text class="ntool" x="702" y="852">pathway ORA + dot-plot</text><circle class="port-sh" cx="790" cy="806" r="4"/><circle class="port-sh" cx="790" cy="864" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="888" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="898" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="911" text-anchor="middle">m11</text><text class="nname" x="752" y="912">GSEA</text><text class="ntool" x="702" y="934">fgsea · ranked stat</text><circle class="port-sh" cx="790" cy="888" r="4"/><circle class="port-sh" cx="790" cy="946" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="970" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="980" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="993" text-anchor="middle">m12</text><text class="nname" x="752" y="994">Semantic Reduction</text><text class="ntool" x="702" y="1016">REVIGO-like (Lin)</text><circle class="port-sh" cx="790" cy="970" r="4"/><circle class="port-sh" cx="790" cy="1028" r="4"/></g>
-        <g><rect class="node n-sh" x="690" y="1052" width="200" height="58" rx="11"/><rect class="chip-sh" x="700" y="1062" width="42" height="18" rx="5"/><text class="chip-t" x="721" y="1075" text-anchor="middle">m15</text><text class="nname" x="752" y="1076">PPI Network</text><text class="ntool" x="702" y="1098">STRING + Louvain</text><circle class="port-sh" cx="790" cy="1052" r="4"/><circle class="port-sh" cx="790" cy="1110" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="662" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="685" text-anchor="middle">m07</text><text class="nname" x="533" y="686">Figures</text><text class="ntool" x="487" y="707">PCA·Volcano·Heatmap·MA</text><circle class="port-sh" cx="570" cy="662" r="4"/><circle class="port-sh" cx="570" cy="718" r="4"/></g>
+        <g><rect class="node n-sh" x="475" y="1090" width="190" height="56" rx="11"/><rect class="chip-sh" x="485" y="1100" width="40" height="18" rx="5"/><text class="chip-t" x="505" y="1113" text-anchor="middle">m08</text><text class="nname" x="533" y="1114">Report</text><text class="ntool" x="487" y="1135">gathers: m07 + m09–m15</text><circle class="port-sh" cx="570" cy="1090" r="4"/></g>
 
-        <g><rect class="node n-prok" x="70" y="724" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="734" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="747" text-anchor="middle">m13</text><text class="nname" x="132" y="748">AMR &amp; Virulence</text><text class="ntool" x="82" y="770">abricate + AMRFinderPlus</text><circle class="port-prok" cx="170" cy="724" r="4"/><circle class="port-prok" cx="170" cy="782" r="4"/></g>
-        <g><rect class="node n-prok" x="70" y="806" width="200" height="58" rx="11"/><rect class="chip-prok" x="80" y="816" width="42" height="18" rx="5"/><text class="chip-t" x="101" y="829" text-anchor="middle">m14</text><text class="nname" x="132" y="830">Operon</text><text class="ntool" x="82" y="852">intergenic + operon DE</text><circle class="port-prok" cx="170" cy="806" r="4"/><circle class="port-prok" cx="170" cy="864" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="662" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="685" text-anchor="middle">m09</text><text class="nname" x="763" y="686">GO Enrichment</text><text class="ntool" x="717" y="707">GO ORA</text><circle class="port-sh" cx="705" cy="690" r="4"/><circle class="port-sh" cx="895" cy="690" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="748" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="758" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="771" text-anchor="middle">m10</text><text class="nname" x="763" y="772">KEGG</text><text class="ntool" x="717" y="793">pathway ORA</text><circle class="port-sh" cx="705" cy="776" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="834" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="844" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="857" text-anchor="middle">m11</text><text class="nname" x="763" y="858">GSEA</text><text class="ntool" x="717" y="879">fgsea · ranked stat</text><circle class="port-sh" cx="705" cy="862" r="4"/><circle class="port-sh" cx="800" cy="890" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="920" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="930" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="943" text-anchor="middle">m12</text><text class="nname" x="763" y="944">Semantic Reduction</text><text class="ntool" x="717" y="965">REVIGO-like (Lin)</text><circle class="port-sh" cx="800" cy="920" r="4"/><circle class="port-sh" cx="895" cy="948" r="4"/></g>
+        <g><rect class="node n-sh" x="705" y="1006" width="190" height="56" rx="11"/><rect class="chip-sh" x="715" y="1016" width="40" height="18" rx="5"/><text class="chip-t" x="735" y="1029" text-anchor="middle">m15</text><text class="nname" x="763" y="1030">PPI Network</text><text class="ntool" x="717" y="1051">STRING + Louvain</text><circle class="port-sh" cx="705" cy="1034" r="4"/></g>
 
-        <g><rect class="node n-sh" x="380" y="1088" width="200" height="58" rx="11"/><rect class="chip-sh" x="390" y="1098" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="1111" text-anchor="middle">m08</text><text class="nname" x="442" y="1112">Report</text><text class="ntool" x="392" y="1134">self-contained HTML</text><circle class="port-sh" cx="480" cy="1088" r="4"/><circle class="port-sh" cx="480" cy="1146" r="4"/></g>
+        <g><rect class="node n-prok" x="55" y="662" width="190" height="56" rx="11"/><rect class="chip-prok" x="65" y="672" width="40" height="18" rx="5"/><text class="chip-t" x="85" y="685" text-anchor="middle">m13</text><text class="nname" x="113" y="686">AMR &amp; Virulence</text><text class="ntool" x="67" y="707">abricate + AMRFinderPlus</text><circle class="port-prok" cx="150" cy="662" r="4"/></g>
+        <g><rect class="node n-prok" x="55" y="748" width="190" height="56" rx="11"/><rect class="chip-prok" x="65" y="758" width="40" height="18" rx="5"/><text class="chip-t" x="85" y="771" text-anchor="middle">m14</text><text class="nname" x="113" y="772">Operon</text><text class="ntool" x="67" y="793">intergenic + operon DE</text><circle class="port-prok" cx="150" cy="748" r="4"/></g>
 
-        <g><rect class="node n-diag" x="150" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="160" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="181" y="1223" text-anchor="middle">m16</text><text class="nname" x="212" y="1224">Sequence QC</text><text class="ntool" x="162" y="1246">SortMeRNA · RSeQC</text><circle class="port-diag" cx="250" cy="1200" r="4"/></g>
-        <g><rect class="node n-diag" x="380" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="390" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="411" y="1223" text-anchor="middle">m18</text><text class="nname" x="442" y="1224">MultiQC</text><text class="ntool" x="392" y="1246">aggregate · capstone</text><circle class="port-diag" cx="480" cy="1200" r="4"/></g>
-        <g><rect class="node n-diag" x="610" y="1200" width="200" height="58" rx="11"/><rect class="chip-diag" x="620" y="1210" width="42" height="18" rx="5"/><text class="chip-t" x="641" y="1223" text-anchor="middle">m17</text><text class="nname" x="672" y="1224">Alignment QC</text><text class="ntool" x="622" y="1246">samtools stats</text><circle class="port-diag" cx="710" cy="1200" r="4"/></g>
+        <g><rect class="node n-diag" x="915" y="384" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="394" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="407" text-anchor="middle">m16</text><text class="nname" x="973" y="408">Sequence QC</text><text class="ntool" x="927" y="429">SortMeRNA · RSeQC</text><circle class="port-diag" cx="915" cy="412" r="4"/></g>
+        <g><rect class="node n-diag" x="915" y="470" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="480" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="493" text-anchor="middle">m17</text><text class="nname" x="973" y="494">Alignment QC</text><text class="ntool" x="927" y="515">samtools stats</text><circle class="port-diag" cx="915" cy="498" r="4"/></g>
+        <g><rect class="node n-diag" x="915" y="566" width="190" height="56" rx="11"/><rect class="chip-diag" x="925" y="576" width="40" height="18" rx="5"/><text class="chip-t" x="945" y="589" text-anchor="middle">m18</text><text class="nname" x="973" y="590">MultiQC</text><text class="ntool" x="927" y="611">capstone · full run</text><circle class="port-diag" cx="915" cy="594" r="4"/></g>
+
+        <text class="hublbl" x="570" y="646" text-anchor="middle">hub → 7 branches</text>
       </svg>
     </div>
-    <figcaption class="sub" style="margin:10px 2px 0">Dashed purple edges mark the diagnostic flow: <span class="mono">m16</span>/<span class="mono">m17</span> run after quantification (<span class="mono">m04</span>) as diagnostics, and <span class="mono">m18</span> scans the whole run.</figcaption>
+    <figcaption class="sub" style="margin:10px 2px 0">Solid colored arrows are the real <span class="mono">run()</span> dependencies (extracted from the code's <span class="mono">state.is_done</span> checks). Dashed purple arrows mark the diagnostic flow: <span class="mono">m16/m17/m18</span> run after quantification (<span class="mono">m04</span>), organism-independent. The report (<span class="mono">m08</span>) hard-requires only <span class="mono">m07</span> and gathers <span class="mono">m09–m15</span> outputs when present.</figcaption>
     </figure>
 
-    <h2>Module matrix — tools</h2>
+    <h2>Module matrix — tools &amp; dependency</h2>
     <div class="tbl-wrap"><table>
-      <thead><tr><th style="width:52px">Code</th><th style="width:180px">Module</th><th>Prokaryote path</th><th class="euk">Eukaryote path</th></tr></thead>
+      <thead><tr><th style="width:52px">Code</th><th style="width:150px">Module</th><th style="width:88px">Depends</th><th>Prokaryote path</th><th class="euk">Eukaryote path</th></tr></thead>
       <tbody>
-        <tr><td class="code">m00</td><td class="mod">Basecalling <span class="tag">SHARED</span></td><td colspan="2">ONT raw signal (FAST5/POD5) → FASTQ (Dorado/Guppy) — long-read ONT only</td></tr>
-        <tr><td class="code">m01</td><td class="mod">Validate <span class="tag">SHARED</span></td><td colspan="2">Input validation + platform / organism / read-type detection</td></tr>
-        <tr><td class="code">m02</td><td class="mod">Read QC <span class="tag">SHARED</span></td><td colspan="2">FastQC (short) · NanoPlot (long) · MultiQC aggregation</td></tr>
-        <tr><td class="code">m03</td><td class="mod">Trimming <span class="tag">SHARED</span></td><td colspan="2">fastp (short) · chopper + Pychopper (long, full-length cDNA)</td></tr>
-        <tr><td class="code">m04</td><td class="mod">Quantify</td><td>bowtie2 (short) · minimap2 (long) — <span class="mono">alignment_rate</span> gate</td><td>Salmon decoy-aware (short) · minimap2 → transcriptome (long)</td></tr>
-        <tr><td class="code">m05</td><td class="mod">Counts</td><td>featureCounts (long: <span class="mono">-L</span>) — <span class="mono">assignment_rate</span> gate</td><td>tximport lengthScaledTPM (short) · tx2gene primary-count (long)</td></tr>
-        <tr><td class="code">m06</td><td class="mod">Differential Expr. <span class="tag">SHARED</span></td><td colspan="2">DESeq2 — <span class="mono">m06</span> onward is organism / read-type agnostic (shared contract)</td></tr>
-        <tr><td class="code">m07</td><td class="mod">Figures <span class="tag">SHARED</span></td><td colspan="2">PCA · Volcano · Heatmap · MA (4 static figures)</td></tr>
-        <tr><td class="code">m08</td><td class="mod">Report <span class="tag">SHARED</span></td><td colspan="2">Single self-contained <span class="mono">report.html</span> (tables + figures + provenance)</td></tr>
-        <tr><td class="code">m09</td><td class="mod">GO Enrichment <span class="tag">SHARED</span></td><td colspan="2">GO ORA — up/down DEGs; transcriptome-symbol bridge for eukaryotes</td></tr>
-        <tr><td class="code">m10</td><td class="mod">KEGG <span class="tag">SHARED</span></td><td colspan="2">KEGG pathway ORA + dot-plot (organism KEGG code)</td></tr>
-        <tr><td class="code">m11</td><td class="mod">GSEA <span class="tag">SHARED</span></td><td colspan="2">fgsea — gene-set enrichment from ranked DESeq2 statistic</td></tr>
-        <tr><td class="code">m12</td><td class="mod">Semantic Reduction <span class="tag">SHARED</span></td><td colspan="2">REVIGO-like Lin semantic reduction (m09 + m11 GO terms)</td></tr>
-        <tr><td class="code">m13</td><td class="mod">AMR &amp; Virulence</td><td>abricate (CARD/VFDB) + AMRFinderPlus — coordinate overlay</td><td class="na">N/A — bacteria-specific</td></tr>
-        <tr><td class="code">m14</td><td class="mod">Operon</td><td>GFF intergenic distance + operon-level DE coordination</td><td class="na">N/A — prokaryote operon structure</td></tr>
-        <tr><td class="code">m15</td><td class="mod">PPI Network <span class="tag">SHARED</span></td><td colspan="2">STRING sub-network + Louvain community (among DEGs)</td></tr>
-        <tr><td class="code">m16</td><td class="mod">Sequence QC <span class="tag diag">DIAG</span></td><td colspan="2">SortMeRNA rRNA% + RSeQC strandedness (two WARN gates) — after m04</td></tr>
-        <tr><td class="code">m17</td><td class="mod">Alignment QC <span class="tag diag">DIAG</span></td><td colspan="2">samtools stats insert-size distribution (diagnostic) — post-alignment</td></tr>
-        <tr><td class="code">m18</td><td class="mod">MultiQC <span class="tag diag">DIAG</span></td><td colspan="2">MultiQC aggregate view — scans the run directory (capstone)</td></tr>
+        <tr><td class="code">m00</td><td class="mod">Basecalling <span class="tag">SHARED</span></td><td class="dep">—</td><td colspan="2">ONT raw signal (FAST5/POD5) → FASTQ (Dorado/Guppy) — long-read ONT only</td></tr>
+        <tr><td class="code">m01</td><td class="mod">Validate <span class="tag">SHARED</span></td><td class="dep">m00*</td><td colspan="2">Input validation + platform / organism / read-type detection</td></tr>
+        <tr><td class="code">m02</td><td class="mod">Read QC <span class="tag">SHARED</span></td><td class="dep">m01</td><td colspan="2">FastQC (short) · NanoPlot (long) — leaf branch aggregated into MultiQC</td></tr>
+        <tr><td class="code">m03</td><td class="mod">Trimming <span class="tag">SHARED</span></td><td class="dep">m01</td><td colspan="2">fastp (short) · chopper + Pychopper (long, full-length cDNA)</td></tr>
+        <tr><td class="code">m04</td><td class="mod">Quantify</td><td class="dep">m03</td><td>bowtie2 (short) · minimap2 (long) — <span class="mono">alignment_rate</span> gate</td><td>Salmon decoy-aware (short) · minimap2 → transcriptome (long)</td></tr>
+        <tr><td class="code">m05</td><td class="mod">Counts</td><td class="dep">m04</td><td>featureCounts (long: <span class="mono">-L</span>) — <span class="mono">assignment_rate</span> gate</td><td>tximport lengthScaledTPM (short) · tx2gene primary-count (long)</td></tr>
+        <tr><td class="code">m06</td><td class="mod">Differential Expr. <span class="tag">HUB</span></td><td class="dep">m05</td><td colspan="2">DESeq2 — central hub; <span class="mono">m06</span> onward is organism / read-type agnostic (shared contract)</td></tr>
+        <tr><td class="code">m07</td><td class="mod">Figures <span class="tag">SHARED</span></td><td class="dep">m06</td><td colspan="2">PCA · Volcano · Heatmap · MA (4 static figures)</td></tr>
+        <tr><td class="code">m08</td><td class="mod">Report <span class="tag">SHARED</span></td><td class="dep">m07 (+m09–m15)</td><td colspan="2">Single self-contained <span class="mono">report.html</span>; hard-requires m07, gathers other outputs when present</td></tr>
+        <tr><td class="code">m09</td><td class="mod">GO Enrichment <span class="tag">SHARED</span></td><td class="dep">m06</td><td colspan="2">GO ORA — up/down DEGs; transcriptome-symbol bridge for eukaryotes</td></tr>
+        <tr><td class="code">m10</td><td class="mod">KEGG <span class="tag">SHARED</span></td><td class="dep">m06</td><td colspan="2">KEGG pathway ORA + dot-plot (organism KEGG code)</td></tr>
+        <tr><td class="code">m11</td><td class="mod">GSEA <span class="tag">SHARED</span></td><td class="dep">m06</td><td colspan="2">fgsea — gene-set enrichment from ranked DESeq2 statistic</td></tr>
+        <tr><td class="code">m12</td><td class="mod">Semantic Reduction <span class="tag">SHARED</span></td><td class="dep">m09 / m11</td><td colspan="2">REVIGO-like Lin semantic reduction (m09 ORA and/or m11 GSEA GO terms)</td></tr>
+        <tr><td class="code">m13</td><td class="mod">AMR &amp; Virulence</td><td class="dep">m06</td><td>abricate (CARD/VFDB) + AMRFinderPlus — coordinate overlay</td><td class="na">N/A — bacteria-specific</td></tr>
+        <tr><td class="code">m14</td><td class="mod">Operon</td><td class="dep">m06</td><td>GFF intergenic distance + operon-level DE coordination</td><td class="na">N/A — prokaryote operon structure</td></tr>
+        <tr><td class="code">m15</td><td class="mod">PPI Network <span class="tag">SHARED</span></td><td class="dep">m06</td><td colspan="2">STRING sub-network + Louvain community (among DEGs)</td></tr>
+        <tr><td class="code">m16</td><td class="mod">Sequence QC <span class="tag diag">DIAG</span></td><td class="dep">m04</td><td colspan="2">SortMeRNA rRNA% + RSeQC strandedness (two WARN gates)</td></tr>
+        <tr><td class="code">m17</td><td class="mod">Alignment QC <span class="tag diag">DIAG</span></td><td class="dep">m04</td><td colspan="2">samtools stats insert-size distribution (diagnostic)</td></tr>
+        <tr><td class="code">m18</td><td class="mod">MultiQC <span class="tag diag">DIAG</span></td><td class="dep">m04</td><td colspan="2">MultiQC aggregate view — scans the run directory (capstone)</td></tr>
       </tbody>
     </table></div>
+    <p class="sub" style="margin-top:8px"><span class="mono">*</span> if <span class="mono">m00</span> ran, <span class="mono">m01</span> uses the resolved metadata; otherwise <span class="mono">m00</span> is skipped (only needed for raw ONT signal input).</p>
 
     <h2>Isolated conda environments</h2>
     <div class="envs">
@@ -372,7 +382,7 @@
       <span class="env"><b>rnaforge-amr</b></span><span class="env"><b>rnaforge-longread</b></span><span class="env"><b>rnaforge-basecall</b></span>
     </div>
     <footer>RNAForge · Bulk RNA-seq analysis platform · github.com/aliarslan47/RNAForge<br>
-      Invariant: the organism × read-type split lives only in <span class="mono">m04</span>/<span class="mono">m05</span>; <span class="mono">m06</span> onward is fully agnostic. Read type ⟂ organism.</footer>
+      Edges are extracted from the real <span class="mono">run()</span> dependencies. The organism × read-type split lives only in <span class="mono">m04</span>/<span class="mono">m05</span>; <span class="mono">m06</span> is the central hub and everything after it is agnostic. Diagnostics depend on <span class="mono">m04</span>, organism-independent. Read type ⟂ organism.</footer>
   </div>
 </div>
 
