@@ -75,6 +75,25 @@ class RunState:
     def is_done(self, module: str) -> bool:
         return module in self._read()["modules"]
 
+    def mark_item_done(self, module: str, item: str, payload: dict | None = None) -> None:
+        """Bir aşama İÇİNDEKİ tek örneği tamamlandı işaretle (örnek-başı resume, PLAN §15).
+
+        KRİTİK: işaretçiler `modules` DIŞINDA ayrı `items` anahtarında tutulur — aksi halde
+        yarıda kalmış bir aşama `is_done()` için tamamlanmış görünür ve downstream bağımlılık
+        guard'ı (ör. m04'ün is_done('m03_trim') kontrolü) sessizce yanlış geçerdi. `payload`
+        örneğin özet istatistiğidir (survival/alignment_rate + çıktı yolu) → resume'da yeniden
+        hesaplamadan kapı kurulur."""
+        data = self._read()
+        items = data.setdefault("items", {}).setdefault(module, {})
+        items[item] = payload if payload is not None else {}
+        self._write(data)
+
+    def is_item_done(self, module: str, item: str) -> bool:
+        return item in self._read().get("items", {}).get(module, {})
+
+    def item_payload(self, module: str, item: str) -> dict | None:
+        return self._read().get("items", {}).get(module, {}).get(item)
+
     def completed_modules(self) -> list[str]:
         return list(self._read()["modules"].keys())
 

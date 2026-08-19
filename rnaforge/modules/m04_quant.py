@@ -26,6 +26,18 @@ MODULE_NAME = "m04_quant"
 _GATE = "alignment_rate"
 
 
+def _cached_sample(state: RunState, sid: str, force: bool) -> dict | None:
+    """Örnek-başı resume (Faz 3): işaretçi + payload'daki çıktı dosyası (bam/quant_sf)
+    hâlâ diskteyse cached özet istatistiğini döndürür; aksi halde None (yeniden hesapla)."""
+    if force or not state.is_item_done(MODULE_NAME, sid):
+        return None
+    payload = state.item_payload(MODULE_NAME, sid) or {}
+    output = payload.get("bam") or payload.get("quant_sf")
+    if output and Path(output).exists():
+        return payload
+    return None
+
+
 @_dataclass
 class _MappingAdapter:
     """build_alignment_gates .alignment_rate bekler; salmon mapping_rate'i uyarlar."""
@@ -85,18 +97,18 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
         read_type = resolve_read_type(run_dir)
         if read_type == "long":
             summary = _quant_euk_long(config, metadata_path, run_dir,
-                                      quant_dir, stats_dir, logs_dir, state)
+                                      quant_dir, stats_dir, logs_dir, state, force)
         else:
             summary = _quant_euk(config, metadata_path, run_dir,
-                                 quant_dir, stats_dir, logs_dir, state)
+                                 quant_dir, stats_dir, logs_dir, state, force)
     else:
         read_type = resolve_read_type(run_dir)
         if read_type == "long":
             summary = _quant_long(config, metadata_path, run_dir,
-                                  quant_dir, stats_dir, logs_dir, state)
+                                  quant_dir, stats_dir, logs_dir, state, force)
         else:
             summary = _quant_short(config, metadata_path, run_dir,
-                                   quant_dir, stats_dir, logs_dir, state)
+                                   quant_dir, stats_dir, logs_dir, state, force)
 
     state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "quant.log")])
     return summary
@@ -104,7 +116,7 @@ def run_quant(config: Config, metadata_path: Path, run_dir: Path,
 
 def _quant_short(config: Config, metadata_path: Path, run_dir: Path,
                  quant_dir: Path, stats_dir: Path, logs_dir: Path,
-                 state: RunState) -> dict:
+                 state: RunState, force: bool = False) -> dict:
     """Kısa-okuma hizalama (bowtie2). alignment_rate FAIL kapısı korunur."""
     stats_path = stats_dir / "alignment_statistics.json"
     profile = load_profile(config.organism_type, config.quality)
@@ -121,14 +133,22 @@ def _quant_short(config: Config, metadata_path: Path, run_dir: Path,
         per_sample = {}
         for sample in samples:
             state.heartbeat()
+            sid = sample.sample_id
+            cached = _cached_sample(state, sid, force)
+            if cached is not None:
+                per_sample[sid] = cached
+                results[sid] = _MappingAdapter(cached["alignment_rate"])
+                log(f"{sid}: resumed (cached alignment_rate={cached['alignment_rate']:.3f})")
+                continue
             t1, t2 = trimmed_reads(run_dir, sample)
-            result = run_bowtie2(index_prefix, quant_dir / sample.sample_id, t1,
+            result = run_bowtie2(index_prefix, quant_dir / sid, t1,
                                  fastq_2=t2, threads=config.resources.threads)
-            results[sample.sample_id] = result
-            per_sample[sample.sample_id] = {
+            results[sid] = result
+            per_sample[sid] = {
                 "alignment_rate": result.alignment_rate, "bam": str(result.bam),
             }
-            log(f"{sample.sample_id}: alignment_rate={result.alignment_rate:.3f}")
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
+            log(f"{sid}: alignment_rate={result.alignment_rate:.3f}")
 
         gates = build_alignment_gates(results, profile)
         summary = {
@@ -147,7 +167,7 @@ def _quant_short(config: Config, metadata_path: Path, run_dir: Path,
 
 def _quant_euk(config: Config, metadata_path: Path, run_dir: Path,
                quant_dir: Path, stats_dir: Path, logs_dir: Path,
-               state: RunState) -> dict:
+               state: RunState, force: bool = False) -> dict:
     """Ökaryot niceleme (Salmon, decoy-aware). mapping_rate → alignment_rate FAIL kapısı
     (eukaryote.yml permissive). Trimlenmiş okuma → salmon quant -l A."""
     stats_path = stats_dir / "alignment_statistics.json"
@@ -168,13 +188,21 @@ def _quant_euk(config: Config, metadata_path: Path, run_dir: Path,
         per_sample = {}
         for sample in samples:
             state.heartbeat()
+            sid = sample.sample_id
+            cached = _cached_sample(state, sid, force)
+            if cached is not None:
+                per_sample[sid] = cached
+                results[sid] = _MappingAdapter(cached["mapping_rate"])
+                log(f"{sid}: resumed (cached mapping_rate={cached['mapping_rate']:.3f})")
+                continue
             t1, t2 = trimmed_reads(run_dir, sample)
-            q = run_salmon_quant(index_dir, quant_dir / sample.sample_id, t1,
+            q = run_salmon_quant(index_dir, quant_dir / sid, t1,
                                  fastq_2=t2, threads=config.resources.threads)
-            results[sample.sample_id] = _MappingAdapter(q.mapping_rate)
-            per_sample[sample.sample_id] = {
+            results[sid] = _MappingAdapter(q.mapping_rate)
+            per_sample[sid] = {
                 "mapping_rate": q.mapping_rate, "quant_sf": str(q.quant_sf)}
-            log(f"{sample.sample_id}: mapping_rate={q.mapping_rate:.3f}")
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
+            log(f"{sid}: mapping_rate={q.mapping_rate:.3f}")
 
         gates = build_alignment_gates(results, profile)
         summary = {
@@ -193,7 +221,7 @@ def _quant_euk(config: Config, metadata_path: Path, run_dir: Path,
 
 def _quant_euk_long(config: Config, metadata_path: Path, run_dir: Path,
                     quant_dir: Path, stats_dir: Path, logs_dir: Path,
-                    state: RunState) -> dict:
+                    state: RunState, force: bool = False) -> dict:
     """Ökaryot uzun-okuma: minimap2 → TRANSKRİPTOM (transkript=hedef, intron yok → splice
     gerekmez). Preset platformdan (ont→map-ont, pacbio_hifi→map-hifi). DIAGNOSTİK — FAIL
     kapısı YOK (tüm long yolları gibi; ONT düşük oranı yanlış FAIL'lemesin). m05 tx2gene ile
@@ -213,13 +241,20 @@ def _quant_euk_long(config: Config, metadata_path: Path, run_dir: Path,
         per_sample = {}
         for sample in samples:
             state.heartbeat()
+            sid = sample.sample_id
+            cached = _cached_sample(state, sid, force)
+            if cached is not None:
+                per_sample[sid] = cached
+                log(f"{sid}: resumed (cached mapping_rate={cached['mapping_rate']:.3f})")
+                continue
             t1, _ = trimmed_reads(run_dir, sample)   # ONT tek-uçlu
             result = run_minimap2(config.reference.transcriptome_fasta,
-                                  quant_dir / sample.sample_id, t1, preset,
+                                  quant_dir / sid, t1, preset,
                                   threads=config.resources.threads)
-            per_sample[sample.sample_id] = {
+            per_sample[sid] = {
                 "mapping_rate": result.alignment_rate, "bam": str(result.bam)}
-            log(f"{sample.sample_id}: mapping_rate={result.alignment_rate:.3f} (diagnostik)")
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
+            log(f"{sid}: mapping_rate={result.alignment_rate:.3f} (diagnostik)")
         summary = {
             "read_type": "long", "organism_type": "eukaryote",
             "n_samples": len(samples), "samples": per_sample, "gate_counts": {},
@@ -231,7 +266,7 @@ def _quant_euk_long(config: Config, metadata_path: Path, run_dir: Path,
 
 def _quant_long(config: Config, metadata_path: Path, run_dir: Path,
                 quant_dir: Path, stats_dir: Path, logs_dir: Path,
-                state: RunState) -> dict:
+                state: RunState, force: bool = False) -> dict:
     """Uzun-okuma hizalama (minimap2). Preset platformdan (ont→map-ont,
     pacbio_hifi→map-hifi). Diagnostik — FAIL kapısı yok (long profil Step 6);
     alignment_rate yalnız istatistik olarak kaydedilir."""
@@ -250,15 +285,23 @@ def _quant_long(config: Config, metadata_path: Path, run_dir: Path,
         per_sample = {}
         for sample in samples:
             state.heartbeat()
+            sid = sample.sample_id
+            cached = _cached_sample(state, sid, force)
+            if cached is not None:
+                per_sample[sid] = cached
+                results[sid] = _MappingAdapter(cached["alignment_rate"])
+                log(f"{sid}: resumed (cached alignment_rate={cached['alignment_rate']:.3f})")
+                continue
             t1, _ = trimmed_reads(run_dir, sample)   # ONT tek-uçlu
             result = run_minimap2(config.reference.genome_fasta,
-                                  quant_dir / sample.sample_id, t1,
+                                  quant_dir / sid, t1,
                                   preset=preset, threads=config.resources.threads)
-            results[sample.sample_id] = result
-            per_sample[sample.sample_id] = {
+            results[sid] = result
+            per_sample[sid] = {
                 "alignment_rate": result.alignment_rate, "bam": str(result.bam),
             }
-            log(f"{sample.sample_id}: alignment_rate={result.alignment_rate:.3f}")
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
+            log(f"{sid}: alignment_rate={result.alignment_rate:.3f}")
 
         # Step 6: uzun-okuma alignment FAIL kapısı (prokaryote_long, eşik 0.50).
         # Yanlış referans/kontaminasyon her platformda GEÇERSİZ → FAIL (survival/assignment

@@ -85,10 +85,10 @@ def run_trim(config: Config, metadata_path: Path, run_dir: Path,
     read_type = resolve_read_type(run_dir)
     if read_type == "long":
         summary = _trim_long(config, metadata_path, run_dir,
-                             trimmed_dir, stats_dir, logs_dir, state)
+                             trimmed_dir, stats_dir, logs_dir, state, force)
     else:
         summary = _trim_short(config, metadata_path, run_dir,
-                             trimmed_dir, stats_dir, logs_dir, state)
+                             trimmed_dir, stats_dir, logs_dir, state, force)
 
     state.mark_done(MODULE_NAME, [str(stats_path), str(logs_dir / "trim.log")])
     return summary
@@ -96,7 +96,7 @@ def run_trim(config: Config, metadata_path: Path, run_dir: Path,
 
 def _trim_short(config: Config, metadata_path: Path, run_dir: Path,
                 trimmed_dir: Path, stats_dir: Path, logs_dir: Path,
-                state: RunState) -> dict:
+                state: RunState, force: bool = False) -> dict:
     """Kısa-okuma trimming (fastp). survival_rate FAIL kapısı korunur."""
     stats_path = stats_dir / "trimming_statistics.json"
     profile = load_profile(config.organism_type, config.quality)
@@ -109,27 +109,35 @@ def _trim_short(config: Config, metadata_path: Path, run_dir: Path,
         samples = load_metadata(metadata_path)
         log(f"m03 fastp: {len(samples)} sample(s), min_length={config.trimming.min_length}, "
             f"aggressive_quality={config.trimming.aggressive_quality}")
-        results = {}
         per_sample = {}
         for sample in samples:
             state.heartbeat()
-            sample_out = trimmed_dir / sample.sample_id
+            sid = sample.sample_id
+            # Örnek-başı resume (Faz 3): işaretçi + trimlenmiş çıktı zaten varsa yeniden
+            # fastp çalıştırma; cached özet istatistiği yükle. Kapı tüm örnekleri gerektirir.
+            out1, _ = trimmed_reads(run_dir, sample)
+            if not force and state.is_item_done(MODULE_NAME, sid) and out1.exists():
+                per_sample[sid] = state.item_payload(MODULE_NAME, sid)
+                log(f"{sid}: resumed (cached survival="
+                    f"{per_sample[sid].get('survival_rate')})")
+                continue
+            sample_out = trimmed_dir / sid
             result = run_fastp(
                 sample.fastq_1, sample_out, min_length=config.trimming.min_length,
                 fastq_2=sample.fastq_2,
                 aggressive_quality=config.trimming.aggressive_quality,
             )
-            results[sample.sample_id] = result
-            per_sample[sample.sample_id] = {
+            per_sample[sid] = {
                 "reads_before": result.reads_before,
                 "reads_after": result.reads_after,
                 "survival_rate": result.survival_rate,
             }
-            log(f"{sample.sample_id}: survival={result.survival_rate:.3f} "
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
+            log(f"{sid}: survival={result.survival_rate:.3f} "
                 f"({result.reads_after}/{result.reads_before})")
 
         gates = build_trim_gates(
-            {sid: r.survival_rate for sid, r in results.items()}, profile)
+            {sid: ps["survival_rate"] for sid, ps in per_sample.items()}, profile)
         # Sıra (m01 deseni): stats yaz → gates yaz → EN SON raise.
         summary = {
             "read_type": "short",
@@ -155,7 +163,7 @@ def _count_fastx(path) -> int:
 
 def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
                trimmed_dir: Path, stats_dir: Path, logs_dir: Path,
-               state: RunState) -> dict:
+               state: RunState, force: bool = False) -> dict:
     """Uzun-okuma ön-işleme. cdna: Pychopper (yönlendir/kes) + chopper (filtre);
     direct_rna: yalnız chopper. Diagnostik — FAIL kapısı yok (long profil Step 6)."""
     chemistry = config.library.chemistry
@@ -183,7 +191,14 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
         per_sample: dict[str, dict] = {}
         for sample in samples:
             state.heartbeat()
+            sid = sample.sample_id
             out1, _ = trimmed_reads(run_dir, sample)
+            # Örnek-başı resume (Faz 3): işaretçi + çıktı varsa yeniden ön-işleme yapma.
+            if not force and state.is_item_done(MODULE_NAME, sid) and out1.exists():
+                per_sample[sid] = state.item_payload(MODULE_NAME, sid)
+                log(f"{sid}: resumed (cached survival="
+                    f"{per_sample[sid].get('survival_rate')})")
+                continue
             out1.parent.mkdir(parents=True, exist_ok=True)
             reads_before = _count_fastx(sample.fastq_1)
 
@@ -199,11 +214,12 @@ def _trim_long(config: Config, metadata_path: Path, run_dir: Path,
                 log(f"{sample.sample_id}: chopper kept {reads_after}")
 
             survival = reads_after / reads_before if reads_before else 0.0
-            per_sample[sample.sample_id] = {
+            per_sample[sid] = {
                 "reads_before": reads_before,
                 "reads_after": reads_after,
                 "survival_rate": round(survival, 4),
             }
+            state.mark_item_done(MODULE_NAME, sid, per_sample[sid])
 
         # Step 6: uzun-okuma survival WARN kapısı (prokaryote_long; asla FAIL —
         # Pychopper tam-boy olmayanı atar, düşük survival şüpheli ama geçersiz değil).

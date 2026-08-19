@@ -79,3 +79,42 @@ def test_corrupt_state_file_does_not_crash(tmp_path):
     (tmp_path / "state.json").write_text("{ bozuk json")
     # bozuk durum = hiç ilerleme yok kabul edilir, çökme YOK
     assert RunState(tmp_path).is_done("m01_validate") is False
+
+
+# --- Faz 3: örnek-başı checkpoint ---------------------------------------------
+
+def test_item_not_done_initially(tmp_path):
+    assert RunState(tmp_path).is_item_done("m03_trim", "s1") is False
+    assert RunState(tmp_path).item_payload("m03_trim", "s1") is None
+
+
+def test_mark_item_done_persists_across_instances(tmp_path):
+    """Örnek-başı işaretçi + payload süreç yeniden başlasa da kalıcı olmalı (resume)."""
+    RunState(tmp_path).mark_item_done("m03_trim", "s1", {"survival_rate": 0.9})
+    reloaded = RunState(tmp_path)
+    assert reloaded.is_item_done("m03_trim", "s1") is True
+    assert reloaded.item_payload("m03_trim", "s1") == {"survival_rate": 0.9}
+
+
+def test_mark_item_done_does_not_mark_module_done(tmp_path):
+    """KRİTİK: örnek-başı işaretçi modülü 'done' YAPMAMALI — yoksa downstream bağımlılık
+    guard'ı (m04 is_done('m03_trim')) yarıda kalmış aşamayı tamamlanmış sanar."""
+    state = RunState(tmp_path)
+    state.mark_item_done("m03_trim", "s1", {})
+    assert state.is_done("m03_trim") is False
+    assert RunState(tmp_path).is_done("m03_trim") is False
+
+
+def test_mark_done_and_item_markers_coexist(tmp_path):
+    """Aşama-düzeyi mark_done ile örnek-düzeyi işaretçiler ayrı yaşar (birbirini silmez)."""
+    state = RunState(tmp_path)
+    state.mark_item_done("m03_trim", "s1", {"survival_rate": 0.8})
+    state.mark_done("m03_trim", ["out.json"])
+    assert state.is_done("m03_trim") is True
+    assert state.is_item_done("m03_trim", "s1") is True
+
+
+def test_item_state_file_is_valid_json(tmp_path):
+    RunState(tmp_path).mark_item_done("m04_quant", "s1", {"alignment_rate": 0.95})
+    data = json.loads((tmp_path / "state.json").read_text())
+    assert data["items"]["m04_quant"]["s1"] == {"alignment_rate": 0.95}

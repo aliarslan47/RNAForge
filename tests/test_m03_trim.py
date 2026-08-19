@@ -304,3 +304,42 @@ def test_cli_trim_returns_one_on_low_survival(tmp_path, monkeypatch, capsys):
     capsys.readouterr()
     assert main(["trim", *common]) == 1
     assert "quality gate" in capsys.readouterr().err.lower()
+
+
+def test_run_trim_skips_already_done_samples(tmp_path, monkeypatch):
+    """Faz 3 örnek-başı resume: önceden tamamlanmış örnekler (işaretçi + çıktı var)
+    yeniden fastp'e SOKULMAMALI; özet yine tüm örnekleri içerir, cached değer korunur."""
+    from rnaforge.state import RunState
+    from rnaforge.metadata import load_metadata
+    from rnaforge.modules.m03_trim import trimmed_reads, MODULE_NAME
+
+    calls = []
+
+    def fake_run(fastq_1, out_dir, min_length, fastq_2=None,
+                 aggressive_quality=False, env="rnaforge-qc"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        calls.append(out_dir.name)
+        out1 = out_dir / (Path(fastq_1).stem + ".trimmed.fastq")
+        out1.write_text("@r\nACGT\n+\nIIII\n")
+        return FastpResult(reads_before=200, reads_after=196, survival_rate=0.98, out1=out1)
+
+    monkeypatch.setattr(m03_trim, "run_fastp", fake_run)
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _run_m01(config_path, metadata_path, run_dir)
+
+    # s1, s2 tamamlanmış gibi tohumla: çıktı dosyası + örnek-başı işaretçi + payload,
+    # AMA modül 'done' DEĞİL (yarıda kalmış aşama).
+    samples = load_metadata(metadata_path)
+    state = RunState(run_dir)
+    for s in samples[:2]:
+        out1, _ = trimmed_reads(run_dir, s)
+        out1.parent.mkdir(parents=True, exist_ok=True)
+        out1.write_text("@r\nACGT\n+\nIIII\n")
+        state.mark_item_done(MODULE_NAME, s.sample_id,
+                             {"reads_before": 100, "reads_after": 99, "survival_rate": 0.99})
+
+    summary = run_trim(load_config(config_path), metadata_path, run_dir)
+    assert sorted(calls) == ["s3", "s4"]                       # yalnız kalan örnekler işlendi
+    assert set(summary["samples"]) == {"s1", "s2", "s3", "s4"}  # özet tam
+    assert summary["samples"]["s1"]["survival_rate"] == 0.99    # cached değer korundu

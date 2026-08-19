@@ -328,3 +328,45 @@ def test_run_quant_eukaryote_long_minimap2_diagnostic(tmp_path, monkeypatch):
     if gpath.exists():
         gates = json.loads(gpath.read_text())["gates"]
         assert all(g.get("status") != "FAIL" for g in gates)   # diagnostik, FAIL yok
+
+
+def test_run_quant_skips_already_done_samples(tmp_path, monkeypatch):
+    """Faz 3 örnek-başı resume: önceden hizalanmış örnekler (işaretçi + BAM var) yeniden
+    bowtie2'ye SOKULMAMALI; özet + kapı yine tüm örnekleri kapsar."""
+    from rnaforge.state import RunState
+    from rnaforge.metadata import load_metadata
+    from rnaforge.modules.m04_quant import MODULE_NAME
+
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    _prep_m01_m03(config_path, metadata_path, run_dir, monkeypatch)
+
+    monkeypatch.setattr(m04_quant, "build_index",
+                        lambda genome, index_dir, env="rnaforge-quant-prok": Path(index_dir) / "genome")
+    calls = []
+
+    def fake_align(index_prefix, out_dir, fastq_1, fastq_2=None, threads=4,
+                   env="rnaforge-quant-prok"):
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        calls.append(out_dir.name)
+        bam = out_dir / "aligned.sorted.bam"; bam.write_bytes(b"BAM")
+        return AlignmentResult(bam=bam, alignment_rate=0.95)
+
+    monkeypatch.setattr(m04_quant, "run_bowtie2", fake_align)
+
+    # s1, s2 hizalanmış gibi tohumla: BAM + işaretçi + payload; modül 'done' DEĞİL.
+    samples = load_metadata(metadata_path)
+    state = RunState(run_dir)
+    for s in samples[:2]:
+        bam = run_dir / "quantification" / s.sample_id / "aligned.sorted.bam"
+        bam.parent.mkdir(parents=True, exist_ok=True)
+        bam.write_bytes(b"BAM")
+        state.mark_item_done(MODULE_NAME, s.sample_id,
+                             {"alignment_rate": 0.91, "bam": str(bam)})
+
+    summary = run_quant(load_config(config_path), metadata_path, run_dir)
+    assert sorted(calls) == ["s3", "s4"]                        # yalnız kalanlar hizalandı
+    assert set(summary["samples"]) == {"s1", "s2", "s3", "s4"}
+    assert summary["samples"]["s1"]["alignment_rate"] == 0.91   # cached değer korundu
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    assert any(g["module"] == "m04_quant" and g["status"] == "PASS" for g in gates)
