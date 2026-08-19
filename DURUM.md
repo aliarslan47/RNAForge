@@ -9,6 +9,35 @@
 **Son güncelleme:** 2026-08-19 14:15 (+03)
 
 ## Şu an nerede kaldık
+- **★★★ HİZMET-HAZIRLIĞI DENETİMİ + İYİLEŞTİRME (Faz 0+1+2) TAMAM — `main` `540b916`, 551 test (2026-08-19).**
+  Ali "bunlar bulk RNA'ya hizmet ediyor mu?" → 3 paralel Explore ajanıyla denetim (girdi+tasarım /
+  kurulum+tekrarlanabilirlik / test+hata+çıktı); en kritik 3 doğruluk iddiası elle doğrulandı. Plan
+  `~/.claude/plans/clever-purring-pancake.md`. **Faz 0+1+2 hepsi TDD + gerçek-araç doğrulandı, push edildi.**
+  - **★ FAZ 0 (doğruluk bloklayıcıları — sessiz-yanlış-sonuç):**
+    (F0.1 `551e450`) `~subject + condition` aracın kendi önerisiydi ama m06 coldata'ya subject yazmıyordu →
+    DESeq2 çöküyordu; artık yazılır+factor'lenir (gerçek paired-subject DESeq2 entegrasyon testi geçti).
+    (F0.2 `0700400`) çok-seviyeli `condition`'da yalnız son-vs-ilk kontrast vardı → yeni `de.contrasts:
+    [[test,ref],...]` her çift için ayrı sonuç dosyası (ilk=birincil, geriye uyumlu; gerçek 3-seviyeli DESeq2
+    testi). (F0.3 `5aeca82`) karışık SE/PE tek koşuda m05 global paired bayrağıyla sessizce yanlış sayıyordu
+    → yeni `read_layout` kapısı m01'de yüksek sesle FAIL.
+  - **★ FAZ 1 (pipeline'ı bütün-olarak kanıtla):** (F1.1 `a144e7b`) yeni **`rnaforge run`** orkestratörü —
+    çekirdek m01→m08 tek komut, stop-on-FAIL (GateFailure→dur), resumable, `--from/--to/--include`. (F1.2)
+    yeni **gerçek-araç uçtan-uca smoke** (`tests/test_e2e_smoke.py`): sentetik 12-gen prokaryot,
+    `rnaforge run` gerçek fastp→bowtie2→featureCounts→DESeq2, 3 sinyal geni anlamlı (42s, conda yoksa skip).
+    **CANLI DOĞRULAMA:** `run --to report` 8 aşama uçtan uca koştu (report.html üretildi, 3 DEG), resume 5
+    aşamayı anında atladı.
+  - **★ FAZ 2 (sağlamlaştırma+tekrarlanabilirlik):** (F2.1 `...`) **`install.sh`** tek-komut 9 env + `pip -e .`
+    + **`rnaforge doctor`** ön-uçuş (env var/eksik, canlı 9/9); `rnaforge-core.yml` `rnaforge==0.1.0` çelişkisi
+    çözüldü. (F2.2 `540b916`) qc/quant-prok/quant-euk floating `>=` → **kesin pin** (fastqc=0.12.1/fastp=1.3.6/
+    bowtie2=2.5.5/samtools=1.24/subread=2.1.1/salmon=2.3.4). (F2.3) parametreli **`prepare_references.sh`**
+    (--kegg-org/--string-taxid/--goa-url, .sha256, QuickGO→GOA fallback). (F2.4 `...`) config bölüm-içi typo
+    reddi + gzip magic-byte + cli OSError ağı. (F2.5) rapor **figure_errors** notu (tanısal degradasyon görünür).
+  - **DENETİM KARNESİ:** ✅ sağlam = metadata şeması, replika/rank/confounding kapıları, dispersiyon fallback,
+    atomic state+resume+heartbeat, self-contained çift-dilli rapor. **KALAN ⚠️ (Ali kararı):** F2.2'nin "rapor
+    yazılım tablosunu runtime'da araçtan oku" kısmı YAPILMADI (env pin'i asıl tekrarlanabilirlik kazancıydı;
+    runtime-capture düşük değer/yüksek churn — ertelendi, dürüstçe not); Faz 3 (keyfi faktör adları, >2-faktör,
+    örnek-başı checkpoint) bu geçişin dışında.
+  - **SIRADA:** Faz 3 (isteğe bağlı) VEYA denetim karnesini müşteri-kalite Artifact olarak yayımla VEYA yeni istek.
 - **★★★ ÖKARYOT UZUN-OKUMA YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI — `main` `00bcad3`, 515 test (2026-08-18). → DÖRT KOL DA
   BİYOLOJİK DOĞRULANDI.** Veri (2 ajan buluştu, bellek lead'iyle örtüştü): **PRJNA1231053** *S. cerevisiae* Glukoz vs
   Galaktoz (Microorganisms 2025, ONT **PCR-cDNA SQK-PCB114.24**, 4 replika). Referans R64-1-1 cDNA (önden hazırdı) +
