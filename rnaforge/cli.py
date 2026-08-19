@@ -45,10 +45,63 @@ def _load_run_profile(config, run_dir):
     return load_profile(profile_name_for(config.organism_type, read_type), config.quality)
 
 
+# Orkestratör aşama sırası. Çekirdek zincir m01→m08 (validate→report); opsiyoneller
+# (m09-m18) rapordan ÖNCE eklenir ki rapor onların çıktısını içerebilsin.
+_CORE_ORDER = ["validate", "qc", "trim", "quant", "counts", "de", "figures", "report"]
+_OPTIONAL_STAGES = ["seqqc", "alignqc", "enrich", "kegg", "gsea", "semantic",
+                    "amr", "operon", "ppi", "multiqc"]
+
+
+def build_run_sequence(start: str | None = None, end: str | None = None,
+                       include=None) -> list[str]:
+    """`rnaforge run`'ın çalıştıracağı sıralı aşama listesini üretir (saf; I/O yok).
+
+    start/end çekirdek zinciri dilimler; include opsiyonel aşamaları (kanonik sırada)
+    rapordan önce (rapor dilimde değilse en sona) yerleştirir."""
+    include = list(include or [])
+    unknown = [s for s in include if s not in _OPTIONAL_STAGES]
+    if unknown:
+        raise ValueError(
+            f"unknown --include stage(s): {', '.join(unknown)}; "
+            f"available: {', '.join(_OPTIONAL_STAGES)}"
+        )
+    for label, stage in (("--from", start), ("--to", end)):
+        if stage is not None and stage not in _CORE_ORDER:
+            raise ValueError(
+                f"{label} {stage!r} is not a core stage; core: {', '.join(_CORE_ORDER)}"
+            )
+    i0 = _CORE_ORDER.index(start) if start else 0
+    i1 = _CORE_ORDER.index(end) if end else len(_CORE_ORDER) - 1
+    if i0 > i1:
+        raise ValueError(f"--from {start!r} comes after --to {end!r}")
+    sliced = _CORE_ORDER[i0:i1 + 1]
+    ordered_incl = [s for s in _OPTIONAL_STAGES if s in include]
+    if "report" in sliced:
+        idx = sliced.index("report")
+        return sliced[:idx] + ordered_incl + sliced[idx:]
+    return sliced + ordered_incl
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rnaforge", description="Bulk RNA-seq pipeline")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")
+
+    run = sub.add_parser(
+        "run", help="run the whole pipeline in order, stop-on-FAIL, resumable (m01→m08)")
+    run.add_argument("--config", required=True, type=Path)
+    run.add_argument("--metadata", required=True, type=Path)
+    run.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    run.add_argument("--run-id", default="run")
+    run.add_argument("--force", action="store_true",
+                     help="re-run every stage even if already completed")
+    run.add_argument("--from", dest="from_stage", default=None,
+                     help=f"start at this core stage (one of: {', '.join(_CORE_ORDER)})")
+    run.add_argument("--to", dest="to_stage", default=None,
+                     help="stop after this core stage")
+    run.add_argument("--include", default=None,
+                     help="comma-separated optional stages to run before report "
+                          f"(any of: {', '.join(_OPTIONAL_STAGES)})")
 
     basecall = sub.add_parser(
         "basecall", help="basecall raw signal (FAST5/POD5) to FASTQ with dorado GPU (m00)")
@@ -642,12 +695,40 @@ def _cmd_report(args) -> int:
     return 0
 
 
+# Aşama adı → komut fonksiyonu. Orkestratör buradan çağırır; testler monkeypatch'ler.
+_STAGE_DISPATCH = {
+    "validate": _cmd_validate, "qc": _cmd_qc, "trim": _cmd_trim, "quant": _cmd_quant,
+    "counts": _cmd_counts, "de": _cmd_de, "figures": _cmd_figures, "report": _cmd_report,
+    "seqqc": _cmd_seqqc, "alignqc": _cmd_alignqc, "enrich": _cmd_enrich, "kegg": _cmd_kegg,
+    "gsea": _cmd_gsea, "semantic": _cmd_semantic, "amr": _cmd_amr, "operon": _cmd_operon,
+    "ppi": _cmd_ppi, "multiqc": _cmd_multiqc,
+}
+
+
+def _cmd_run(args) -> int:
+    include = [s.strip() for s in (args.include or "").split(",") if s.strip()]
+    sequence = build_run_sequence(args.from_stage, args.to_stage, include)
+    print(f"pipeline: {' → '.join(sequence)}")
+    for i, name in enumerate(sequence, start=1):
+        print(f"=== [{i}/{len(sequence)}] {name} ===")
+        # GateFailure BURADA yakalanmaz: main'in handler'ına yükselir → pipeline durur,
+        # sonraki aşamalar KOŞMAZ, exit 1. Bu stop-on-FAIL'in ta kendisi.
+        rc = _STAGE_DISPATCH[name](args)
+        if rc != 0:
+            print(f"stage {name} returned non-zero ({rc}); stopping pipeline", file=sys.stderr)
+            return rc
+    print(f"pipeline complete: {len(sequence)} stage(s) — {sequence[-1]} was last")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command is None:
         print("error: no command given (try: rnaforge validate --help)", file=sys.stderr)
         return 2
     try:
+        if args.command == "run":
+            return _cmd_run(args)
         if args.command == "basecall":
             return _cmd_basecall(args)
         if args.command == "qc":
