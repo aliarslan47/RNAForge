@@ -62,6 +62,25 @@ def _setup_ont_with_chemistry(tmp_path, chemistry):
     return config_path, metadata_path
 
 
+def test_mixed_se_pe_fails_the_read_layout_gate(tmp_path):
+    """Karışık tek/çift-uçlu tek koşuda yüksek sesle durmalı (sessiz yanlış sayım yerine)."""
+    config_path, metadata_path = _setup(tmp_path, _illumina)
+    write_fastq(tmp_path / "c1_2.fastq", 200, 150, "I")   # yalnız s1 çift-uçlu
+    metadata_path.write_text(
+        "sample_id\tcondition\tfastq_1\tfastq_2\n"
+        "s1\tcontrol\tc1.fastq\tc1_2.fastq\n"
+        "s2\tcontrol\tc2.fastq\t\n"
+        "s3\ttreated\tt1.fastq\t\n"
+        "s4\ttreated\tt2.fastq\t\n"
+    )
+    run_dir = tmp_path / "run"
+    with pytest.raises(GateFailure):
+        run_validation(load_config(config_path), metadata_path, run_dir)
+    gates = json.loads((run_dir / "quality" / "gates.json").read_text())["gates"]
+    layout = [g for g in gates if g["name"] == "read_layout"][0]
+    assert layout["status"] == "FAIL" and "s1" in layout["samples"]
+
+
 def test_validation_succeeds_on_illumina(tmp_path):
     config_path, metadata_path = _setup(tmp_path, _illumina)
     run_dir = tmp_path / "run"

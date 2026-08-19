@@ -12,7 +12,7 @@ from pathlib import Path
 from rnaforge.config import REQUIRED_REFERENCE, Config
 from rnaforge.gates import raise_if_failed, write_gate_results
 from rnaforge.basecall import basecalled_metadata_path
-from rnaforge.metadata import Sample, load_metadata, validate_design
+from rnaforge.metadata import Sample, load_metadata, validate_design, validate_read_layout
 from rnaforge.platform import PlatformInfo, detect_platform, read_type_for, require_supported
 from rnaforge.quality import load_profile
 from rnaforge.state import RunState
@@ -90,12 +90,15 @@ def run_validation(
         log(f"quality profile: {profile.name} (permissive={profile.permissive})")
 
         design_gates = validate_design(samples, config.de.design, paired=config.paired)
-        write_gate_results(run_dir, design_gates)
-        for gate in design_gates:
+        # Karışık SE/PE tek koşuda sessiz yanlış sayıma yol açar → tasarım kapılarıyla
+        # birlikte ÖNCE yazılır, SONRA zorlanır (aynı teşhis sözleşmesi).
+        gates = [*design_gates, validate_read_layout(samples)]
+        write_gate_results(run_dir, gates)
+        for gate in gates:
             log(f"gate {gate.name}: {gate.status} — {gate.message}")
         # Kapılar ÖNCE yazılır, SONRA zorlanır: FAIL'de de gates.json diskte kalmalı,
         # teşhis raporu onu okuyacak (spec §3.5).
-        raise_if_failed(design_gates)
+        raise_if_failed(gates)
         log(f"design formula {config.de.design!r}: OK")
 
         per_sample: list[dict] = []

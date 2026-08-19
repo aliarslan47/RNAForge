@@ -5,11 +5,39 @@ import pytest
 from rnaforge.gates import FAIL, PASS
 from rnaforge.metadata import (
     MetadataError,
+    Sample,
     design_variables,
     load_metadata,
     looks_paired,
     validate_design,
+    validate_read_layout,
 )
+
+
+def _sample(sample_id, condition, paired):
+    return Sample(sample_id, condition, f"{sample_id}_1.fq",
+                  f"{sample_id}_2.fq" if paired else None)
+
+
+def test_read_layout_uniform_paired_passes():
+    samples = [_sample("s1", "control", True), _sample("s2", "treated", True)]
+    gate = validate_read_layout(samples)
+    assert gate.name == "read_layout"
+    assert gate.status == PASS
+
+
+def test_read_layout_uniform_single_end_passes():
+    samples = [_sample("s1", "control", False), _sample("s2", "treated", False)]
+    assert validate_read_layout(samples).status == PASS
+
+
+def test_read_layout_mixed_se_pe_fails_loudly():
+    """Karışık SE/PE tek koşuda sessiz yanlış sayıma yol açıyordu (m05 global paired
+    bayrağı tüm BAM'lere) → yüksek sesle FAIL, sorumlu örnekleri adlandır."""
+    samples = [_sample("s1", "control", True), _sample("s2", "treated", False)]
+    gate = validate_read_layout(samples)
+    assert gate.status == FAIL
+    assert "s2" in gate.samples          # tek-uçlu örnek adlandırılmalı
 
 
 def _make_fastqs(tmp_path, *names):

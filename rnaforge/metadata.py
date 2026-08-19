@@ -128,6 +128,35 @@ def validate_design(
     ]
 
 
+def validate_read_layout(samples: list[Sample]) -> GateResult:
+    """Tüm örnekler aynı düzende (hepsi tek-uçlu VEYA hepsi çift-uçlu) mi?
+
+    Karışık SE/PE tek koşuda desteklenmez: m05 tek global `paired` bayrağını TÜM
+    BAM'lere uyguluyordu → prokaryot featureCounts paired-mode'u SE BAM'ler üzerinde
+    çalıştırıp sessizce yanlış sayardı. Tahmin/otomatik-onarım yerine yüksek sesle
+    FAIL: kullanıcı ayrı koşular çalıştırmalı (Kural 7, gürültülü hata)."""
+    paired = [s for s in samples if s.fastq_2 is not None]
+    single = [s for s in samples if s.fastq_2 is None]
+    if paired and single:
+        # Azınlıktaki grup "sorumlu" örnekler olarak adlandırılır (teşhis raporu render eder).
+        offending = single if len(single) <= len(paired) else paired
+        return GateResult(
+            name="read_layout", module=MODULE, status=FAIL,
+            message=(
+                f"samples mix single-end and paired-end layouts in one run "
+                f"({len(paired)} paired, {len(single)} single-end); this is not "
+                "supported in a single run and would silently miscount"
+            ),
+            remedy=(
+                "run single-end and paired-end samples as separate runs (separate "
+                "metadata sheets), or make the layout consistent"
+            ),
+            samples=[s.sample_id for s in offending],
+        )
+    layout = "paired-end" if paired else "single-end"
+    return _ok("read_layout", f"all samples share one read layout ({layout})")
+
+
 def _ok(name: str, message: str) -> GateResult:
     return GateResult(
         name=name, module=MODULE, status=PASS, message=message, remedy="no action needed"
