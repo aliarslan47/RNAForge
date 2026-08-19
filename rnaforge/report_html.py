@@ -248,6 +248,7 @@ def load_report_inputs(run_dir: Path) -> dict:
     return {
         "norm_counts": parse_normalized_counts(de_dir / "normalized_counts.tsv"),
         "coldata": parse_coldata(de_dir / "coldata.tsv"),
+        "figure_errors": collect_figure_errors(run_dir),
         "raw": _read_json(stats / "raw_statistics.json"),
         "qc": _read_json(stats / "qc_statistics.json"),
         "trimming": _read_json(stats / "trimming_statistics.json"),
@@ -805,7 +806,29 @@ def section_de(de: dict, L: dict) -> str:
     return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}{expr}</section>'
 
 
-def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: str = "tr") -> str:
+def collect_figure_errors(run_dir: Path) -> list[str]:
+    """statistics/*.json içindeki `figure_errors` (best-effort figürlerin başarısızlıkları)
+    tek bir insan-okunur listede toplar. Bu figürler TANISALDIR; verdict'i etkilemez ama
+    üretilememeleri müşteri çıktısında GÖRÜNMELİ (yalnız log'da kalmasın)."""
+    stats_dir = Path(run_dir) / "statistics"
+    if not stats_dir.exists():
+        return []
+    out: list[str] = []
+    for path in sorted(stats_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        errors = data.get("figure_errors") if isinstance(data, dict) else None
+        if isinstance(errors, dict):
+            source = path.stem.replace("_statistics", "")
+            for name, msg in errors.items():
+                out.append(f"{source}/{name}: {msg}")
+    return out
+
+
+def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: str = "tr",
+                    figure_errors: list[str] | None = None) -> str:
     figures_dir = Path(figures_dir)
     caps = FIGURE_CAPTIONS.get(lang, FIGURE_CAPTIONS["tr"])
     blocks = []
@@ -817,7 +840,18 @@ def section_figures(figures_manifest: dict, figures_dir: Path, L: dict, lang: st
         cap_html = (f'<figcaption><strong>{_esc(fig.get("title"))}</strong> — {_esc(cap)}</figcaption>'
                     if cap else f'<figcaption>{_esc(fig.get("title"))}</figcaption>')
         blocks.append(f'<figure><img src="{embed_png(png)}" alt="{_esc(fig.get("title"))}"/>{cap_html}</figure>')
-    return f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{_intro("figures", L)}{"".join(blocks)}</section>'
+    note = ""
+    if figure_errors:
+        if lang == "en":
+            lead = (f"Note: {len(figure_errors)} diagnostic figure(s) could not be generated "
+                    "(this does not affect the results):")
+        else:
+            lead = (f"Not: {len(figure_errors)} tanısal figür üretilemedi "
+                    "(sonucu etkilemez):")
+        items = "".join(f"<li>{_esc(e)}</li>" for e in figure_errors)
+        note = f'<div class="note"><p>{_esc(lead)}</p><ul>{items}</ul></div>'
+    return (f'<section id="figures"><h2>{_esc(L["figures"])}</h2>{_intro("figures", L)}'
+            f'{note}{"".join(blocks)}</section>')
 
 
 def _deg_table(rows: list[dict], L: dict, cond_ctx: dict | None = None, caption: str = "") -> str:
@@ -1620,7 +1654,8 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                         inputs.get("qc"), inputs.get("figures_dir"),
                         inputs.get("alignqc"), inputs.get("multiqc")),
         section_de(inputs["de"], L),
-        section_figures(inputs["figures"], inputs["figures_dir"], L, lang),
+        section_figures(inputs["figures"], inputs["figures_dir"], L, lang,
+                        inputs.get("figure_errors")),
         section_table(inputs["de_results"], inputs["gene_map"],
                       config.de.fdr_threshold, config.de.log2fc_threshold, L, cond_ctx),
         section_go(inputs, L, lang),

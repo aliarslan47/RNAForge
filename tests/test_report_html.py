@@ -171,6 +171,35 @@ def test_section_figures_loud_when_png_missing(tmp_path):
         section_figures(manifest, fig, LABELS["en"])
 
 
+def test_collect_figure_errors_scans_statistics(tmp_path):
+    import json
+
+    from rnaforge.report_html import collect_figure_errors
+    stats = tmp_path / "statistics"; stats.mkdir()
+    (stats / "alignqc_statistics.json").write_text(
+        json.dumps({"figure_errors": {"insert_size": "matplotlib boom"}}))
+    (stats / "de_statistics.json").write_text(json.dumps({"n_genes": 10}))  # errors yok
+    errs = collect_figure_errors(tmp_path)
+    assert any("insert_size" in e and "matplotlib boom" in e for e in errs)
+
+
+def test_section_figures_surfaces_diagnostic_errors(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    (fig / "01_pca.png").write_bytes(b"\x89PNG")
+    manifest = {"figures": [{"id": "pca", "title": "PCA", "png": "01_pca.png", "svg": None}]}
+    h = section_figures(manifest, fig, LABELS["en"],
+                        figure_errors=["alignqc/insert_size: matplotlib boom"])
+    assert "matplotlib boom" in h
+
+
+def test_section_figures_no_error_note_when_clean(tmp_path):
+    fig = tmp_path / "figures"; fig.mkdir()
+    (fig / "01_pca.png").write_bytes(b"\x89PNG")
+    manifest = {"figures": [{"id": "pca", "title": "PCA", "png": "01_pca.png", "svg": None}]}
+    h = section_figures(manifest, fig, LABELS["en"], figure_errors=[])
+    assert "could not be generated" not in h and "üretilemedi" not in h
+
+
 from rnaforge.report_html import top_degs_by_direction
 
 
