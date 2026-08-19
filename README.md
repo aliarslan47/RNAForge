@@ -5,6 +5,10 @@ self-contained HTML report, with a full functional-analysis layer on top of diff
 
 Turkish version: [README.tr.md](README.tr.md) · Reference document: [PLAN.md](PLAN.md) (v1.4)
 
+[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](docs/pipeline_architecture.html)
+[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote-2f8f5b)](docs/pipeline_architecture.html)
+[![reads](https://img.shields.io/badge/reads-short%20%C2%B7%20long-c07211)](docs/pipeline_architecture.html)
+
 ## What it does
 
 A staged pipeline that takes raw reads to biology:
@@ -13,6 +17,9 @@ A staged pipeline that takes raw reads to biology:
 validate → qc → trim → quant → counts → de → figures → report
                                           └→ enrich · kegg · gsea · semantic · amr · operon · ppi
 ```
+
+The full pipeline as an interactive, bilingual node-graph (organism × read-type branching, `m00`–`m18`):
+[`docs/pipeline_architecture.html`](docs/pipeline_architecture.html).
 
 - **Core**: input/design validation, QC, gentle trimming, alignment/quantification, DESeq2
   differential expression, publication-quality figures, and a bilingual (`tr`/`en`) self-contained

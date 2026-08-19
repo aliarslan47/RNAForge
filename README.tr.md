@@ -5,6 +5,10 @@ HTML rapora; diferansiyel ekspresyonun üstünde tam bir fonksiyonel-analiz katm
 
 İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.4)
 
+[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](docs/pipeline_architecture.html)
+[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot-2f8f5b)](docs/pipeline_architecture.html)
+[![okuma](https://img.shields.io/badge/okuma-k%C4%B1sa%20%C2%B7%20uzun-c07211)](docs/pipeline_architecture.html)
+
 ## Ne yapar
 
 Ham okumaları biyolojiye taşıyan aşamalı bir pipeline:
@@ -13,6 +17,9 @@ Ham okumaları biyolojiye taşıyan aşamalı bir pipeline:
 validate → qc → trim → quant → counts → de → figures → report
                                           └→ enrich · kegg · gsea · semantic · amr · operon · ppi
 ```
+
+Tüm pipeline'ın etkileşimli, çift-dilli node-graph şeması (organizma × okuma-tipi dallanması, `m00`–`m18`):
+[`docs/pipeline_architecture.html`](docs/pipeline_architecture.html).
 
 - **Çekirdek**: girdi/tasarım doğrulama, QC, nazik kırpma, hizalama/kantifikasyon, DESeq2 diferansiyel
   ekspresyon, yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.
