@@ -6,9 +6,33 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-19 14:15 (+03)
+**Son güncelleme:** 2026-08-19 16:40 (+03)
 
 ## Şu an nerede kaldık
+- **★★★ FAZ 3 TAMAM (keyfi faktör adları + >2-faktör + örnek-başı checkpoint) — `main` `39b4bc6`, 570 test (2026-08-19).**
+  Ali "sırayla plan modunda otonom başla" → brainstorm→plan (`~/.claude/plans/gleaming-baking-graham.md`).
+  Kararlar: **üçü de** + faktör modeli **kovaryat genişletme** anlamında (condition ANA tetkik faktörü
+  kalır, gate'ler condition-merkezli). TDD, iki bağımsız parça, hepsi push edildi.
+  - **★ PART A — faktör modeli (`1ed892c`):** `condition` ANA faktör kalır; keyfi adlı ek kovaryatlar
+    (sex/lane/genotype...) design'a katılabilir; kontrastlar `[test,ref]` (→condition, geriye uyumlu)
+    VEYA `[factor,test,ref]` (condition-dışı faktör tetkiki). Değişenler: metadata `Sample.covariates`
+    + `validate_design` sabit allow-list yerine "her design değişkeni bir metadata sütunu olmalı" +
+    `_rank_gate` condition-dışı TÜM faktörlere genellendi (`_factor_value`); config `_build_contrasts`
+    2/3-tuple; m06 `_write_coldata` design'daki tüm faktörleri dinamik yazar; `deseq2.py`/`deseq2.R`
+    generic faktörleme + faktör-adlı contrast vektörü (`results(dds, c(factor,test,ref))`), condition-dışı
+    çıktı faktör-önekli dosya; m00_basecall kovaryatları korur. **Gerçek-R: `~genotype+condition`
+    faktör-adlı kontrast genotype sinyalini bulur.**
+  - **★ PART B — örnek-başı checkpoint (`6148ecb`):** m03/m04 aşama-içi çökme sonrası resume artık
+    yalnız kalan örnekleri işler (eskiden tüm aşama baştan). state `mark_item_done/is_item_done/
+    item_payload` — **KRİTİK: işaretçiler `modules` DIŞINDA ayrı `items` anahtarında** (is_done'u
+    tetiklemez → downstream bağımlılık guard'ı yarıda kalmışı tamamlanmış sanmaz). m03 `_trim_short/
+    _trim_long` + m04 `_cached_sample` helper × 4 döngü (short/euk/euk_long/long); bam/quant_sf varlık
+    çift-emniyet; `force` tüm örnekleri yeniden işler.
+  - **★ A6 CANLI DOĞRULAMA (`39b4bc6`):** çok-faktör (`~sex+condition` + `[sex,M,F]` kontrast) gerçek
+    fastp→bowtie2→featureCounts→DESeq2→**report** zincirinde koştu — coldata çok-sütunlu, condition
+    sinyali bulundu, sex kontrast dosyası üretildi, **rapor çökmeden oluştu** (None-güvenlik gerekmedi).
+  - **SIRADA:** yeni istek. Faz 3 kapandı; dört kol + kod temiz + DAG/Pages/PipelineForge + hizmet-hazırlığı
+    (Faz 0/1/2) + Faz 3 hepsi hazır. Denetim karnesini müşteri-kalite Artifact olarak yayımlama seçeneği açık.
 - **★★★ HİZMET-HAZIRLIĞI DENETİMİ + İYİLEŞTİRME (Faz 0+1+2) TAMAM — `main` `540b916`, 551 test (2026-08-19).**
   Ali "bunlar bulk RNA'ya hizmet ediyor mu?" → 3 paralel Explore ajanıyla denetim (girdi+tasarım /
   kurulum+tekrarlanabilirlik / test+hata+çıktı); en kritik 3 doğruluk iddiası elle doğrulandı. Plan
