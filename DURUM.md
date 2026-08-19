@@ -31,8 +31,11 @@
   - **★ A6 CANLI DOĞRULAMA (`39b4bc6`):** çok-faktör (`~sex+condition` + `[sex,M,F]` kontrast) gerçek
     fastp→bowtie2→featureCounts→DESeq2→**report** zincirinde koştu — coldata çok-sütunlu, condition
     sinyali bulundu, sex kontrast dosyası üretildi, **rapor çökmeden oluştu** (None-güvenlik gerekmedi).
-  - **SIRADA:** yeni istek. Faz 3 kapandı; dört kol + kod temiz + DAG/Pages/PipelineForge + hizmet-hazırlığı
-    (Faz 0/1/2) + Faz 3 hepsi hazır. Denetim karnesini müşteri-kalite Artifact olarak yayımlama seçeneği açık.
+  - **★ DENETİM KARNESİ ARTIFACT YAYIMLANDI (2026-08-19):** müşteri-kalite web sayfası (Spectral/IBM Plex,
+    laboratuvar cihaz-paneli estetiği, TR, dört-kol 2×2 matris + gerçek log2FC değerleri + Faz 0-3 + kapı ilkesi).
+    Özel Artifact: `https://claude.ai/code/artifact/8b0b1c96-fe6d-499f-8675-b2c0995b13d1` (Ali paylaşabilir).
+  - **SIRADA:** yeni istek. Faz 3 + denetim karnesi kapandı; dört kol + kod temiz + DAG/Pages/PipelineForge +
+    hizmet-hazırlığı (Faz 0/1/2/3) hepsi hazır.
 - **★★★ HİZMET-HAZIRLIĞI DENETİMİ + İYİLEŞTİRME (Faz 0+1+2) TAMAM — `main` `540b916`, 551 test (2026-08-19).**
   Ali "bunlar bulk RNA'ya hizmet ediyor mu?" → 3 paralel Explore ajanıyla denetim (girdi+tasarım /
   kurulum+tekrarlanabilirlik / test+hata+çıktı); en kritik 3 doğruluk iddiası elle doğrulandı. Plan
