@@ -5,9 +5,9 @@ self-contained HTML report, with a full functional-analysis layer on top of diff
 
 Turkish version: [README.tr.md](README.tr.md) · Reference document: [PLAN.md](PLAN.md) (v1.4)
 
-[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
-[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote-2f8f5b)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
-[![reads](https://img.shields.io/badge/reads-short%20%C2%B7%20long-c07211)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
+[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![reads](https://img.shields.io/badge/reads-short%20%C2%B7%20long-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 
 ## What it does
 
@@ -19,7 +19,7 @@ validate → qc → trim → quant → counts → de → figures → report
 ```
 
 The full pipeline as an interactive, bilingual node-graph (organism × read-type branching, `m00`–`m18`) —
-[**rendered diagram**](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a) · source: `docs/pipeline_architecture.html`.
+[**rendered diagram**](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html) · source: `docs/pipeline_architecture.html`.
 
 - **Core**: input/design validation, QC, gentle trimming, alignment/quantification, DESeq2
   differential expression, publication-quality figures, and a bilingual (`tr`/`en`) self-contained

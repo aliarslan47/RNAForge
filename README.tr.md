@@ -5,9 +5,9 @@ HTML rapora; diferansiyel ekspresyonun üstünde tam bir fonksiyonel-analiz katm
 
 İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.4)
 
-[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
-[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot-2f8f5b)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
-[![okuma](https://img.shields.io/badge/okuma-k%C4%B1sa%20%C2%B7%20uzun-c07211)](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a)
+[![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![okuma](https://img.shields.io/badge/okuma-k%C4%B1sa%20%C2%B7%20uzun-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 
 ## Ne yapar
 
@@ -19,7 +19,7 @@ validate → qc → trim → quant → counts → de → figures → report
 ```
 
 Tüm pipeline'ın etkileşimli, çift-dilli node-graph şeması (organizma × okuma-tipi dallanması, `m00`–`m18`) —
-[**render edilmiş şema**](https://claude.ai/code/artifact/7d033f10-ade2-4cbe-801d-b468a06b0c5a) · kaynak: `docs/pipeline_architecture.html`.
+[**render edilmiş şema**](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html) · kaynak: `docs/pipeline_architecture.html`.
 
 - **Çekirdek**: girdi/tasarım doğrulama, QC, nazik kırpma, hizalama/kantifikasyon, DESeq2 diferansiyel
   ekspresyon, yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.

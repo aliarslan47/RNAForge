@@ -6,7 +6,7 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-19 13:14 (+03)
+**Son güncelleme:** 2026-08-19 13:55 (+03)
 
 ## Şu an nerede kaldık
 - **★★★ ÖKARYOT UZUN-OKUMA YOLU BİYOLOJİK UÇTAN-UCA DOĞRULANDI — `main` `00bcad3`, 515 test (2026-08-18). → DÖRT KOL DA
