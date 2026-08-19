@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from rnaforge.go_annotation import _symbol_to_locus, parse_annotation_symbols, parse_gff_go
+from rnaforge.go_annotation import _symbol_to_locus, parse_annotation_symbols
 
 # KEGG "Global and overview maps" — ORA'yı bozacak kadar geniş, dışlanır (numerik id, agnostik).
 GLOBAL_MAPS = frozenset({

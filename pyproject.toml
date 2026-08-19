@@ -20,3 +20,10 @@ rnaforge = ["profiles/*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+# Cila taraması: `ruff check rnaforge` — kullanılmayan import / ölü kod / bariz hatalar.
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["F", "E9"]  # F: pyflakes (unused/undefined), E9: syntax hataları

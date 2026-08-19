@@ -11,7 +11,7 @@ from pathlib import Path
 
 from rnaforge.chopper import run_chopper
 from rnaforge.config import CHEMISTRY, Config
-from rnaforge.fastp import FastpResult, run_fastp, trimmed_name
+from rnaforge.fastp import run_fastp, trimmed_name
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_gate_results
 from rnaforge.metadata import Sample, load_metadata
 from rnaforge.pychopper import run_pychopper

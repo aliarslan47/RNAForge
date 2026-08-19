@@ -249,7 +249,7 @@ def build_gene2go(gff_path: Path | None, obo: dict, gaf_path: Path | None = None
         sources.update(gaf_sources)
         n_goa = len(additions)
     elif log is not None:
-        log(f"m09: GAF verilmedi — yalnız GFF GO + propagation kullanılıyor")
+        log("m09: GAF verilmedi — yalnız GFF GO + propagation kullanılıyor")
 
     direct = {lt: set(gos) for lt, gos in gene2go.items()}
     propagated = propagate(gene2go, obo)
