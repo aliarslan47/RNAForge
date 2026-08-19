@@ -3,7 +3,7 @@ Parserlar saftır: string girer, veri çıkar (I/O yok)."""
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _NUMERIC = ("baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")
@@ -24,6 +24,13 @@ class DeseqResult:
     metrics: dict
     results_path: Path | None = None
     normalized_path: Path | None = None
+    # Açık kontrast istendiğinde her biri için ayrı sonuç dosyası: "<test>_vs_<ref>" -> yol.
+    contrast_paths: dict = field(default_factory=dict)
+
+
+def format_contrasts(contrasts) -> str:
+    """((test, ref), ...) -> 'test:ref;test2:ref2' (deseq2.R'nin 6. argümanı). Boş -> ''."""
+    return ";".join(f"{t}:{r}" for t, r in (contrasts or ()))
 
 
 def _num(value: str):
@@ -61,11 +68,14 @@ def parse_de_metrics(metrics_text: str) -> dict:
 
 
 def run_deseq2(counts_tsv: Path, coldata_tsv: Path, design: str, out_dir: Path,
-               reference: str | None = None, env: str = "rnaforge-de") -> DeseqResult:
+               reference: str | None = None, contrasts=None,
+               env: str = "rnaforge-de") -> DeseqResult:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    contrasts = tuple(contrasts or ())
     cmd = ["conda", "run", "-n", env, "Rscript", str(_SCRIPT),
-           str(counts_tsv), str(coldata_tsv), design, reference or "", str(out_dir)]
+           str(counts_tsv), str(coldata_tsv), design, reference or "", str(out_dir),
+           format_contrasts(contrasts)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise DeseqRunError(
@@ -79,7 +89,17 @@ def run_deseq2(counts_tsv: Path, coldata_tsv: Path, design: str, out_dir: Path,
         raise DeseqRunError(
             f"DESeq2 reported success but output missing in {out_dir}\nstderr: {r.stderr.strip()}"
         )
+    contrast_paths: dict = {}
+    for test, ref in contrasts:
+        path = out_dir / f"deseq2_results.{test}_vs_{ref}.tsv"
+        if not path.exists():
+            raise DeseqRunError(
+                f"DESeq2 reported success but contrast output missing: {path}\n"
+                f"stderr: {r.stderr.strip()}"
+            )
+        contrast_paths[f"{test}_vs_{ref}"] = path
     results = parse_deseq2_results(results_path.read_text())
     metrics = parse_de_metrics(metrics_path.read_text())
     return DeseqResult(results=results, metrics=metrics,
-                       results_path=results_path, normalized_path=normalized_path)
+                       results_path=results_path, normalized_path=normalized_path,
+                       contrast_paths=contrast_paths)

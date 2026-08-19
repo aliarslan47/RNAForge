@@ -9,10 +9,48 @@ from rnaforge.deseq2 import (
     DeseqParseError,
     DeseqResult,
     DeseqRunError,
+    format_contrasts,
     parse_de_metrics,
     parse_deseq2_results,
     run_deseq2,
 )
+
+
+def test_format_contrasts_serializes_pairs():
+    assert format_contrasts((("high", "control"), ("low", "control"))) == "high:control;low:control"
+
+
+def test_format_contrasts_empty():
+    assert format_contrasts(()) == ""
+    assert format_contrasts(None) == ""
+
+
+def test_run_deseq2_passes_contrasts_and_collects_paths(tmp_path, monkeypatch):
+    """Wrapper contrasts'ı R'a 6. arg olarak geçmeli ve her contrast çıktı dosyasını
+    toplamalı. subprocess.run mock'lanır (conda gerekmez)."""
+    import subprocess as sp
+    captured = {}
+
+    def fake_run(cmd, capture_output, text):
+        captured["cmd"] = cmd
+        out_dir = Path(cmd[-2])          # ... out_dir, contrasts_spec
+        for name in ("deseq2_results.tsv", "deseq2_results.high_vs_control.tsv",
+                     "deseq2_results.low_vs_control.tsv"):
+            (out_dir / name).write_text("gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\n"
+                                        "g0\t10\t1\t0.1\t2\t0.01\t0.02\n")
+        (out_dir / "de_metrics.tsv").write_text("min_replicate_correlation\t0.9\ncontrast\thigh vs control\nn_genes\t1\n")
+        (out_dir / "normalized_counts.tsv").write_text("gene\ts1\ng0\t10\n")
+
+        class R: returncode = 0; stderr = ""
+        return R()
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    contrasts = (("high", "control"), ("low", "control"))
+    result = run_deseq2(tmp_path / "counts.tsv", tmp_path / "coldata.tsv", "~condition",
+                        tmp_path / "de", reference="control", contrasts=contrasts)
+    assert captured["cmd"][-1] == "high:control;low:control"
+    assert set(result.contrast_paths) == {"high_vs_control", "low_vs_control"}
+    assert result.contrast_paths["high_vs_control"].exists()
 
 _RESULTS = (
     "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\n"
@@ -112,6 +150,55 @@ def test_run_deseq2_paired_subject_design(tmp_path):
     by_gene = {r["gene"]: r for r in result.results}
     assert by_gene["g0"]["padj"] is not None and by_gene["g0"]["padj"] < 0.05
     assert by_gene["g0"]["log2FoldChange"] > 1
+
+
+def _write_three_level(tmp_path):
+    """3 seviye (control/low/high) × 3 replika; g0 high'da güçlü, low'da orta yukarı."""
+    import random
+    random.seed(11)
+    conds = ["control", "low", "high"]
+    samples = [(f"{c}{i}", c) for c in conds for i in (1, 2, 3)]
+    mult = {"control": 1, "low": 2, "high": 5}
+    counts = tmp_path / "counts.tsv"
+    with counts.open("w") as f:
+        f.write("gene\t" + "\t".join(sid for sid, _ in samples) + "\n")
+        for gi in range(40):
+            base = random.randint(100, 200)
+            row = []
+            for _sid, cond in samples:
+                val = base + random.randint(-10, 10)
+                if gi < 5:
+                    val *= mult[cond]
+                row.append(str(val))
+            f.write(f"g{gi}\t" + "\t".join(row) + "\n")
+    coldata = tmp_path / "coldata.tsv"
+    with coldata.open("w") as f:
+        f.write("sample\tcondition\n")
+        for sid, cond in samples:
+            f.write(f"{sid}\t{cond}\n")
+    return counts, coldata
+
+
+@pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")
+def test_run_deseq2_multiple_contrasts(tmp_path):
+    """Entegrasyon: 3-seviyeli condition'da açık kontrastlar ayrı dosyalar üretir ve
+    her biri doğru karşılaştırmayı raporlar (high-vs-control > low-vs-control g0'da)."""
+    counts, coldata = _write_three_level(tmp_path)
+    contrasts = (("high", "control"), ("low", "control"))
+    try:
+        result = run_deseq2(counts, coldata, "~condition", tmp_path / "de",
+                            reference="control", contrasts=contrasts)
+    except DeseqRunError as exc:
+        pytest.skip(f"DESeq2 çalıştırılamadı (env yok?): {exc}")
+    assert set(result.contrast_paths) == {"high_vs_control", "low_vs_control"}
+    high = {r["gene"]: r for r in parse_deseq2_results(
+        result.contrast_paths["high_vs_control"].read_text())}
+    low = {r["gene"]: r for r in parse_deseq2_results(
+        result.contrast_paths["low_vs_control"].read_text())}
+    assert high["g0"]["log2FoldChange"] > low["g0"]["log2FoldChange"] > 0
+    assert high["g0"]["padj"] < 0.05
+    # Birincil deseq2_results.tsv = ilk kontrast (high vs control)
+    assert result.metrics["contrast"] == "high vs control"
 
 
 @pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")

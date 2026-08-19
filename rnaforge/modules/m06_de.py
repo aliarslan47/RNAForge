@@ -109,10 +109,11 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
         coldata_path = de_dir / "coldata.tsv"
         _write_coldata(samples, coldata_path)
         counts_tsv = run_dir / "quantification" / "counts.tsv"
-        log(f"m06 DESeq2: design={config.de.design!r} reference={config.de.reference!r}")
+        log(f"m06 DESeq2: design={config.de.design!r} reference={config.de.reference!r} "
+            f"contrasts={config.de.contrasts!r}")
         state.heartbeat()
         result = run_deseq2(counts_tsv, coldata_path, config.de.design, de_dir,
-                            reference=config.de.reference)
+                            reference=config.de.reference, contrasts=config.de.contrasts)
 
         fdr = config.de.fdr_threshold
         lfc = config.de.log2fc_threshold
@@ -131,6 +132,7 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
             "n_up": n_up,
             "n_down": n_down,
             "contrast": result.metrics.get("contrast", ""),
+            "contrasts": list(result.contrast_paths.keys()),
             "min_replicate_correlation": min_corr,
             "fdr_threshold": fdr, "log2fc_threshold": lfc,
             "gate_counts": dict(Counter(g.status for g in gates)),

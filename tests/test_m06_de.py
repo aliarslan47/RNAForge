@@ -121,7 +121,8 @@ def _mark_m05_done(run_dir):
 
 
 def _fake_deseq2(monkeypatch, min_corr=0.95, sig_gene=True):
-    def fake_run(counts_tsv, coldata_tsv, design, out_dir, reference=None, env="rnaforge-de"):
+    def fake_run(counts_tsv, coldata_tsv, design, out_dir, reference=None,
+                 contrasts=None, env="rnaforge-de"):
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         rp = out_dir / "deseq2_results.tsv"
         padj = "1e-6" if sig_gene else "0.9"

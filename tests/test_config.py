@@ -156,6 +156,38 @@ def test_de_reference_loaded(tmp_path):
     assert cfg.de.design == "~condition"
 
 
+def test_de_contrasts_default_empty(tmp_path):
+    assert load_config(_write(tmp_path, PROK_BODY)).de.contrasts == ()
+
+
+def test_de_contrasts_loaded_as_pairs(tmp_path):
+    body = PROK_BODY + (
+        "  contrasts:\n"
+        "    - [high, control]\n"
+        "    - [low, control]\n"
+    )
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.de.contrasts == (("high", "control"), ("low", "control"))
+
+
+def test_de_contrasts_rejects_non_pair(tmp_path):
+    body = PROK_BODY + "  contrasts:\n    - [only_one]\n"
+    with pytest.raises(ConfigError, match="contrasts"):
+        load_config(_write(tmp_path, body))
+
+
+def test_de_contrasts_rejects_identical_levels(tmp_path):
+    body = PROK_BODY + "  contrasts:\n    - [same, same]\n"
+    with pytest.raises(ConfigError, match="identical"):
+        load_config(_write(tmp_path, body))
+
+
+def test_de_contrasts_rejects_delimiter_in_level(tmp_path):
+    body = PROK_BODY + "  contrasts:\n    - [\"a:b\", control]\n"
+    with pytest.raises(ConfigError, match="';'|':'"):
+        load_config(_write(tmp_path, body))
+
+
 def test_quantification_defaults(tmp_path):
     cfg = load_config(_write(tmp_path, PROK_BODY))
     assert cfg.quantification.feature_type == "exon"

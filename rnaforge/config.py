@@ -80,6 +80,10 @@ class DE:
     fdr_threshold: float = 0.05
     log2fc_threshold: float = 1.0
     reference: str | None = None
+    # Çok-seviyeli condition için açık kontrastlar: her biri (test_seviyesi, referans_seviyesi).
+    # Boş → DESeq2 varsayılanı (son-vs-ilk seviye), 2-seviyeli koşular için yeterli.
+    # 3+ gruplu koşu (kontrol/düşük/yüksek, zaman serisi) tüm karşılaştırmaları buradan ister.
+    contrasts: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -213,6 +217,38 @@ def _as_bool(value, field: str) -> bool:
     raise ConfigError(f"{field}: expected a boolean (true/false), got {value!r}")
 
 
+def _build_contrasts(raw) -> tuple:
+    """de.contrasts'ı doğrulayıp ((test, ref), ...) döndürür. Boş/None → ()."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ConfigError(
+            f"de.contrasts must be a list of [test, reference] pairs, got {type(raw).__name__}"
+        )
+    out: list[tuple[str, str]] = []
+    for i, pair in enumerate(raw):
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            raise ConfigError(
+                f"de.contrasts[{i}] must be a [test, reference] pair, got {pair!r}"
+            )
+        test, ref = str(pair[0]).strip(), str(pair[1]).strip()
+        for lvl in (test, ref):
+            if not lvl:
+                raise ConfigError(f"de.contrasts[{i}] has an empty condition level")
+            if ":" in lvl or ";" in lvl:
+                raise ConfigError(
+                    f"de.contrasts[{i}] level {lvl!r} must not contain ':' or ';' "
+                    "(used as internal delimiters)"
+                )
+        if test == ref:
+            raise ConfigError(
+                f"de.contrasts[{i}] test and reference are identical ({test!r}); "
+                "a contrast compares two different condition levels"
+            )
+        out.append((test, ref))
+    return tuple(out)
+
+
 def _require_organism_type(raw: dict) -> str:
     value = raw.get("organism_type")
     if value is None:
@@ -311,6 +347,7 @@ def load_config(path: Path | str) -> Config:
                 de_raw.get("log2fc_threshold", 1.0), "de.log2fc_threshold"
             ),
             reference=(str(de_raw["reference"]) if de_raw.get("reference") else None),
+            contrasts=_build_contrasts(de_raw.get("contrasts")),
         ),
         report=Report(
             language=_one_of(report_raw.get("language", "tr"), REPORT_LANGUAGES, "report.language")
