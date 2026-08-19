@@ -772,6 +772,8 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 1
     except (ConfigError, MetadataError, UnsupportedPlatformError,
-            FileNotFoundError, ValueError) as exc:
+            OSError, ValueError) as exc:
+        # OSError (FileNotFoundError, gzip.BadGzipFile, izin hataları…) traceback yerine
+        # temiz kullanıcı-hatası olarak yüzeye çıkmalı — Kural 7 (sessiz/çirkin hata yok).
         print(f"error: {exc}", file=sys.stderr)
         return 1

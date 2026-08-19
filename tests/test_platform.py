@@ -30,6 +30,21 @@ def test_gzipped_fastq_supported(tmp_path):
     assert detect_platform(path).platform == "illumina"
 
 
+def test_gzip_detected_by_content_not_extension(tmp_path):
+    """gzip'li ama .gz uzantısız dosya içerikten (magic byte) tanınmalı — yoksa
+    okuma çöp uzunluk üretip platformu yanlış sınıflardı."""
+    path = write_fastq(tmp_path / "mislabeled.fastq", 100, 150, "I", gzipped=True)
+    info = detect_platform(path)
+    assert info.platform == "illumina"
+    assert info.mean_read_length == pytest.approx(150.0)
+
+
+def test_plain_fastq_named_gz_does_not_crash(tmp_path):
+    """Düz metin ama .gz adlı dosya BadGzipFile ile patlamamalı (magic byte kararı)."""
+    path = write_fastq(tmp_path / "plain.fastq.gz", 100, 150, "I", gzipped=False)
+    assert detect_platform(path).platform == "illumina"
+
+
 def test_illumina_is_supported(illumina_fastq):
     require_supported(detect_platform(illumina_fastq), illumina_fastq)  # raise etmemeli
 

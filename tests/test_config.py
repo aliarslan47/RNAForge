@@ -156,6 +156,26 @@ def test_de_reference_loaded(tmp_path):
     assert cfg.de.design == "~condition"
 
 
+def test_section_typo_in_de_is_rejected(tmp_path):
+    """Bölüm-içi yazım hatası sessiz default kullanmamalı (top-level koruması gibi)."""
+    body = PROK_BODY + "  fdr_treshold: 0.01\n"      # threshold -> treshold
+    with pytest.raises(ConfigError, match="fdr_treshold"):
+        load_config(_write(tmp_path, body))
+
+
+def test_section_typo_in_library_is_rejected(tmp_path):
+    body = PROK_BODY + 'library:\n  stranddness: "reverse"\n'
+    with pytest.raises(ConfigError, match="stranddness"):
+        load_config(_write(tmp_path, body))
+
+
+def test_quality_section_allows_arbitrary_gate_names(tmp_path):
+    """quality serbest-biçim (gate override adları değişken) — reddedilmemeli."""
+    body = PROK_BODY + "quality:\n  replicate_correlation: 0.2\n  alignment_rate: 0.4\n"
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.quality["replicate_correlation"] == 0.2
+
+
 def test_de_contrasts_default_empty(tmp_path):
     assert load_config(_write(tmp_path, PROK_BODY)).de.contrasts == ()
 

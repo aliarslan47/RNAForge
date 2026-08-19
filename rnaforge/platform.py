@@ -45,8 +45,16 @@ class PlatformInfo:
     n_reads_sampled: int
 
 
+def _is_gzip(path: Path) -> bool:
+    """gzip'i UZANTIDAN değil İÇERİKTEN (magic byte 1f 8b) tespit et: yanlış adlandırılmış
+    dosya (gz içerik/.fastq ad, ya da düz metin/.gz ad) sessiz çöp ya da BadGzipFile
+    çökmesi üretmesin. Boş dosya → gzip değil (metin olarak okunur → 'unknown' → reddedilir)."""
+    with open(path, "rb") as fh:
+        return fh.read(2) == b"\x1f\x8b"
+
+
 def _open(path: Path):
-    return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path, "rt")
+    return gzip.open(path, "rt") if _is_gzip(path) else open(path, "rt")
 
 
 def _sample_fastq(path: Path, max_reads: int) -> tuple[list[int], list[float]]:

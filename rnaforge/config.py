@@ -182,9 +182,31 @@ def _one_of(value, allowed, field: str):
     return value
 
 
+# Bölüm-içi bilinen anahtarlar. Top-level koruması (KNOWN_TOP_LEVEL_KEYS) gibi:
+# bölüm içindeki yazım hatası (ör. de.fdr_treshold) sessizce default kullanmasın.
+# quality HARİÇ: gate-override adları serbest-biçimdir (değişken), sabit sete bağlanamaz.
+_KNOWN_SECTION_KEYS = {
+    "reference": {"genome_fasta", "annotation_gff", "transcriptome_fasta", "tx2gene"},
+    "library": {"strandedness", "selection", "chemistry", "full_length_cdna"},
+    "trimming": {"min_length", "aggressive_quality"},
+    "de": {"design", "fdr_threshold", "log2fc_threshold", "reference", "contrasts"},
+    "report": {"language"},
+    "resources": {"threads", "memory_gb"},
+    "quantification": {"feature_type", "attribute"},
+    "enrichment": {"min_term_size", "top_n", "obo", "gaf", "kegg_organism", "kegg_dir",
+                   "gsea_min_size", "gsea_max_size", "revigo_similarity"},
+    "amr": {"amr_db", "virulence_db", "env", "min_identity", "min_coverage",
+            "amrfinder_organism", "amrfinder_env"},
+    "operon": {"max_gap"},
+    "ppi": {"taxid", "string_dir", "min_score", "min_community_size"},
+    "basecall": {"dorado_bin", "model", "device", "env", "models_dir"},
+}
+
+
 def _section(raw: dict, field: str) -> dict:
     """Bir config bölümünü mapping olarak al. `library: "foo"` ham AttributeError
-    yerine ConfigError vermeli: hata mesajı kullanıcıya ne yapacağını söylemeli."""
+    yerine ConfigError vermeli: hata mesajı kullanıcıya ne yapacağını söylemeli.
+    Bilinen-anahtar seti olan bölümlerde yazım hatası (bilinmeyen anahtar) reddedilir."""
     value = raw.get(field)
     if value is None:
         return {}
@@ -192,6 +214,17 @@ def _section(raw: dict, field: str) -> dict:
         raise ConfigError(
             f"{field} must be a mapping of settings, got {type(value).__name__} ({value!r})"
         )
+    known = _KNOWN_SECTION_KEYS.get(field)
+    if known is not None:
+        unknown = [k for k in value if k not in known]
+        if unknown:
+            raise ConfigError(
+                f"unknown key(s) in '{field}' section: "
+                f"{', '.join(map(repr, sorted(map(str, unknown))))}. "
+                f"Allowed: {', '.join(sorted(known))}. "
+                "A typo'd key is silently ignored otherwise, so the run would use "
+                "stale defaults."
+            )
     return value
 
 
