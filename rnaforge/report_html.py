@@ -1181,7 +1181,10 @@ _SOFTWARE: list[tuple] = [
 
 def section_software(config, L: dict, inputs: dict, flags: dict) -> str:
     lang = "en" if L is LABELS["en"] else "tr"
-    sw_rows = [[t, v, (ptr if lang == "tr" else pen)] for t, v, ptr, pen, cond in _SOFTWARE
+    # F2.2: runtime'da yakalanan gerçek sürümler (varsa) curated fallback'i ezer.
+    runtime = inputs.get("software_versions") or {}
+    sw_rows = [[t, runtime.get(t, v), (ptr if lang == "tr" else pen)]
+               for t, v, ptr, pen, cond in _SOFTWARE
                if cond is None or flags.get(cond)]
     sw_tbl = _table([L["sw_tool"], L["sw_version"], L["sw_purpose"]], sw_rows, L["cap_software"])
     # Veritabanları — yalnız koşan analizler

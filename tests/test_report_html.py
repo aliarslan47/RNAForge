@@ -729,6 +729,16 @@ def test_section_software_hides_unrun_tools():
     assert "AMRFinderPlus" not in html and "SortMeRNA" not in html   # koşmadı -> gizli
 
 
+def test_section_software_uses_runtime_versions_when_present():
+    """F2.2: inputs['software_versions'] verildiğinde tablo curated yerine runtime'da
+    yakalanan sürümü gösterir (gerçek tekrarlanabilirlik)."""
+    cfg = _cfg("en")
+    flags = {"gsea": False, "amr": False, "ppi": False, "seqqc": False, "enrichment": False, "kegg": False}
+    html = section_software(cfg, LABELS["en"], {"software_versions": {"DESeq2 (R)": "1.99.9"}}, flags)
+    assert "1.99.9" in html            # runtime sürüm
+    assert "1.50.2" not in html        # curated fallback ezildi
+
+
 def test_general_references_always_present(tmp_path):
     refs = section_references(LABELS["en"])
     assert "10.3389/fgene.2025.1697922" in refs   # Dawadi 2025 (genel kaynak, koşulsuz)

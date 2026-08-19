@@ -8,6 +8,7 @@ from rnaforge import __version__
 from rnaforge.config import Config
 from rnaforge.report_html import load_report_inputs, render_report, N_SECTIONS
 from rnaforge.state import RunState
+from rnaforge.versions import capture_tool_versions
 
 MODULE_NAME = "m08_report"
 
@@ -34,6 +35,13 @@ def run_report(config: Config, metadata_path: Path, run_dir: Path,
     log_path = logs_dir / "report.log"
     with log_path.open("w") as log_file:
         inputs = load_report_inputs(run_dir)
+        # F2.2: yazılım tablosu için gerçek kurulu sürümleri yakala (best-effort; conda
+        # yoksa boş → rapor curated fallback kullanır, çökmez).
+        try:
+            inputs["software_versions"] = capture_tool_versions()
+        except Exception as exc:  # asla rapor üretimini bloklama
+            log_file.write(f"software version capture failed (curated fallback): {exc}\n")
+            inputs["software_versions"] = {}
         state.heartbeat()
         doc = render_report(inputs, config, version=__version__, run_id=run_dir.name)
         report_path = report_dir / "report.html"
