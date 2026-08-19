@@ -12,6 +12,7 @@ counts  <- counts[, rownames(coldata), drop = FALSE]        # örnek sırasını
 coldata$condition <- factor(coldata$condition)
 if (nzchar(reference)) coldata$condition <- relevel(coldata$condition, ref = reference)
 if ("batch" %in% colnames(coldata)) coldata$batch <- factor(coldata$batch)
+if ("subject" %in% colnames(coldata)) coldata$subject <- factor(coldata$subject)
 
 dds <- DESeqDataSetFromMatrix(countData = as.matrix(counts),
                               colData = coldata, design = as.formula(design_str))

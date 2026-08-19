@@ -70,6 +70,50 @@ def _write_counts_coldata(tmp_path):
     return counts, coldata
 
 
+def _write_paired_counts_coldata(tmp_path):
+    """3 denek × 2 koşul (eşleştirilmiş); denek-bazlı baseline kayması + koşul sinyali."""
+    import random
+    random.seed(7)
+    subjects = ["p1", "p2", "p3"]
+    samples = [(f"{s}_{c}", c, s) for s in subjects for c in ("control", "treated")]
+    genes = [f"g{i}" for i in range(40)]
+    subj_offset = {"p1": 0, "p2": 120, "p3": 240}     # denekler arası baseline farkı
+    counts = tmp_path / "counts.tsv"
+    with counts.open("w") as f:
+        f.write("gene\t" + "\t".join(sid for sid, _, _ in samples) + "\n")
+        for gi, g in enumerate(genes):
+            base = random.randint(100, 200)
+            row = []
+            for _sid, cond, subj in samples:
+                val = base + subj_offset[subj] + random.randint(-10, 10)
+                if gi < 5 and cond == "treated":
+                    val += 400                          # ilk 5 gen treated'da yukarı
+                row.append(str(val))
+            f.write(g + "\t" + "\t".join(row) + "\n")
+    coldata = tmp_path / "coldata.tsv"
+    with coldata.open("w") as f:
+        f.write("sample\tcondition\tsubject\n")
+        for sid, cond, subj in samples:
+            f.write(f"{sid}\t{cond}\t{subj}\n")
+    return counts, coldata
+
+
+@pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")
+def test_run_deseq2_paired_subject_design(tmp_path):
+    """Entegrasyon: '~subject + condition' coldata'da subject olduğunda çökmeden koşar
+    ve koşul sinyalini bulur. Regresyon: eskiden coldata subject yazmıyordu → R'da
+    'variable subject not found' ile patlıyordu. rnaforge-de yoksa skip."""
+    counts, coldata = _write_paired_counts_coldata(tmp_path)
+    try:
+        result = run_deseq2(counts, coldata, "~subject + condition", tmp_path / "de",
+                            reference="control")
+    except DeseqRunError as exc:
+        pytest.skip(f"DESeq2 çalıştırılamadı (env yok?): {exc}")
+    by_gene = {r["gene"]: r for r in result.results}
+    assert by_gene["g0"]["padj"] is not None and by_gene["g0"]["padj"] < 0.05
+    assert by_gene["g0"]["log2FoldChange"] > 1
+
+
 @pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")
 def test_run_deseq2_detects_signal(tmp_path):
     """Entegrasyon: gerçek DESeq2 sinyalli genleri anlamlı bulur. rnaforge-de yoksa skip."""

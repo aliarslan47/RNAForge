@@ -23,14 +23,22 @@ _GATE = "replicate_correlation"
 
 
 def _write_coldata(samples, path: Path) -> None:
+    # batch VE subject, tasarımda kullanılabildiğinde coldata'ya yazılır. subject
+    # atlanırsa `~subject + condition` (metadata.py'nin eşleştirilmiş-veri için önerdiği
+    # tasarım) DESeq2'de "variable 'subject' not found" ile derin çöker — kendisiyle çelişki.
     has_batch = any(s.batch for s in samples)
+    has_subject = any(s.subject for s in samples)
     with path.open("w") as f:
-        header = "sample\tcondition" + ("\tbatch" if has_batch else "")
+        header = ("sample\tcondition"
+                  + ("\tbatch" if has_batch else "")
+                  + ("\tsubject" if has_subject else ""))
         f.write(header + "\n")
         for s in samples:
             row = f"{s.sample_id}\t{s.condition}"
             if has_batch:
                 row += f"\t{s.batch or 'NA'}"
+            if has_subject:
+                row += f"\t{s.subject or 'NA'}"
             f.write(row + "\n")
 
 

@@ -15,6 +15,35 @@ from rnaforge.quality import load_profile
 from rnaforge.state import RunState
 
 
+def test_write_coldata_includes_subject_when_present(tmp_path):
+    """~subject + condition tasarımı için coldata subject sütununu içermeli;
+    aksi halde DESeq2 'subject not found' ile derin çöker (aracın kendi önerisi)."""
+    from rnaforge.metadata import Sample
+    samples = [
+        Sample("s1", "control", tmp_path / "a.fq", None, batch="b1", subject="p1"),
+        Sample("s2", "treated", tmp_path / "b.fq", None, batch="b1", subject="p1"),
+        Sample("s3", "control", tmp_path / "c.fq", None, batch="b2", subject="p2"),
+        Sample("s4", "treated", tmp_path / "d.fq", None, batch="b2", subject="p2"),
+    ]
+    out = tmp_path / "coldata.tsv"
+    m06_de._write_coldata(samples, out)
+    lines = out.read_text().splitlines()
+    assert lines[0] == "sample\tcondition\tbatch\tsubject"
+    assert lines[1] == "s1\tcontrol\tb1\tp1"
+
+
+def test_write_coldata_omits_subject_when_absent(tmp_path):
+    """subject yoksa sütun eklenmemeli (geriye uyumlu — doğrulanmış koşular değişmez)."""
+    from rnaforge.metadata import Sample
+    samples = [
+        Sample("s1", "control", tmp_path / "a.fq", None),
+        Sample("s2", "treated", tmp_path / "b.fq", None),
+    ]
+    out = tmp_path / "coldata.tsv"
+    m06_de._write_coldata(samples, out)
+    assert out.read_text().splitlines()[0] == "sample\tcondition"
+
+
 def test_count_up_down():
     res = [
         {"padj": 1e-8, "log2FoldChange": 3.0},   # up
