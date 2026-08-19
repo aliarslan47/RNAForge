@@ -18,6 +18,7 @@ from rnaforge.modules.m04_quant import run_quant
 from rnaforge.modules.m05_counts import run_counts
 from rnaforge.modules.m06_de import run_de
 from rnaforge.platform import UnsupportedPlatformError
+from rnaforge.preflight import ENVIRONMENTS, environment_report, list_conda_envs
 from rnaforge.basecall import basecalled_metadata_path
 from rnaforge.quality import load_profile, profile_name_for
 from rnaforge.report.confidence import write_confidence_card
@@ -86,6 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rnaforge", description="Bulk RNA-seq pipeline")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")
+
+    sub.add_parser(
+        "doctor", help="check that the required conda environments exist (run after install)")
 
     run = sub.add_parser(
         "run", help="run the whole pipeline in order, stop-on-FAIL, resumable (m01→m08)")
@@ -705,6 +709,23 @@ _STAGE_DISPATCH = {
 }
 
 
+def _cmd_doctor(args) -> int:
+    available = list_conda_envs()
+    report = environment_report(available)
+    missing = [name for name, _desc, present in report if not present]
+    for name, desc, present in report:
+        mark = "OK  " if present else "MISSING"
+        print(f"[{mark}] {name} — {desc}")
+    if missing:
+        print(f"\n{len(missing)} environment(s) missing. Create with:", file=sys.stderr)
+        for name in missing:
+            print(f"  conda env create -f envs/{name}.yml", file=sys.stderr)
+        print("  pip install -e .    # into rnaforge-core", file=sys.stderr)
+        return 1
+    print(f"\nall {len(ENVIRONMENTS)} environment(s) present — OK")
+    return 0
+
+
 def _cmd_run(args) -> int:
     include = [s.strip() for s in (args.include or "").split(",") if s.strip()]
     sequence = build_run_sequence(args.from_stage, args.to_stage, include)
@@ -727,6 +748,8 @@ def main(argv: list[str] | None = None) -> int:
         print("error: no command given (try: rnaforge validate --help)", file=sys.stderr)
         return 2
     try:
+        if args.command == "doctor":
+            return _cmd_doctor(args)
         if args.command == "run":
             return _cmd_run(args)
         if args.command == "basecall":

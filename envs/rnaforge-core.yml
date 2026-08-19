@@ -44,6 +44,8 @@ dependencies:
   - pip:
       - networkx==3.6.1
       - numpy==2.4.6
-      - rnaforge==0.1.0
       - scipy==1.17.1
+      # rnaforge paketinin KENDİSİ buraya konmaz: env oluşturulduktan sonra
+      # `pip install -e .` ile editable kurulur (PyPI'da yayınlı değil). Buraya
+      # 'rnaforge==0.1.0' koymak temiz makinede env oluşturmayı bozuyordu.
 prefix: /home/ali/miniconda3/envs/rnaforge-core
