@@ -119,3 +119,22 @@ def test_config_basecall_defaults(tmp_path):
     assert cfg.basecall.model == "hac"
     assert cfg.basecall.device == "cuda:all"
     assert cfg.basecall.env == "rnaforge-basecall"
+
+
+def test_resolved_metadata_preserves_covariates(tmp_path):
+    """Faz 3: basecall çözülmüş metadata'yı yeniden yazarken keyfi kovaryatları (sex,
+    genotype...) düşürmemeli — yoksa ONT yolunda kovaryat design'ları sessizce bozulur."""
+    from rnaforge.metadata import Sample
+    (tmp_path / "a.fq").write_text("@r\nACGT\n+\nIIII\n")
+    (tmp_path / "b.fq").write_text("@r\nACGT\n+\nIIII\n")
+    rows = [
+        Sample("s1", "control", tmp_path / "a.fq", None,
+               batch="b1", covariates={"sex": "M", "lane": "L1"}),
+        Sample("s2", "treated", tmp_path / "b.fq", None,
+               batch="b1", covariates={"sex": "F", "lane": "L2"}),
+    ]
+    out = tmp_path / "resolved.tsv"
+    m00_basecall._write_resolved_metadata(out, rows)
+    reloaded = load_metadata(out)
+    assert [s.covariates.get("sex") for s in reloaded] == ["M", "F"]
+    assert [s.covariates.get("lane") for s in reloaded] == ["L1", "L2"]

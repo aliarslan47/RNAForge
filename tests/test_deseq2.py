@@ -17,7 +17,15 @@ from rnaforge.deseq2 import (
 
 
 def test_format_contrasts_serializes_pairs():
-    assert format_contrasts((("high", "control"), ("low", "control"))) == "high:control;low:control"
+    """(factor|None, test, ref) → 'factor:test:ref'; None faktör → 'condition' (Faz 3)."""
+    assert (
+        format_contrasts(((None, "high", "control"), (None, "low", "control")))
+        == "condition:high:control;condition:low:control"
+    )
+
+
+def test_format_contrasts_names_covariate_factor():
+    assert format_contrasts((("genotype", "mut", "WT"),)) == "genotype:mut:WT"
 
 
 def test_format_contrasts_empty():
@@ -27,7 +35,8 @@ def test_format_contrasts_empty():
 
 def test_run_deseq2_passes_contrasts_and_collects_paths(tmp_path, monkeypatch):
     """Wrapper contrasts'ı R'a 6. arg olarak geçmeli ve her contrast çıktı dosyasını
-    toplamalı. subprocess.run mock'lanır (conda gerekmez)."""
+    toplamalı. subprocess.run mock'lanır (conda gerekmez). condition faktörü → dosya
+    adı geriye uyumlu (faktör öneki yok)."""
     import subprocess as sp
     captured = {}
 
@@ -45,12 +54,38 @@ def test_run_deseq2_passes_contrasts_and_collects_paths(tmp_path, monkeypatch):
         return R()
 
     monkeypatch.setattr(sp, "run", fake_run)
-    contrasts = (("high", "control"), ("low", "control"))
+    contrasts = ((None, "high", "control"), (None, "low", "control"))
     result = run_deseq2(tmp_path / "counts.tsv", tmp_path / "coldata.tsv", "~condition",
                         tmp_path / "de", reference="control", contrasts=contrasts)
-    assert captured["cmd"][-1] == "high:control;low:control"
+    assert captured["cmd"][-1] == "condition:high:control;condition:low:control"
     assert set(result.contrast_paths) == {"high_vs_control", "low_vs_control"}
     assert result.contrast_paths["high_vs_control"].exists()
+
+
+def test_run_deseq2_covariate_factor_contrast_path(tmp_path, monkeypatch):
+    """condition-dışı faktör kontrastı → dosya adı faktör-önekli (çakışmayı önler)."""
+    import subprocess as sp
+    captured = {}
+
+    def fake_run(cmd, capture_output, text):
+        captured["cmd"] = cmd
+        out_dir = Path(cmd[-2])
+        for name in ("deseq2_results.tsv", "deseq2_results.genotype.mut_vs_WT.tsv"):
+            (out_dir / name).write_text("gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\n"
+                                        "g0\t10\t1\t0.1\t2\t0.01\t0.02\n")
+        (out_dir / "de_metrics.tsv").write_text("min_replicate_correlation\t0.9\ncontrast\tmut vs WT\nn_genes\t1\n")
+        (out_dir / "normalized_counts.tsv").write_text("gene\ts1\ng0\t10\n")
+
+        class R: returncode = 0; stderr = ""
+        return R()
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    result = run_deseq2(tmp_path / "counts.tsv", tmp_path / "coldata.tsv",
+                        "~genotype + condition", tmp_path / "de",
+                        contrasts=(("genotype", "mut", "WT"),))
+    assert captured["cmd"][-1] == "genotype:mut:WT"
+    assert set(result.contrast_paths) == {"genotype.mut_vs_WT"}
+    assert result.contrast_paths["genotype.mut_vs_WT"].exists()
 
 _RESULTS = (
     "gene\tbaseMean\tlog2FoldChange\tlfcSE\tstat\tpvalue\tpadj\n"
@@ -184,7 +219,7 @@ def test_run_deseq2_multiple_contrasts(tmp_path):
     """Entegrasyon: 3-seviyeli condition'da açık kontrastlar ayrı dosyalar üretir ve
     her biri doğru karşılaştırmayı raporlar (high-vs-control > low-vs-control g0'da)."""
     counts, coldata = _write_three_level(tmp_path)
-    contrasts = (("high", "control"), ("low", "control"))
+    contrasts = ((None, "high", "control"), (None, "low", "control"))
     try:
         result = run_deseq2(counts, coldata, "~condition", tmp_path / "de",
                             reference="control", contrasts=contrasts)
@@ -219,3 +254,50 @@ def test_run_deseq2_detects_signal(tmp_path):
     assert disp.exists()
     header = disp.read_text().splitlines()[0].split("\t")
     assert header == ["gene_id", "baseMean", "dispGeneEst", "dispFit", "dispFinal"]
+
+
+def _write_covariate_counts_coldata(tmp_path):
+    """2 condition × 2 genotype (WT/mut) × 2 replika; g0-4 mut'ta yukarı (genotype sinyali)."""
+    import random
+    random.seed(13)
+    rows = [(f"{c}_{g}_{i}", c, g)
+            for c in ("control", "treated")
+            for g in ("WT", "mut")
+            for i in (1, 2)]
+    counts = tmp_path / "counts.tsv"
+    with counts.open("w") as f:
+        f.write("gene\t" + "\t".join(sid for sid, _, _ in rows) + "\n")
+        for gi in range(40):
+            base = random.randint(100, 200)
+            line = []
+            for _sid, cond, geno in rows:
+                val = base + random.randint(-10, 10)
+                if gi < 5 and geno == "mut":
+                    val *= 4                       # ilk 5 gen mut'ta yukarı
+                line.append(str(val))
+            f.write(f"g{gi}\t" + "\t".join(line) + "\n")
+    coldata = tmp_path / "coldata.tsv"
+    with coldata.open("w") as f:
+        f.write("sample\tcondition\tgenotype\n")
+        for sid, cond, geno in rows:
+            f.write(f"{sid}\t{cond}\t{geno}\n")
+    return counts, coldata
+
+
+@pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")
+def test_run_deseq2_covariate_factor_contrast(tmp_path):
+    """Entegrasyon: condition-DIŞI bir faktörü (genotype) tetkik eden kontrast, generic
+    faktörleme sayesinde faktör-önekli ayrı dosya üretir ve genotype sinyalini bulur.
+    Regresyon: eskiden R contrast vektöründe 'condition' sabitti → başka faktör tetkik
+    edilemezdi. rnaforge-de yoksa skip."""
+    counts, coldata = _write_covariate_counts_coldata(tmp_path)
+    try:
+        result = run_deseq2(counts, coldata, "~genotype + condition", tmp_path / "de",
+                            contrasts=(("genotype", "mut", "WT"),))
+    except DeseqRunError as exc:
+        pytest.skip(f"DESeq2 çalıştırılamadı (env yok?): {exc}")
+    assert set(result.contrast_paths) == {"genotype.mut_vs_WT"}
+    by_gene = {r["gene"]: r for r in parse_deseq2_results(
+        result.contrast_paths["genotype.mut_vs_WT"].read_text())}
+    assert by_gene["g0"]["padj"] is not None and by_gene["g0"]["padj"] < 0.05
+    assert by_gene["g0"]["log2FoldChange"] > 1     # mut, WT'ye göre yukarı

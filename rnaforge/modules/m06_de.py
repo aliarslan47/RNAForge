@@ -14,7 +14,7 @@ from pathlib import Path
 from rnaforge.config import Config
 from rnaforge.deseq2 import run_deseq2
 from rnaforge.gates import PASS, WARN, GateResult, write_gate_results
-from rnaforge.metadata import load_metadata
+from rnaforge.metadata import _factor_value, design_variables, load_metadata
 from rnaforge.quality import Profile, load_profile
 from rnaforge.state import RunState
 
@@ -22,24 +22,17 @@ MODULE_NAME = "m06_de"
 _GATE = "replicate_correlation"
 
 
-def _write_coldata(samples, path: Path) -> None:
-    # batch VE subject, tasarımda kullanılabildiğinde coldata'ya yazılır. subject
-    # atlanırsa `~subject + condition` (metadata.py'nin eşleştirilmiş-veri için önerdiği
-    # tasarım) DESeq2'de "variable 'subject' not found" ile derin çöker — kendisiyle çelişki.
-    has_batch = any(s.batch for s in samples)
-    has_subject = any(s.subject for s in samples)
+def _write_coldata(samples, path: Path, design: str) -> None:
+    # Design formülünde geçen HER faktör coldata'ya yazılır (condition/batch/subject +
+    # keyfi kovaryatlar: sex, lane, genotype...). Aksi halde faktör R'da "variable not
+    # found" ile derin çöker. condition ANA tetkik faktörü → her zaman ilk sütun.
+    factors = design_variables(design)
+    ordered = ["condition"] + [f for f in factors if f != "condition"]
     with path.open("w") as f:
-        header = ("sample\tcondition"
-                  + ("\tbatch" if has_batch else "")
-                  + ("\tsubject" if has_subject else ""))
-        f.write(header + "\n")
+        f.write("sample\t" + "\t".join(ordered) + "\n")
         for s in samples:
-            row = f"{s.sample_id}\t{s.condition}"
-            if has_batch:
-                row += f"\t{s.batch or 'NA'}"
-            if has_subject:
-                row += f"\t{s.subject or 'NA'}"
-            f.write(row + "\n")
+            values = [str(_factor_value(s, col) or "NA") for col in ordered]
+            f.write(s.sample_id + "\t" + "\t".join(values) + "\n")
 
 
 def build_de_gates(min_correlation: float, profile: Profile) -> list[GateResult]:
@@ -107,7 +100,7 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
 
         samples = load_metadata(metadata_path)
         coldata_path = de_dir / "coldata.tsv"
-        _write_coldata(samples, coldata_path)
+        _write_coldata(samples, coldata_path, config.de.design)
         counts_tsv = run_dir / "quantification" / "counts.tsv"
         log(f"m06 DESeq2: design={config.de.design!r} reference={config.de.reference!r} "
             f"contrasts={config.de.contrasts!r}")

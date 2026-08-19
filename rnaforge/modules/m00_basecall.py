@@ -29,15 +29,26 @@ _COLUMNS = ("sample_id", "condition", "fastq_1", "fastq_2", "batch", "subject")
 def _write_resolved_metadata(path: Path, rows: list[Sample]) -> None:
     """Çözülmüş metadata MUTLAK yollarla yazılır: load_metadata yolları metadata
     dosyasının dizinine göre çözer; göreli yol yazmak (run_dir göreli olduğunda)
-    yolu ikilerdi (canlı e2e'de yakalandı)."""
+    yolu ikilerdi (canlı e2e'de yakalandı).
+
+    Keyfi kovaryat sütunları (sex, lane, genotype...) korunur (Faz 3) — düşürmek ONT
+    yolunda kovaryat design'larını sessizce bozardı. Kovaryat sütun birleşimi tüm
+    örneklerden toplanır; bir örnekte yoksa boş yazılır."""
+    covariate_cols: list[str] = []
+    for s in rows:
+        for key in s.covariates:
+            if key not in covariate_cols:
+                covariate_cols.append(key)
+    columns = list(_COLUMNS) + covariate_cols
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as fh:
-        fh.write("\t".join(_COLUMNS) + "\n")
+        fh.write("\t".join(columns) + "\n")
         for s in rows:
             fh.write("\t".join([
                 s.sample_id, s.condition, str(Path(s.fastq_1).resolve()),
                 str(Path(s.fastq_2).resolve()) if s.fastq_2 else "",
                 s.batch or "", s.subject or "",
+                *[s.covariates.get(c, "") for c in covariate_cols],
             ]) + "\n")
 
 
@@ -93,7 +104,8 @@ def run_basecall(config: Config, metadata_path: Path, run_dir: Path,
             log(f"{sample.sample_id}: {kind} → basecalled {reads} reads ({out_fastq})")
             # ONT tek-uçlu; fastq_1 basecall çıktısına yönlendirilir, fastq_2 yok.
             resolved.append(Sample(sample.sample_id, sample.condition, out_fastq,
-                                   None, sample.batch, sample.subject))
+                                   None, sample.batch, sample.subject,
+                                   sample.covariates))
 
         _write_resolved_metadata(resolved_path, resolved)
         summary = {

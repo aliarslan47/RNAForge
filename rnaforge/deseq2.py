@@ -28,9 +28,27 @@ class DeseqResult:
     contrast_paths: dict = field(default_factory=dict)
 
 
+def _contrast_filename(factor: str | None, test: str, ref: str) -> str:
+    """Kontrast sonuç dosya adı. condition (faktör None) → geriye uyumlu ad;
+    condition-dışı faktör → faktör-önekli (dosya adı çakışmasını önler)."""
+    if factor is None or factor == "condition":
+        return f"deseq2_results.{test}_vs_{ref}.tsv"
+    return f"deseq2_results.{factor}.{test}_vs_{ref}.tsv"
+
+
+def _contrast_key(factor: str | None, test: str, ref: str) -> str:
+    if factor is None or factor == "condition":
+        return f"{test}_vs_{ref}"
+    return f"{factor}.{test}_vs_{ref}"
+
+
 def format_contrasts(contrasts) -> str:
-    """((test, ref), ...) -> 'test:ref;test2:ref2' (deseq2.R'nin 6. argümanı). Boş -> ''."""
-    return ";".join(f"{t}:{r}" for t, r in (contrasts or ()))
+    """((factor|None, test, ref), ...) -> 'factor:test:ref;...' (deseq2.R'nin 6. arg).
+
+    Faktör None → 'condition' (ANA tetkik faktörü). Boş -> ''."""
+    return ";".join(
+        f"{factor or 'condition'}:{test}:{ref}" for factor, test, ref in (contrasts or ())
+    )
 
 
 def _num(value: str):
@@ -90,14 +108,14 @@ def run_deseq2(counts_tsv: Path, coldata_tsv: Path, design: str, out_dir: Path,
             f"DESeq2 reported success but output missing in {out_dir}\nstderr: {r.stderr.strip()}"
         )
     contrast_paths: dict = {}
-    for test, ref in contrasts:
-        path = out_dir / f"deseq2_results.{test}_vs_{ref}.tsv"
+    for factor, test, ref in contrasts:
+        path = out_dir / _contrast_filename(factor, test, ref)
         if not path.exists():
             raise DeseqRunError(
                 f"DESeq2 reported success but contrast output missing: {path}\n"
                 f"stderr: {r.stderr.strip()}"
             )
-        contrast_paths[f"{test}_vs_{ref}"] = path
+        contrast_paths[_contrast_key(factor, test, ref)] = path
     results = parse_deseq2_results(results_path.read_text())
     metrics = parse_de_metrics(metrics_path.read_text())
     return DeseqResult(results=results, metrics=metrics,

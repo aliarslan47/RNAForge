@@ -158,7 +158,9 @@ def test_malformed_formula_still_raises(tmp_path):
     samples = load_metadata(path)
     with pytest.raises(MetadataError, match="no variables"):
         validate_design(samples, "~")
-    with pytest.raises(MetadataError, match="unknown variable"):
+    # 'temperature' metadata'da bir sütun değil → hâlâ MetadataError (mesaj artık
+    # onu "eksik metadata sütunu" olarak adlandırır, keyfi-kovaryat sözleşmesiyle).
+    with pytest.raises(MetadataError, match="temperature"):
         validate_design(samples, "~temperature")
 
 
@@ -473,3 +475,73 @@ def test_subject_in_design_missing_for_some_sample_raises(tmp_path):
     samples = load_metadata(path)
     with pytest.raises(MetadataError, match="subject"):
         validate_design(samples, "~subject + condition")
+
+
+# --- Faz 3: keyfi kovaryat adları (kovaryat genişletme) -----------------------
+
+def test_arbitrary_covariate_column_loaded(tmp_path):
+    """Çekirdek olmayan sütunlar (sex, lane, RIN...) Sample.covariates'e yakalanır."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsex\tfastq_1\n"
+        "s1\tcontrol\tM\ta.fastq\n"
+        "s2\ttreated\tF\tb.fastq\n"
+    ))
+    samples = load_metadata(path)
+    assert [s.covariates.get("sex") for s in samples] == ["M", "F"]
+
+
+def test_covariate_in_design_passes(tmp_path):
+    """~sex + condition (sex dengeli, condition ile confounded değil) → kapılar PASS."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsex\tfastq_1\n"
+        "s1\tcontrol\tM\ta.fastq\n"
+        "s2\tcontrol\tF\tb.fastq\n"
+        "s3\ttreated\tM\tc.fastq\n"
+        "s4\ttreated\tF\td.fastq\n"
+    ))
+    gates = validate_design(load_metadata(path), "~sex + condition")
+    assert all(g.status == PASS for g in gates)
+
+
+def test_covariate_single_level_fails_rank(tmp_path):
+    """Tek-seviyeli kovaryat rank-deficient → design_rank FAIL (batch/subject gibi)."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsex\tfastq_1\n"
+        "s1\tcontrol\tM\ta.fastq\n"
+        "s2\tcontrol\tM\tb.fastq\n"
+        "s3\ttreated\tM\tc.fastq\n"
+        "s4\ttreated\tM\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~sex + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert "sex" in gate.message
+
+
+def test_covariate_confounded_with_condition_fails_rank(tmp_path):
+    """Kovaryat condition ile tam confounded → design_rank FAIL (condition-merkezli ölçüm)."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq", "c.fastq", "d.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsex\tfastq_1\n"
+        "s1\tcontrol\tM\ta.fastq\n"
+        "s2\tcontrol\tM\tb.fastq\n"
+        "s3\ttreated\tF\tc.fastq\n"
+        "s4\ttreated\tF\td.fastq\n"
+    ))
+    gate = _gate(validate_design(load_metadata(path), "~sex + condition"), "design_rank")
+    assert gate.status == FAIL
+    assert "confounded" in gate.message
+
+
+def test_covariate_missing_value_raises(tmp_path):
+    """Design bir kovaryat kullanıyor ama bazı örneklerde değeri yok → MetadataError."""
+    _make_fastqs(tmp_path, "a.fastq", "b.fastq")
+    path = _write_meta(tmp_path, (
+        "sample_id\tcondition\tsex\tfastq_1\n"
+        "s1\tcontrol\tM\ta.fastq\n"
+        "s2\ttreated\t\tb.fastq\n"
+    ))
+    with pytest.raises(MetadataError, match="sex"):
+        validate_design(load_metadata(path), "~sex + condition")

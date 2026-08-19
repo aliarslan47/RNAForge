@@ -251,34 +251,50 @@ def _as_bool(value, field: str) -> bool:
 
 
 def _build_contrasts(raw) -> tuple:
-    """de.contrasts'ı doğrulayıp ((test, ref), ...) döndürür. Boş/None → ()."""
+    """de.contrasts'ı doğrulayıp ((factor|None, test, ref), ...) döndürür. Boş/None → ().
+
+    İki biçim (Faz 3, geriye uyumlu):
+      [test, ref]          → (None, test, ref)   faktör = condition (ANA tetkik faktörü)
+      [factor, test, ref]  → (factor, test, ref) condition-dışı bir faktörü tetkik et
+    """
     if raw is None:
         return ()
     if not isinstance(raw, list):
         raise ConfigError(
-            f"de.contrasts must be a list of [test, reference] pairs, got {type(raw).__name__}"
+            f"de.contrasts must be a list of [test, reference] or [factor, test, reference] "
+            f"entries, got {type(raw).__name__}"
         )
-    out: list[tuple[str, str]] = []
-    for i, pair in enumerate(raw):
-        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+    out: list[tuple[str | None, str, str]] = []
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, (list, tuple)) or len(entry) not in (2, 3):
             raise ConfigError(
-                f"de.contrasts[{i}] must be a [test, reference] pair, got {pair!r}"
+                f"de.contrasts[{i}] must be a [test, reference] pair or a "
+                f"[factor, test, reference] triple, got {entry!r}"
             )
-        test, ref = str(pair[0]).strip(), str(pair[1]).strip()
-        for lvl in (test, ref):
-            if not lvl:
-                raise ConfigError(f"de.contrasts[{i}] has an empty condition level")
-            if ":" in lvl or ";" in lvl:
+        if len(entry) == 2:
+            factor, test, ref = None, str(entry[0]).strip(), str(entry[1]).strip()
+        else:
+            factor, test, ref = (
+                str(entry[0]).strip(),
+                str(entry[1]).strip(),
+                str(entry[2]).strip(),
+            )
+        for name, part in (("factor", factor), ("test", test), ("reference", ref)):
+            if part is None:
+                continue
+            if not part:
+                raise ConfigError(f"de.contrasts[{i}] has an empty {name}")
+            if ":" in part or ";" in part:
                 raise ConfigError(
-                    f"de.contrasts[{i}] level {lvl!r} must not contain ':' or ';' "
+                    f"de.contrasts[{i}] {name} {part!r} must not contain ':' or ';' "
                     "(used as internal delimiters)"
                 )
         if test == ref:
             raise ConfigError(
                 f"de.contrasts[{i}] test and reference are identical ({test!r}); "
-                "a contrast compares two different condition levels"
+                "a contrast compares two different levels"
             )
-        out.append((test, ref))
+        out.append((factor, test, ref))
     return tuple(out)
 
 

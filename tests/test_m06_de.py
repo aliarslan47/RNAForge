@@ -26,7 +26,7 @@ def test_write_coldata_includes_subject_when_present(tmp_path):
         Sample("s4", "treated", tmp_path / "d.fq", None, batch="b2", subject="p2"),
     ]
     out = tmp_path / "coldata.tsv"
-    m06_de._write_coldata(samples, out)
+    m06_de._write_coldata(samples, out, "~batch + subject + condition")
     lines = out.read_text().splitlines()
     assert lines[0] == "sample\tcondition\tbatch\tsubject"
     assert lines[1] == "s1\tcontrol\tb1\tp1"
@@ -40,8 +40,22 @@ def test_write_coldata_omits_subject_when_absent(tmp_path):
         Sample("s2", "treated", tmp_path / "b.fq", None),
     ]
     out = tmp_path / "coldata.tsv"
-    m06_de._write_coldata(samples, out)
+    m06_de._write_coldata(samples, out, "~condition")
     assert out.read_text().splitlines()[0] == "sample\tcondition"
+
+
+def test_write_coldata_includes_covariate_in_design(tmp_path):
+    """Keyfi kovaryat (sex) design'da geçiyorsa coldata'ya sütun olarak yazılır (Faz 3)."""
+    from rnaforge.metadata import Sample
+    samples = [
+        Sample("s1", "control", tmp_path / "a.fq", None, covariates={"sex": "M"}),
+        Sample("s2", "treated", tmp_path / "b.fq", None, covariates={"sex": "F"}),
+    ]
+    out = tmp_path / "coldata.tsv"
+    m06_de._write_coldata(samples, out, "~sex + condition")
+    lines = out.read_text().splitlines()
+    assert lines[0] == "sample\tcondition\tsex"
+    assert lines[1] == "s1\tcontrol\tM"
 
 
 def test_count_up_down():

@@ -7,8 +7,9 @@ from __future__ import annotations
 import csv
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Mapping
 
 from rnaforge.gates import FAIL, PASS, GateResult
 
@@ -27,6 +28,16 @@ class Sample:
     fastq_2: Path | None = None
     batch: str | None = None
     subject: str | None = None
+    # Çekirdek-dışı metadata sütunları (sex, lane, RIN, genotype...). Design'a keyfi
+    # adlı kovaryat olarak katılabilir; condition ANA tetkik faktörü olarak kalır (Faz 3).
+    covariates: Mapping[str, str] = field(default_factory=dict)
+
+
+# batch/subject'in gate'de özel işlemesi var; bunlar + kimlik/fastq sütunları
+# covariates'e GİRMEZ, geri kalan her sütun kovaryat olur.
+_CORE_COLUMNS = frozenset(
+    {"sample_id", "condition", "fastq_1", "fastq_2", "batch", "subject"}
+)
 
 
 def _resolve(value: str, base_dir: Path) -> Path:
@@ -76,7 +87,14 @@ def load_metadata(path: Path | str, base_dir: Path | None = None) -> list[Sample
 
         batch = (row.get("batch") or "").strip() or None
         subject = (row.get("subject") or "").strip() or None
-        samples.append(Sample(sample_id, condition, fastqs[0], fastqs[1], batch, subject))
+        covariates = {
+            col: (val or "").strip()
+            for col, val in row.items()
+            if col is not None and col not in _CORE_COLUMNS
+        }
+        samples.append(
+            Sample(sample_id, condition, fastqs[0], fastqs[1], batch, subject, covariates)
+        )
 
     duplicates = [s for s, n in Counter(x.sample_id for x in samples).items() if n > 1]
     if duplicates:
@@ -106,19 +124,25 @@ def validate_design(
     if not variables:
         raise MetadataError(f"design formula has no variables: {design!r}")
 
-    known = {"condition", "batch", "subject"}
-    unknown = [v for v in variables if v not in known]
-    if unknown:
-        raise MetadataError(
-            f"design formula references unknown variable(s): {', '.join(unknown)}. "
-            f"Metadata columns available for design: {', '.join(sorted(known))}"
-        )
-    for variable in ("batch", "subject"):
-        if variable in variables and any(getattr(s, variable) is None for s in samples):
+    # 'condition' ANA tetkik faktörü (her zaman var). 'batch'/'subject' özel gate
+    # işlemeli çekirdek faktörler. Geri kalan HER değişken keyfi bir kovaryat
+    # sütunudur ve TÜM örneklerde değeri olmalı (yoksa DESeq2 sessizce/kriptik çöker).
+    for variable in variables:
+        if variable in ("condition", "batch", "subject"):
+            if variable != "condition" and any(
+                getattr(s, variable) is None for s in samples
+            ):
+                raise MetadataError(
+                    f"design formula uses {variable!r} but the metadata has no {variable} "
+                    f"value for every sample. Add a {variable!r} column, or drop it from "
+                    "the design."
+                )
+            continue
+        if any(not (s.covariates.get(variable) or "").strip() for s in samples):
             raise MetadataError(
-                f"design formula uses {variable!r} but the metadata has no {variable} "
-                f"value for every sample. Add a {variable!r} column, or drop it from "
-                "the design."
+                f"design formula references {variable!r} but the metadata has no "
+                f"{variable!r} column with a value for every sample. Add a {variable!r} "
+                "column, or drop it from the design."
             )
 
     return [
@@ -163,21 +187,28 @@ def _ok(name: str, message: str) -> GateResult:
     )
 
 
-RANK_FACTORS = ("batch", "subject")
+def _factor_value(sample: Sample, factor: str):
+    """Bir faktörün örnekteki değeri: çekirdek faktörler attribute, kovaryatlar dict."""
+    if factor in ("condition", "batch", "subject"):
+        return getattr(sample, factor)
+    return sample.covariates.get(factor)
 
 
 def _rank_gate(samples: list[Sample], variables: list[str]) -> GateResult:
-    # Tasarımdaki HER kategorik faktör (batch, subject, ...) ayrı ayrı kontrol
-    # edilmeli — yalnızca batch'e bakmak, subject üzerinden doygun/confounded
-    # tasarımları sessizce PASS ettirir (bkz. Finding 1: 4 örnek + 4 benzersiz
-    # subject -> DESeq2 "model matrix is not full rank" ile patlar).
-    factors = [v for v in RANK_FACTORS if v in variables]
+    # Tasarımdaki condition-DIŞI HER kategorik faktör (batch, subject, sex, lane...)
+    # ayrı ayrı kontrol edilmeli — yalnızca batch'e bakmak, subject/kovaryat üzerinden
+    # doygun/confounded tasarımları sessizce PASS ettirir (bkz. Finding 1: 4 örnek + 4
+    # benzersiz subject -> DESeq2 "model matrix is not full rank" ile patlar).
+    factors = [v for v in variables if v != "condition"]
     if not factors:
-        return _ok("design_rank", "the design uses no batch or subject term, so it is full rank")
+        return _ok(
+            "design_rank",
+            "the design uses no factor beyond condition, so it is full rank",
+        )
 
     n_samples = len(samples)
     for factor in factors:
-        levels = {getattr(s, factor) for s in samples}
+        levels = {_factor_value(s, factor) for s in samples}
 
         # (a) Tek seviye: faktör hiçbir ayrım bilgisi eklemez.
         if len(levels) < 2:
@@ -219,11 +250,11 @@ def _rank_gate(samples: list[Sample], variables: list[str]) -> GateResult:
         # görülüyorsa, faktörün etkisi condition'ınkinden ayrıştırılamaz.
         by_factor: dict[str, set[str]] = {}
         for sample in samples:
-            by_factor.setdefault(getattr(sample, factor), set()).add(sample.condition)
+            by_factor.setdefault(_factor_value(sample, factor), set()).add(sample.condition)
         if all(len(conditions) == 1 for conditions in by_factor.values()):
             mapping = ", ".join(f"{lvl}->{next(iter(c))}" for lvl, c in sorted(by_factor.items()))
             offending_samples = [
-                s.sample_id for s in samples if len(by_factor[getattr(s, factor)]) == 1
+                s.sample_id for s in samples if len(by_factor[_factor_value(s, factor)]) == 1
             ]
             return GateResult(
                 name="design_rank", module=MODULE, status=FAIL,

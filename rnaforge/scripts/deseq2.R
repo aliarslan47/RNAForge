@@ -4,17 +4,20 @@
 args <- commandArgs(trailingOnly = TRUE)
 counts_tsv <- args[1]; coldata_tsv <- args[2]; design_str <- args[3]
 reference  <- args[4]; out_dir    <- args[5]
-# 6. arg (opsiyonel): açık kontrastlar "test:ref;test2:ref2". Boş → varsayılan (son-vs-ilk).
+# 6. arg (opsiyonel): açık kontrastlar "factor:test:ref;factor2:test2:ref2". factor=condition
+# (ANA tetkik faktörü) çoğu koşuda; condition-dışı faktör de tetkik edilebilir (Faz 3).
+# Boş → varsayılan (condition son-vs-ilk).
 contrasts_spec <- if (length(args) >= 6) args[6] else ""
 suppressMessages(library(DESeq2))
 
 counts  <- read.delim(counts_tsv, row.names = 1, check.names = FALSE)
 coldata <- read.delim(coldata_tsv, row.names = 1, check.names = FALSE)
 counts  <- counts[, rownames(coldata), drop = FALSE]        # örnek sırasını hizala
-coldata$condition <- factor(coldata$condition)
+# coldata'daki HER sütunu (condition/batch/subject + keyfi kovaryatlar) faktörle —
+# özel-durum yerine generic döngü (Faz 3: keyfi faktör adları). condition ANA tetkik
+# faktörü olduğundan reference'a relevel edilir; diğer faktörlerin test/ref'i kontrastta açık.
+for (col in colnames(coldata)) coldata[[col]] <- factor(coldata[[col]])
 if (nzchar(reference)) coldata$condition <- relevel(coldata$condition, ref = reference)
-if ("batch" %in% colnames(coldata)) coldata$batch <- factor(coldata$batch)
-if ("subject" %in% colnames(coldata)) coldata$subject <- factor(coldata$subject)
 
 dds <- DESeqDataSetFromMatrix(countData = as.matrix(counts),
                               colData = coldata, design = as.formula(design_str))
@@ -58,19 +61,29 @@ cond_levels <- levels(coldata$condition)
 primary_contrast <- paste(rev(cond_levels)[1], "vs", cond_levels[1])
 
 if (nzchar(contrasts_spec)) {
-  # Açık kontrastlar: her biri için ayrı dosya; İLK çift birincil deseq2_results.tsv olur
-  # (downstream/rapor birincili tüketir). Geriye uyumlu: spec boşsa bu blok atlanır.
-  pairs <- strsplit(contrasts_spec, ";", fixed = TRUE)[[1]]
+  # Açık kontrastlar: her biri "factor:test:ref"; her biri için ayrı dosya. İLK giriş
+  # birincil deseq2_results.tsv olur (downstream/rapor birincili tüketir). condition
+  # faktörü → dosya adı geriye uyumlu (öneksiz); condition-dışı → faktör-önekli.
+  specs <- strsplit(contrasts_spec, ";", fixed = TRUE)[[1]]
   first <- TRUE
-  for (pair in pairs) {
-    tr <- strsplit(pair, ":", fixed = TRUE)[[1]]
-    test <- tr[1]; ref <- tr[2]
-    if (!(test %in% cond_levels) || !(ref %in% cond_levels)) {
-      stop(sprintf("contrast '%s vs %s': condition level not found (levels: %s)",
-                   test, ref, paste(cond_levels, collapse = ", ")))
+  for (spec in specs) {
+    ftr <- strsplit(spec, ":", fixed = TRUE)[[1]]
+    factor_name <- ftr[1]; test <- ftr[2]; ref <- ftr[3]
+    if (!(factor_name %in% colnames(coldata))) {
+      stop(sprintf("contrast factor '%s' not found in coldata columns (%s)",
+                   factor_name, paste(colnames(coldata), collapse = ", ")))
     }
-    res_i <- results(dds, contrast = c("condition", test, ref))
-    write_results(res_i, file.path(out_dir, sprintf("deseq2_results.%s_vs_%s.tsv", test, ref)))
+    flevels <- levels(coldata[[factor_name]])
+    if (!(test %in% flevels) || !(ref %in% flevels)) {
+      stop(sprintf("contrast '%s: %s vs %s': level not found (%s levels: %s)",
+                   factor_name, test, ref, factor_name, paste(flevels, collapse = ", ")))
+    }
+    res_i <- results(dds, contrast = c(factor_name, test, ref))
+    fname <- if (factor_name == "condition")
+               sprintf("deseq2_results.%s_vs_%s.tsv", test, ref)
+             else
+               sprintf("deseq2_results.%s.%s_vs_%s.tsv", factor_name, test, ref)
+    write_results(res_i, file.path(out_dir, fname))
     if (first) {
       write_results(res_i, file.path(out_dir, "deseq2_results.tsv"))
       primary_contrast <- paste(test, "vs", ref)

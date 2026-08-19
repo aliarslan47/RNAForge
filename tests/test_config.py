@@ -181,19 +181,37 @@ def test_de_contrasts_default_empty(tmp_path):
 
 
 def test_de_contrasts_loaded_as_pairs(tmp_path):
+    """2-elemanlı çift geriye uyumlu: faktör None (= condition) olarak saklanır."""
     body = PROK_BODY + (
         "  contrasts:\n"
         "    - [high, control]\n"
         "    - [low, control]\n"
     )
     cfg = load_config(_write(tmp_path, body))
-    assert cfg.de.contrasts == (("high", "control"), ("low", "control"))
+    assert cfg.de.contrasts == ((None, "high", "control"), (None, "low", "control"))
 
 
-def test_de_contrasts_rejects_non_pair(tmp_path):
+def test_de_contrasts_three_tuple_names_factor(tmp_path):
+    """3-elemanlı üçlü condition-dışı bir faktörü adlandırır: (factor, test, ref)."""
+    body = PROK_BODY + (
+        "  contrasts:\n"
+        "    - [genotype, mutant, WT]\n"
+        "    - [treated, control]\n"
+    )
+    cfg = load_config(_write(tmp_path, body))
+    assert cfg.de.contrasts == (
+        ("genotype", "mutant", "WT"),
+        (None, "treated", "control"),
+    )
+
+
+def test_de_contrasts_rejects_wrong_arity(tmp_path):
     body = PROK_BODY + "  contrasts:\n    - [only_one]\n"
     with pytest.raises(ConfigError, match="contrasts"):
         load_config(_write(tmp_path, body))
+    body4 = PROK_BODY + "  contrasts:\n    - [a, b, c, d]\n"
+    with pytest.raises(ConfigError, match="contrasts"):
+        load_config(_write(tmp_path, body4))
 
 
 def test_de_contrasts_rejects_identical_levels(tmp_path):
