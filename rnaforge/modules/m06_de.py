@@ -69,6 +69,26 @@ def count_up_down(results: list[dict], fdr: float, lfc: float) -> tuple[int, int
     return up, down
 
 
+def _run_isoform_de(config: Config, coldata_path: Path, run_dir: Path, de_dir: Path,
+                    fdr: float, lfc: float, log) -> dict | None:
+    """counts_transcript.tsv (m05 NanoCount) varsa transkript-düzeyi DESeq2 → isoform/ alt-dizin.
+    Aynı coldata + design; run_deseq2 agnostik (satırlar transkript ID). Best-effort: matris yoksa
+    None; DESeq2 çökerse gen-DE'yi bloklamadan None + yüksek sesle log."""
+    tx_counts = run_dir / "quantification" / "counts_transcript.tsv"
+    if not tx_counts.exists():
+        return None
+    try:
+        res = run_deseq2(tx_counts, coldata_path, config.de.design, de_dir / "isoform",
+                         reference=config.de.reference, contrasts=config.de.contrasts)
+    except Exception as exc:  # izoform-DE gen-DE'yi asla bloklamaz
+        log(f"izoform-DE ATLANDI (best-effort; gen-DE korunur): {exc}")
+        return None
+    n_up, n_down = count_up_down(res.results, fdr, lfc)
+    log(f"izoform-DE: {len(res.results)} transkript, {n_up}↑ / {n_down}↓")
+    return {"n_transcripts": len(res.results), "n_up": n_up, "n_down": n_down,
+            "contrast": res.metrics.get("contrast", "")}
+
+
 def run_de(config: Config, metadata_path: Path, run_dir: Path,
            force: bool = False) -> dict:
     run_dir = Path(run_dir)
@@ -119,6 +139,10 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
         min_corr = float(result.metrics.get("min_replicate_correlation", 1.0))
         gates = build_de_gates(min_corr, profile)
 
+        # İzoform-düzeyi DE (ökaryot uzun-okuma; counts_transcript.tsv varsa). Gen-DE
+        # (birincil) DEĞİŞMEZ; izoform ayrı alt-dizine yazılır. Best-effort.
+        isoform_de = _run_isoform_de(config, coldata_path, run_dir, de_dir, fdr, lfc, log)
+
         summary = {
             "n_genes": len(result.results),
             "n_significant": n_sig,
@@ -130,6 +154,8 @@ def run_de(config: Config, metadata_path: Path, run_dir: Path,
             "fdr_threshold": fdr, "log2fc_threshold": lfc,
             "gate_counts": dict(Counter(g.status for g in gates)),
         }
+        if isoform_de is not None:
+            summary["isoform_de"] = isoform_de
         stats_path.write_text(json.dumps(summary, indent=2))
         write_gate_results(run_dir, gates)
         for g in gates:

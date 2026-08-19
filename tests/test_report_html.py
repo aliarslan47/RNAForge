@@ -154,6 +154,18 @@ def test_section_de_counts():
     h = section_de(de, LABELS["en"])
     assert "1634" in h and "4398" in h and "t vs c" in h
     assert "807" in h and "827" in h    # n_up / n_down surfaced
+    assert "Isoform" not in h           # izoform yoksa alt-bölüm çıkmaz
+
+
+def test_section_de_isoform_subsection():
+    """isoform_de varsa izoform-düzeyi DE alt-bölümü render edilir (transkript sayısı)."""
+    de = {"contrast": "t vs c", "n_genes": 6333, "n_significant": 1425,
+          "n_up": 673, "n_down": 752, "fdr_threshold": 0.05, "log2fc_threshold": 1.0,
+          "min_replicate_correlation": 0.9,
+          "isoform_de": {"n_transcripts": 9200, "n_up": 410, "n_down": 505, "contrast": "t vs c"}}
+    h = section_de(de, LABELS["en"])
+    assert "Isoform" in h and "9200" in h       # izoform başlığı + transkript sayısı
+    assert "410" in h and "505" in h            # izoform up/down
 
 
 def test_section_figures_embeds(tmp_path):

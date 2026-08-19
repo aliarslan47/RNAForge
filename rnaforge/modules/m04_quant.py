@@ -248,9 +248,11 @@ def _quant_euk_long(config: Config, metadata_path: Path, run_dir: Path,
                 log(f"{sid}: resumed (cached mapping_rate={cached['mapping_rate']:.3f})")
                 continue
             t1, _ = trimmed_reads(run_dir, sample)   # ONT tek-uçlu
+            # -N 10: ikincil hizalamaları sakla → NanoCount izoform EM (m05). Primary seçimi
+            # değişmez, gen-düzeyi primer-sayımı (m05) etkilenmez.
             result = run_minimap2(config.reference.transcriptome_fasta,
                                   quant_dir / sid, t1, preset,
-                                  threads=config.resources.threads)
+                                  threads=config.resources.threads, secondary_n=10)
             per_sample[sid] = {
                 "mapping_rate": result.alignment_rate, "bam": str(result.bam)}
             state.mark_item_done(MODULE_NAME, sid, per_sample[sid])

@@ -42,6 +42,7 @@ dependencies:
   - compiler-rt22_linux-64=22.1.8=hffcefe0_1
   - compiler-rt_linux-64=22.1.8=ha770c72_1
   - contourpy=1.3.3=py313hc8edb43_4
+  - colorlog=6.11.0=pyh8f84b5b_0
   - cycler=0.12.1=pyhcf101f3_2
   - font-ttf-dejavu-sans-mono=2.37=hab24e00_0
   - font-ttf-inconsolata=3.000=h77eed37_0
@@ -139,6 +140,7 @@ dependencies:
   - minimap2=2.31=h118bc1c_0
   - mpi=1.0=openmpi
   - munkres=1.1.4=pyhd8ed1ab_1
+  - nanocount=1.0.0.post6=pyhdfd78af_0
   - nanoget=1.19.5=pyhdfd78af_0
   - nanoplot=1.47.1=pyhdfd78af_0
   - narwhals=2.24.0=pyhcf101f3_0

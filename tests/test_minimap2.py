@@ -121,3 +121,30 @@ def test_count_primary_alignments(tmp_path):
     subprocess.run(["conda", "run", "-n", "rnaforge-longread", "bash", "-c",
                     f"samtools sort -o {bam} {sam} && samtools index {bam}"], check=True)
     assert count_primary_alignments(bam) == {"tx1": 2, "tx2": 1}
+
+
+def test_run_minimap2_secondary_n_adds_flag(tmp_path, monkeypatch):
+    """İzoform EM (NanoCount) için minimap2 ikincil hizalamaları saklamalı: secondary_n
+    verilince komuta '-N 10' eklenir; verilmeyince eklenmez (gen-yolu regresyon-güvenli)."""
+    import rnaforge.minimap2 as mm
+    genome = tmp_path / "tx.fa"; genome.write_text(">t1\nACGT\n")
+    reads = tmp_path / "r.fq"; reads.write_text("@r\nACGT\n+\nIIII\n")
+    captured = {}
+
+    def fake_run(cmd):
+        if "minimap2" in cmd:
+            captured["mm"] = cmd
+            Path(cmd[cmd.index("-o") + 1]).write_text("")          # sam
+        elif "sort" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"BAM")     # bam
+        class R:
+            returncode = 0; stderr = ""; stdout = _FLAGSTAT
+        return R()
+
+    monkeypatch.setattr(mm, "_run", fake_run)
+
+    run_minimap2(genome, tmp_path / "a", reads, preset="map-ont", secondary_n=10)
+    assert "-N" in captured["mm"] and captured["mm"][captured["mm"].index("-N") + 1] == "10"
+
+    run_minimap2(genome, tmp_path / "b", reads, preset="map-ont")
+    assert "-N" not in captured["mm"]                              # default: ikincil yok

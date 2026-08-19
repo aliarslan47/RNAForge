@@ -345,6 +345,9 @@ def test_run_counts_eukaryote_long_aggregates_tx_to_gene(tmp_path, monkeypatch):
     cnts = {"s1": {"ENST1.1": 3, "ENST3.1": 1}, "s2": {"ENST2.2": 5}}
     monkeypatch.setattr(m05, "count_primary_alignments",
                         lambda bam, **k: cnts["s1" if "s1" in str(bam) else "s2"])
+    # İzoform (NanoCount) best-effort; bu test gen-yoluna odaklı → NanoCount'u atlat.
+    monkeypatch.setattr(m05, "run_nanocount",
+                        lambda bam, out, **k: (_ for _ in ()).throw(RuntimeError("no NanoCount")))
     from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
     cfg = Config(organism="human", organism_type="eukaryote", platform="ont",
         reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=t2g),
@@ -356,3 +359,48 @@ def test_run_counts_eukaryote_long_aggregates_tx_to_gene(tmp_path, monkeypatch):
     assert d["ENSG1"] == ["3", "5"] and d["ENSG2"] == ["1", "0"]
     assert summary["read_type"] == "long" and summary["organism_type"] == "eukaryote"
     assert summary["n_genes"] == 2
+    # best-effort: NanoCount yoksa izoform matrisi yok, gen-düzeyi bozulmaz.
+    assert not (qd / "counts_transcript.tsv").exists()
+    assert "n_transcripts" not in summary
+
+
+def _setup_euk_long(tmp_path, monkeypatch):
+    """Ökaryot uzun-okuma euk-long ortak kurulum (gen sayımı mock'lu)."""
+    import rnaforge.modules.m05_counts as m05
+    from rnaforge.state import RunState
+    run_dir = tmp_path / "run"; (run_dir / "statistics").mkdir(parents=True)
+    (run_dir / "statistics" / "raw_statistics.json").write_text('{"read_type":"long","platform":"ont"}')
+    RunState(run_dir).mark_done("m04_quant", [])
+    qd = run_dir / "quantification"
+    for sid in ("s1", "s2"):
+        (qd / sid).mkdir(parents=True); (qd / sid / "aligned.sorted.bam").write_text("")
+    t2g = tmp_path / "t2g.tsv"; t2g.write_text("ENST1.1\tENSG1\nENST2.2\tENSG1\nENST3.1\tENSG2\n")
+    a = tmp_path / "a.fq"; a.write_text("@r\nA\n+\nI\n"); b = tmp_path / "b.fq"; b.write_text("@r\nA\n+\nI\n")
+    meta = tmp_path / "m.tsv"; meta.write_text(f"sample_id\tcondition\tfastq_1\ns1\tctrl\t{a}\ns2\ttrt\t{b}\n")
+    monkeypatch.setattr(m05, "count_primary_alignments",
+                        lambda bam, **k: ({"ENST1.1": 3, "ENST3.1": 1} if "s1" in str(bam) else {"ENST2.2": 5}))
+    from rnaforge.config import (Config, Reference, Library, Trimming, DE, Report, Resources)
+    cfg = Config(organism="human", organism_type="eukaryote", platform="ont",
+        reference=Reference(transcriptome_fasta=tmp_path / "tx.fa", tx2gene=t2g),
+        library=Library(), trimming=Trimming(), de=DE(), report=Report(), resources=Resources())
+    return m05, cfg, meta, run_dir, qd
+
+
+def test_run_counts_eukaryote_long_writes_transcript_matrix(tmp_path, monkeypatch):
+    """İzoform: NanoCount est_count → counts_transcript.tsv (yuvarlı); gen counts.tsv DEĞİŞMEZ."""
+    m05, cfg, meta, run_dir, qd = _setup_euk_long(tmp_path, monkeypatch)
+    nc = {"s1": {"ENST1.1": 3.4, "ENST3.1": 1.0}, "s2": {"ENST2.2": 5.6}}
+    monkeypatch.setattr(m05, "run_nanocount",
+                        lambda bam, out, **k: nc["s1" if "s1" in str(bam) else "s2"])
+    summary = m05.run_counts(cfg, meta, run_dir)
+    # gen matrisi (primer-sayım) değişmedi
+    assert (qd / "counts.tsv").read_text().splitlines()[0] == "gene\ts1\ts2"
+    assert summary["n_genes"] == 2
+    # YENİ izoform matrisi
+    tlines = (qd / "counts_transcript.tsv").read_text().splitlines()
+    assert tlines[0] == "transcript\ts1\ts2"
+    td = {l.split("\t")[0]: l.split("\t")[1:] for l in tlines[1:]}
+    assert td["ENST1.1"] == ["3", "0"]   # round(3.4)=3, s2'de yok=0
+    assert td["ENST2.2"] == ["0", "6"]   # round(5.6)=6
+    assert td["ENST3.1"] == ["1", "0"]
+    assert summary["n_transcripts"] == 3

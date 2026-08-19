@@ -16,6 +16,7 @@ from rnaforge.gates import FAIL, PASS, WARN, GateResult, raise_if_failed, write_
 from rnaforge.metadata import load_metadata
 from rnaforge.quality import Profile, load_profile, profile_name_for
 from rnaforge.minimap2 import count_primary_alignments
+from rnaforge.nanocount import run_nanocount
 from rnaforge.routing import resolve_platform, resolve_read_type
 from rnaforge.state import RunState
 from rnaforge.tximport import parse_tx2gene, run_tximport
@@ -220,8 +221,45 @@ def _counts_euk_long(config: Config, metadata_path: Path, run_dir: Path,
             "read_type": "long", "organism_type": "eukaryote",
             "n_samples": len(samples), "n_genes": len(genes), "gate_counts": {},
         }
+        # İzoform-düzeyi (NanoCount EM) matrisi — ADDITIVE, best-effort. Gen matrisi (üstte)
+        # değişmez; NanoCount yoksa/başarısızsa gen-düzeyi korunur (yüksek sesle log).
+        n_tx = _write_transcript_matrix(samples, quant_dir, sample_ids, log)
+        if n_tx is not None:
+            summary["n_transcripts"] = n_tx
         stats_path.write_text(json.dumps(summary, indent=2))
     return summary
+
+
+def _write_transcript_matrix(samples, quant_dir: Path, sample_ids: list[str],
+                             log) -> int | None:
+    """NanoCount ile izoform-düzeyi sayım → counts_transcript.tsv (transkript × örnek).
+    est_count (kesirli EM tahmini) DESeq2 için yuvarlanır. Best-effort: NanoCount yoksa/
+    herhangi bir örnek başarısızsa None döner (gen-düzeyi yol bozulmaz)."""
+    try:
+        per_sample_tx: dict[str, dict[str, float]] = {}
+        tx_seen: set[str] = set()
+        for sample in samples:
+            bam = quant_dir / sample.sample_id / "aligned.sorted.bam"
+            nc_tsv = quant_dir / sample.sample_id / "nanocount.tsv"
+            est = run_nanocount(bam, nc_tsv)
+            per_sample_tx[sample.sample_id] = est
+            tx_seen.update(est)
+            log(f"{sample.sample_id}: NanoCount {len(est)} transkript (izoform EM)")
+    except Exception as exc:  # NanoCount yok/başarısız → izoform atla, gen-düzeyi korunur
+        log(f"izoform niceleme ATLANDI (NanoCount yok/başarısız; gen-düzeyi korunur): {exc}")
+        return None
+    if not tx_seen:
+        log("izoform niceleme: 0 transkript (NanoCount boş) — izoform matrisi yazılmadı")
+        return None
+    tx_ids = sorted(tx_seen)
+    tx_matrix = quant_dir / "counts_transcript.tsv"
+    with tx_matrix.open("w") as fh:
+        fh.write("transcript\t" + "\t".join(sample_ids) + "\n")
+        for t in tx_ids:
+            fh.write(t + "\t" + "\t".join(
+                str(round(per_sample_tx[s].get(t, 0.0))) for s in sample_ids) + "\n")
+    log(f"transcript (isoform) matrix written: {tx_matrix} ({len(tx_ids)} transcripts)")
+    return len(tx_ids)
 
 
 def _counts_short(config: Config, metadata_path: Path, run_dir: Path,

@@ -69,7 +69,8 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
 
 
 def run_minimap2(genome_fasta: Path, out_dir: Path, fastq: Path, preset: str,
-                 threads: int = 4, env: str = "rnaforge-longread") -> AlignmentResult:
+                 threads: int = 4, env: str = "rnaforge-longread",
+                 secondary_n: int | None = None) -> AlignmentResult:
     genome_fasta = Path(genome_fasta)
     if not genome_fasta.exists():
         raise Minimap2RunError(f"genome FASTA does not exist: {genome_fasta}")
@@ -79,8 +80,12 @@ def run_minimap2(genome_fasta: Path, out_dir: Path, fastq: Path, preset: str,
     bam = out_dir / "aligned.sorted.bam"
     log = out_dir / "minimap2.log"
 
-    mm = ["conda", "run", "-n", env, "minimap2", "-ax", preset,
-          "-t", str(threads), str(genome_fasta), str(fastq), "-o", str(sam)]
+    mm = ["conda", "run", "-n", env, "minimap2", "-ax", preset]
+    # İzoform EM (NanoCount) transkript başına çok-hizalama ister → -N ile ikincilleri sakla.
+    # Default None: primary-only davranış (gen-yolu / prok-long değişmez).
+    if secondary_n is not None:
+        mm += ["-N", str(secondary_n)]
+    mm += ["-t", str(threads), str(genome_fasta), str(fastq), "-o", str(sam)]
     r = _run(mm)
     log.write_text(r.stderr)
     if r.returncode != 0 or not sam.exists():

@@ -355,6 +355,10 @@ LABELS: dict[str, dict[str, str]] = {
         "summary": "Özet",
         "cap_gates": "Kalite kapıları", "cap_samples": "Örnekler",
         "cap_quality": "Hizalama, atama ve rRNA oranları", "cap_de": "Diferansiyel ekspresyon özeti",
+        "iso_de": "İzoform (Transkript) Düzeyi DE", "cap_iso": "İzoform-düzeyi DE özeti",
+        "iso_n": "Transkript sayısı",
+        "iso_note": "Uzun-okuma izoform-düzeyi niceleme (NanoCount EM); transkript sonuçları "
+                    "differential_expression/isoform/ altında.",
         "cap_operon": "Koordineli operonlar", "cap_ppi": "Protein etkileşim modülleri",
         "software": "Yazılım ve Veritabanları", "sw_tool": "Yazılım", "sw_version": "Sürüm",
         "sw_purpose": "Amaç", "db_name": "Veritabanı", "db_version": "Sürüm / kaynak", "db_purpose": "Amaç",
@@ -461,6 +465,10 @@ LABELS: dict[str, dict[str, str]] = {
         "summary": "Summary",
         "cap_gates": "Quality gates", "cap_samples": "Samples",
         "cap_quality": "Alignment, assignment and rRNA rates", "cap_de": "Differential expression summary",
+        "iso_de": "Isoform (Transcript) Level DE", "cap_iso": "Isoform-level DE summary",
+        "iso_n": "Transcripts",
+        "iso_note": "Long-read isoform-level quantification (NanoCount EM); transcript results "
+                    "under differential_expression/isoform/.",
         "cap_operon": "Coordinated operons", "cap_ppi": "Protein interaction modules",
         "software": "Software and Databases", "sw_tool": "Software", "sw_version": "Version",
         "sw_purpose": "Purpose", "db_name": "Database", "db_version": "Version / source", "db_purpose": "Purpose",
@@ -803,7 +811,21 @@ def section_de(de: dict, L: dict) -> str:
     ]
     tbl = _table([" ", " "], rows, L["cap_de"])
     expr = f'<p class="note">{_esc(L["expr_note"])}</p>'
-    return f'<section id="de"><h2>{_esc(L["de"])}</h2>{_intro("de", L)}{summary}{tbl}{expr}</section>'
+    # İzoform-düzeyi DE alt-bölümü (ökaryot uzun-okuma; m06 isoform_de üretti). Yoksa boş.
+    iso = de.get("isoform_de")
+    iso_html = ""
+    if iso:
+        iso_rows = [
+            [L["contrast"], iso.get("contrast")],
+            [L["iso_n"], iso.get("n_transcripts")],
+            [L["up"], iso.get("n_up")],
+            [L["down"], iso.get("n_down")],
+        ]
+        iso_html = (f'<h3>{_esc(L["iso_de"])}</h3>'
+                    f'<p class="note">{_esc(L["iso_note"])}</p>'
+                    f'{_table([" ", " "], iso_rows, L["cap_iso"])}')
+    return (f'<section id="de"><h2>{_esc(L["de"])}</h2>'
+            f'{_intro("de", L)}{summary}{tbl}{expr}{iso_html}</section>')
 
 
 def collect_figure_errors(run_dir: Path) -> list[str]:

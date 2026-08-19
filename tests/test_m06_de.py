@@ -176,6 +176,32 @@ def test_run_de_writes_results_and_coldata(tmp_path, monkeypatch):
     assert any(g["module"] == "m06_de" and g["status"] == "PASS" for g in gates)
 
 
+def test_run_de_runs_isoform_de_when_transcript_matrix_present(tmp_path, monkeypatch):
+    """İzoform: counts_transcript.tsv varsa gen-DE'ye EK izoform-DESeq2 (isoform/ alt-dizin);
+    gen-DE (birincil) değişmez."""
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"; _mark_m05_done(run_dir)
+    (run_dir / "quantification" / "counts_transcript.tsv").write_text(
+        "transcript\ts1\ts2\ts3\ts4\nENST1\t100\t110\t400\t420\nENST2\t50\t55\t52\t53\n")
+    _fake_deseq2(monkeypatch, sig_gene=True)
+    summary = run_de(load_config(config_path), metadata_path, run_dir)
+    # gen-DE birincil korunur
+    assert (run_dir / "differential_expression" / "deseq2_results.tsv").exists()
+    # izoform-DE ayrı alt-dizinde
+    assert (run_dir / "differential_expression" / "isoform" / "deseq2_results.tsv").exists()
+    assert "isoform_de" in summary and summary["isoform_de"]["n_up"] >= 1
+
+
+def test_run_de_no_isoform_when_transcript_matrix_absent(tmp_path, monkeypatch):
+    """İzoform matrisi yoksa (prok/euk-short) izoform-DE atlanır (mevcut davranış)."""
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"; _mark_m05_done(run_dir)
+    _fake_deseq2(monkeypatch)
+    summary = run_de(load_config(config_path), metadata_path, run_dir)
+    assert "isoform_de" not in summary
+    assert not (run_dir / "differential_expression" / "isoform").exists()
+
+
 def test_run_de_low_correlation_warns_but_completes(tmp_path, monkeypatch):
     config_path, metadata_path = _setup(tmp_path)
     run_dir = tmp_path / "run"; _mark_m05_done(run_dir)
