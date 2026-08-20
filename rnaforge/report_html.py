@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 17
+N_SECTIONS = 18
 
 
 def _num(v):
@@ -132,6 +132,27 @@ def parse_community_tsv(path: Path) -> list[dict]:
     return rows
 
 
+def parse_abundance_matrix(path: Path) -> tuple[list[str], list[dict]]:
+    """m_taxonomy taxonomy/abundance_matrix.tsv -> (örnek id'leri, satırlar). Her satır
+    {"taxon": ad, <sample_id>: fraction, ...}; dosya yoksa ([], []) döner (dürüst boş)."""
+    path = Path(path)
+    if not path.exists():
+        return [], []
+    rows: list[dict] = []
+    with path.open() as f:
+        reader = csv.reader(f, delimiter="\t")
+        header = next(reader, None)
+        sample_ids = header[1:] if header else []
+        for r in reader:
+            if not r or not r[0]:
+                continue
+            row: dict = {"taxon": r[0]}
+            for sid, v in zip(sample_ids, r[1:]):
+                row[sid] = _num(v) or 0.0
+            rows.append(row)
+    return sample_ids, rows
+
+
 def load_gene_map(path: Path) -> dict[str, str]:
     path = Path(path)
     if not path.exists():
@@ -245,6 +266,11 @@ def load_report_inputs(run_dir: Path) -> dict:
     enrich_manifest = enrich_dir / "manifest.json"
     kegg_dir = run_dir / "kegg"
     kegg_manifest = kegg_dir / "manifest.json"
+    # m_taxonomy — opsiyonel: yalnız metatranskriptom kolunda üretilir.
+    abundance_path = run_dir / "taxonomy" / "abundance_matrix.tsv"
+    taxonomy_samples, taxonomy_rows = (
+        parse_abundance_matrix(abundance_path) if abundance_path.exists() else (None, None)
+    )
     return {
         "norm_counts": parse_normalized_counts(de_dir / "normalized_counts.tsv"),
         "coldata": parse_coldata(de_dir / "coldata.tsv"),
@@ -326,6 +352,12 @@ def load_report_inputs(run_dir: Path) -> dict:
         "ppi_manifest": json.loads((run_dir / "ppi" / "manifest.json").read_text())
         if (run_dir / "ppi" / "manifest.json").exists() else None,
         "ppi_dir": run_dir / "ppi",
+        # m_taxonomy (metatranskriptom) — opsiyonel: çalıştırılmadıysa None.
+        "taxonomy_samples": taxonomy_samples,
+        "taxonomy_rows": taxonomy_rows,
+        # m_rrna_deplete (metatranskriptom) — opsiyonel: çalıştırılmadıysa None.
+        "rrna_depletion": json.loads((stats / "rrna_depletion.json").read_text())
+        if (stats / "rrna_depletion.json").exists() else None,
     }
 
 
@@ -439,6 +471,15 @@ LABELS: dict[str, dict[str, str]] = {
             "Diferansiyel eksprese genler STRING protein-etkileşim kenarlarıyla (combined score ≥ {score}) "
             "bağlandı ve ağ Louvain yöntemiyle modüllere ayrıldı. STRING etkileşimleri kanıt-skorlu "
             "tahminlerdir, hepsi deneysel doğrulanmış değildir. Tam liste ppi/communities.tsv'de."),
+        "organism_type": "Organizma tipi", "community": "Topluluk (metatranskriptom)",
+        "taxonomy": "Topluluk Kompozisyonu (Taksonomi)", "taxon": "Takson", "fraction": "Fraksiyon",
+        "cap_taxonomy": "Taksonlar (bolluk fraksiyonu)", "rrna_depletion_mean": "Ortalama rRNA depletion",
+        "taxonomy_not_run": "Taksonomi bu koşuda çalıştırılmadı (rnaforge taxonomy ile üretilir).",
+        "taxonomy_legend": (
+            "Fraksiyonlar Kraken2 taksonomik sınıflandırması + Bracken bolluk yeniden-tahminiyle "
+            "hesaplandı (rRNA'sı SortMeRNA ile çıkarılmış okumalar üzerinde). Ortalama fraksiyonu en "
+            "yüksek ilk {n} takson gösterilir; tam matris taxonomy/abundance_matrix.tsv'de. Saf tanısaldır, "
+            "diferansiyel ekspresyona girmez."),
     },
     "en": {
         "confidence": "Confidence Card", "dataset": "Dataset and Samples",
@@ -540,6 +581,15 @@ LABELS: dict[str, dict[str, str]] = {
             "score ≥ {score}) and the network was partitioned into modules by the Louvain method. STRING "
             "interactions are evidence-scored predictions, not all experimentally validated. Full list in "
             "ppi/communities.tsv."),
+        "organism_type": "Organism type", "community": "Community (metatranscriptome)",
+        "taxonomy": "Community Composition (Taxonomy)", "taxon": "Taxon", "fraction": "Fraction",
+        "cap_taxonomy": "Taxa (abundance fraction)", "rrna_depletion_mean": "Mean rRNA depletion",
+        "taxonomy_not_run": "Taxonomy was not run for this run (produced by rnaforge taxonomy).",
+        "taxonomy_legend": (
+            "Fractions were computed by Kraken2 taxonomic classification + Bracken abundance "
+            "re-estimation (on reads with rRNA removed by SortMeRNA). The top {n} taxa by mean fraction "
+            "are shown; the full matrix is in taxonomy/abundance_matrix.tsv. Purely diagnostic — does "
+            "not feed differential expression."),
         "semantic": "Semantic Reduction (REVIGO)", "n_collapsed": "Terms represented",
         "sem_ora_up": "Up GO terms (representatives)", "sem_ora_down": "Down GO terms (representatives)",
         "sem_gsea_go": "GSEA GO terms (representatives)",
@@ -618,6 +668,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                   "düzenlenen transkripsiyon birimlerini gen-düzeyinin üstünde gösterir.",
         "ppi": "DEG'lerin STRING protein etkileşim ağındaki modülleri — birlikte işleyen fonksiyonel "
                "gen gruplarını (kompleksler/yolaklar) ağ topolojisinden çıkarır.",
+        "taxonomy": "Topluluğun (rRNA'sı çıkarılmış okumalardan) Kraken2/Bracken ile tahmin edilen "
+                    "taksonomik kompozisyonu — tanısaldır, diferansiyel ekspresyona girmez.",
         "software": "Bu koşuda kullanılan yazılımların sürümleri ve referans veritabanları (tekrarlanabilirlik için).",
         "methods": "Kullanılan araçlar ve parametreler.",
         "references": "Yöntemlerin dayandığı yayınlar.",
@@ -643,6 +695,8 @@ SECTION_INTRO: dict[str, dict[str, str]] = {
                   "transcription units above the gene level.",
         "ppi": "Modules of the DEGs in the STRING protein-interaction network — revealing co-functioning "
                "gene groups (complexes/pathways) from network topology.",
+        "taxonomy": "The community's taxonomic composition estimated with Kraken2/Bracken (on reads with "
+                    "rRNA removed) — diagnostic, does not feed differential expression.",
         "software": "Versions of the software used in this run and the reference databases (for reproducibility).",
         "methods": "Tools and parameters used.",
         "references": "Publications the methods are based on.",
@@ -705,9 +759,13 @@ def section_dataset(raw: dict, L: dict) -> str:
     rt_gloss = {"short": ("kısa" if lang_tr else "short"),
                 "long": ("uzun" if lang_tr else "long")}
     rt_disp = (f'{_esc(L["read_type"])}: {_esc(rt_gloss.get(rt, rt))} · ' if rt else "")
+    # organism_type rozeti — yalnız metatranskriptom (topluluk) koşusunda; diğerlerinde
+    # zaten "organism" tür adı yeterli, ek rozet gürültü olur.
+    ot_disp = (f'{_esc(L["organism_type"])}: {_esc(L["community"])} · '
+               if raw.get("organism_type") == "metatranscriptome" else "")
     meta = (f'<p>{_esc(L["organism"])}: {_esc(raw.get("organism"))} · '
             f'{_esc(L["platform"])}: {_esc(raw.get("platform"))} · '
-            f'{rt_disp}'
+            f'{rt_disp}{ot_disp}'
             f'{_esc(L["design"])}: {_esc(raw.get("design"))} · {_esc(conds)}</p>')
     rows = [[s.get("sample_id"), s.get("condition"), s.get("batch"), s.get("paired"),
              s.get("mean_read_length"), s.get("mean_quality")] for s in raw.get("samples", [])]
@@ -1177,6 +1235,57 @@ def section_ppi(inputs: dict, L: dict, lang: str = "tr", cap: int = 20) -> str:
             f'{_intro("ppi", L)}{summary}{fig_html}{body_html}{legend}</section>')
 
 
+def _mean_fraction(row: dict, sample_ids: list[str]) -> float:
+    vals = [row.get(sid, 0.0) or 0.0 for sid in sample_ids]
+    return sum(vals) / len(vals) if vals else 0.0
+
+
+def section_taxonomy(inputs: dict, L: dict, lang: str = "tr", top_n: int = 15) -> str:
+    """Metatranskriptom topluluk kompozisyonu — m_taxonomy'nin abundance_matrix.tsv'sinden
+    ortalama fraksiyonu en yüksek top-N takson tablosu + best-effort bar figürü (qcplots/
+    qc_plot deseni: figür üretilemezse rapor çökmez, hata notla gösterilir)."""
+    rows = inputs.get("taxonomy_rows")
+    if rows is None:
+        return (f'<section id="taxonomy"><h2>{_esc(L["taxonomy"])}</h2>'
+                f'<p class="note">{_esc(L["taxonomy_not_run"])}</p></section>')
+    sample_ids = inputs.get("taxonomy_samples") or []
+    ranked = sorted(rows, key=lambda r: -_mean_fraction(r, sample_ids))[:top_n]
+    # rrna_depletion.json (m_rrna_deplete) — bu kompozisyonun rRNA-çıkarılmış okumalar
+    # üzerinde hesaplandığını gösteren bağlam satırı (Consumes: statistics/rrna_depletion.json).
+    depletion = inputs.get("rrna_depletion") or {}
+    rates = [v.get("depletion_rate") for v in depletion.values()
+             if isinstance(v, dict) and v.get("depletion_rate") is not None]
+    depl_line = (f'<p>{_esc(L["rrna_depletion_mean"])}: {_pct(sum(rates) / len(rates))}</p>'
+                 if rates else "")
+    if not ranked:
+        body_html = f'<p>{_esc(L["no_degs"])}</p>'
+    else:
+        headers = [L["taxon"]] + sample_ids
+        table_rows = [[r["taxon"]] + [_pct(r.get(sid, 0.0)) for sid in sample_ids] for r in ranked]
+        body_html = _table(headers, table_rows, L["cap_taxonomy"])
+    fig_html = ""
+    figures_dir = inputs.get("figures_dir")
+    if figures_dir is not None and ranked:
+        try:
+            from rnaforge.qcplots import render_qc_figure
+            spec = {
+                "type": "bars", "title": L["cap_taxonomy"],
+                "xlabel": L["taxon"], "ylabel": L["fraction"],
+                "x": [r["taxon"] for r in ranked],
+                "y": [_mean_fraction(r, sample_ids) for r in ranked],
+            }
+            png = Path(figures_dir) / "taxonomy_top_taxa.png"
+            render_qc_figure(spec, png)
+            fig_html = _fig_block(png, L["cap_taxonomy"])
+        except Exception as exc:  # best-effort: rapor asla çökmez; hata GÜRÜLTÜLÜ gösterilir.
+            lead = ("Not: taksonomi figürü üretilemedi (sonucu etkilemez)" if lang == "tr"
+                    else "Note: taxonomy figure could not be generated (does not affect the results)")
+            fig_html = f'<p class="note">{_esc(lead)}: {_esc(str(exc))}</p>'
+    legend = f'<p class="note">{L["taxonomy_legend"].format(n=top_n)}</p>'
+    return (f'<section id="taxonomy"><h2>{_esc(L["taxonomy"])}</h2>'
+            f'{_intro("taxonomy", L)}{depl_line}{body_html}{fig_html}{legend}</section>')
+
+
 # Kullanılan yazılım sürümleri (envs/*.yml ile eşleşir). (araç, sürüm, amaç_tr, amaç_en, koşul).
 _SOFTWARE: list[tuple] = [
     ("Python", "3.11", "Orkestrasyon", "Orchestration", None),
@@ -1198,6 +1307,11 @@ _SOFTWARE: list[tuple] = [
     ("SortMeRNA", "7.0.0", "rRNA%", "rRNA%", "seqqc"),
     ("RSeQC", "5.0.5", "Strandedness", "Strandedness", "seqqc"),
     ("networkx", "3.6.1", "PPI community", "PPI community", "ppi"),
+    # Metatranskriptom araç zinciri (cond "meta") — fastp/Bowtie2/featureCounts/DESeq2
+    # yukarıdaki genel/short satırlarla paylaşılır; burada yalnız bu kola özgü ekler.
+    ("SortMeRNA", "7.0.0", "rRNA depletion (metatranskriptom)", "rRNA depletion (metatranscriptome)", "meta"),
+    ("Kraken2", "2.1.6", "Taksonomik sınıflandırma", "Taxonomic classification", "meta"),
+    ("Bracken", "3.1", "Bolluk yeniden-tahmini (topluluk)", "Abundance re-estimation (community)", "meta"),
 ]
 
 
@@ -1228,6 +1342,12 @@ def section_software(config, L: dict, inputs: dict, flags: dict) -> str:
     if inputs.get("seqqc"):
         db_rows.append(["rRNA referansı", "referans genom" if lang == "tr" else "reference genome",
                         "rRNA%" if lang == "tr" else "rRNA%"])
+    if flags.get("meta"):
+        db_rows.append(["Kraken2/Bracken DB", str(config.taxonomy.kraken2_db or "—"),
+                        "Taksonomik sınıflandırma" if lang == "tr" else "Taxonomic classification"])
+        db_rows.append([("SortMeRNA rRNA referansı" if lang == "tr" else "SortMeRNA rRNA reference"),
+                        str(config.rrna.db_fasta or "—"),
+                        "rRNA depletion" if lang == "tr" else "rRNA depletion"])
     db_html = _table([L["db_name"], L["db_version"], L["db_purpose"]], db_rows, L["cap_database"]) if db_rows else ""
     return (f'<section id="software"><h2>{_esc(L["software"])}</h2>'
             f'{_intro("software", L)}{sw_tbl}{db_html}</section>')
@@ -1304,6 +1424,53 @@ _METHODS_TEXT_LONG: dict[str, str] = {
         "differentially expressed when adjusted p (padj) < {fdr} and |log2 fold change| ≥ {lfc}. Long-read "
         "quality thresholds are deliberately permissive (prokaryote_long profile, stamped in the report). All "
         "figures were produced with ggplot2."
+    ),
+}
+
+# Metatranskriptom (topluluk RNA-seq, referans-tabanlı) yöntem anlatısı — kısa-okuma araç
+# zincirine rRNA depletion (SortMeRNA) + taksonomik profilleme (Kraken2/Bracken) eklenir;
+# aşağı akış (Bowtie2 → featureCounts → DESeq2) kısa-okuma ile aynı gen kataloğuna karşı çalışır.
+_METHODS_TEXT_META: dict[str, str] = {
+    "tr": (
+        "Ham okumaların kalitesi FastQC ile değerlendirildi (taban kalitesi, adaptör ve GC içeriği). "
+        "Adaptör dizileri ve kısa okumalar fastp ile kırpıldı (asgari okuma uzunluğu {min_len} nt); "
+        "agresif kalite kırpması {aggr}. Topluluk kütüphanesinin büyük bölümünü oluşturan ribozomal "
+        "RNA, SortMeRNA ile (--other) kırpılmış okumalardan çıkarıldı (rRNA depletion); yalnız "
+        "rRNA'sı çıkarılmış okumalar aşağı akışa aktarıldı. rRNA'sız okumaların taksonomik kompozisyonu "
+        "Kraken2 ile sınıflandırılıp Bracken ile bolluk yeniden-tahminiyle özetlendi — bu adım saf "
+        "tanısaldır ve diferansiyel ekspresyona girmez. Aynı rRNA'sız okumalar gen kataloğuna "
+        "(referans genom) Bowtie2 ile (uçtan-uca) hizalandı. Hizalanan okumalar featureCounts ile "
+        "özniteliklere atanarak gen×örnek sayım matrisi oluşturuldu (öznitelik tipi {feature_type}, "
+        "kimlik özniteliği {attribute}). Diferansiyel ekspresyon DESeq2 ile hesaplandı: kütüphane "
+        "büyüklüğü medyan-oran yöntemiyle normalize edildi (boyut faktörleri); gen-bazlı dispersiyonlar "
+        "kestirilip ortalama-dispersiyon eğilimine doğru empirical-Bayes ile büzüldü; koşul etkisi "
+        "negatif binom genelleştirilmiş doğrusal modelle test edildi (Wald testi) ve p-değerleri "
+        "Benjamini–Hochberg (FDR) ile düzeltildi. Tasarım formülü {design}. Bir gen, düzeltilmiş p "
+        "(padj) < {fdr} ve |log2 kat değişimi| ≥ {lfc} ise anlamlı diferansiyel eksprese sayıldı. Gen "
+        "kataloğu topluluğun tümünü doğası gereği kapsamadığından hizalama/atama eşikleri bilinçli "
+        "olarak permissive'dir (metatranscriptome profili, rapora damgalanır). Tüm görseller ggplot2 "
+        "ile üretildi."
+    ),
+    "en": (
+        "Raw read quality was assessed with FastQC (per-base quality, adapter and GC content). Adapter "
+        "sequences and short reads were trimmed with fastp (minimum read length {min_len} nt); "
+        "aggressive quality trimming was {aggr}. Ribosomal RNA, which dominates community RNA "
+        "libraries, was removed from the trimmed reads with SortMeRNA (--other, rRNA depletion); only "
+        "the rRNA-depleted reads were carried forward. The taxonomic composition of the rRNA-depleted "
+        "reads was classified with Kraken2 and summarised by Bracken abundance re-estimation — this "
+        "step is purely diagnostic and does not feed differential expression. The same rRNA-depleted "
+        "reads were aligned to the gene catalogue (reference genome) with Bowtie2 (end-to-end). "
+        "Aligned reads were assigned to features with featureCounts to build a gene×sample count "
+        "matrix (feature type {feature_type}, identifier attribute {attribute}). Differential "
+        "expression was computed with DESeq2: library sizes were normalized by the median-of-ratios "
+        "method (size factors); gene-wise dispersions were estimated and shrunk toward the "
+        "mean–dispersion trend by empirical Bayes; the condition effect was tested with a "
+        "negative-binomial generalized linear model (Wald test) and p-values were adjusted by "
+        "Benjamini–Hochberg (FDR). Design formula {design}. A gene was called significantly "
+        "differentially expressed when adjusted p (padj) < {fdr} and |log2 fold change| ≥ {lfc}. "
+        "Because the gene catalogue inherently does not cover the whole community, alignment/"
+        "assignment thresholds are deliberately permissive (metatranscriptome profile, stamped in "
+        "the report). All figures were produced with ggplot2."
     ),
 }
 
@@ -1432,13 +1599,19 @@ _PPI_METHODS: dict[str, str] = {
 def section_methods(config, L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                     gsea_ran: bool = False, semantic_ran: bool = False, amr_ran: bool = False,
                     operon_ran: bool = False, ppi_ran: bool = False,
-                    read_type: str = "short") -> str:
+                    read_type: str = "short", organism_type: str = "prokaryote") -> str:
     lang = "en" if L is LABELS["en"] else "tr"
     t = config.trimming
     q = config.quantification
     d = config.de
-    # read_type'a göre araç-zinciri anlatısı (uzun: NanoPlot/Pychopper/minimap2/-L).
-    methods_src = _METHODS_TEXT_LONG if read_type == "long" else _METHODS_TEXT
+    # organism_type/read_type'a göre araç-zinciri anlatısı: metatranskriptom (rRNA depletion +
+    # Kraken2/Bracken) > uzun-okuma (NanoPlot/Pychopper/minimap2/-L) > kısa-okuma (varsayılan).
+    if organism_type == "metatranscriptome":
+        methods_src = _METHODS_TEXT_META
+    elif read_type == "long":
+        methods_src = _METHODS_TEXT_LONG
+    else:
+        methods_src = _METHODS_TEXT
     text = methods_src[lang].format(
         min_len=t.min_length, aggr=_METHODS_AGGR[lang][bool(t.aggressive_quality)],
         feature_type=q.feature_type, attribute=q.attribute,
@@ -1497,6 +1670,17 @@ _REFERENCES_LONG: list[tuple[str, str]] = [
      "Bioinformatics. 2018;34(18):3094–3100.", "https://doi.org/10.1093/bioinformatics/bty191"),
     ("Oxford Nanopore Technologies. Pychopper: identify, orient and trim full-length cDNA reads. 2023.",
      "https://github.com/epi2me-labs/pychopper"),
+]
+# Metatranskriptom kolu atıfları (yalnız organism_type=metatranscriptome raporunda) — SortMeRNA
+# (rRNA depletion), Kraken2 (taksonomik sınıflandırma), Bracken (bolluk yeniden-tahmini).
+_REFERENCES_META: list[tuple[str, str]] = [
+    ("Kopylova E, Noé L, Touzet H. SortMeRNA: fast and accurate filtering of ribosomal RNAs in "
+     "metatranscriptomic data. Bioinformatics. 2012;28(24):3211–3217.",
+     "https://doi.org/10.1093/bioinformatics/bts611"),
+    ("Wood DE, Lu J, Langmead B. Improved metagenomic analysis with Kraken 2. "
+     "Genome Biol. 2019;20:257.", "https://doi.org/10.1186/s13059-019-1891-0"),
+    ("Lu J, Breitwieser FP, Thielen P, Salzberg SL. Bracken: estimating species abundance in "
+     "metagenomics data. PeerJ Comput Sci. 2017;3:e104.", "https://doi.org/10.7717/peerj-cs.104"),
 ]
 # Okuma-tipinden bağımsız (her raporda) atıflar.
 _REFERENCES: list[tuple[str, str]] = [
@@ -1595,10 +1779,12 @@ def _ref_link_label(url: str) -> str:
 def section_references(L: dict, enrichment_ran: bool = False, kegg_ran: bool = False,
                        gsea_ran: bool = False, semantic_ran: bool = False,
                        amr_ran: bool = False, operon_ran: bool = False,
-                       ppi_ran: bool = False, read_type: str = "short") -> str:
+                       ppi_ran: bool = False, read_type: str = "short",
+                       meta_ran: bool = False) -> str:
     # Okuma-tipine özgü araç atıfları önce (kullanılmayan aracı atıflamaz — dürüstlük).
     platform_refs = _REFERENCES_LONG if read_type == "long" else _REFERENCES_SHORT
-    refs = (platform_refs + _REFERENCES + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
+    refs = (platform_refs + (_REFERENCES_META if meta_ran else []) + _REFERENCES
+            + (_ENRICHMENT_REFERENCES if enrichment_ran else [])
             + (_KEGG_REFERENCES if kegg_ran else [])
             + (_GSEA_REFERENCES if gsea_ran else [])
             + (_SEMANTIC_REFERENCES if semantic_ran else [])
@@ -1665,6 +1851,9 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
     ppi_ran = inputs.get("communities") is not None
     # read_type: raw_statistics otoriter; alignment stats yedek; varsayılan short.
     read_type = raw.get("read_type") or (inputs.get("alignment") or {}).get("read_type") or "short"
+    # organism_type: raw_statistics otoriter; yoksa config (dogrudan-insa edilmis test girdileri icin).
+    organism_type = raw.get("organism_type") or getattr(config, "organism_type", None) or "prokaryote"
+    meta_ran = organism_type == "metatranscriptome"
     generated = datetime.now().isoformat(timespec="seconds")
     run_part = f'{_esc(run_id)} · ' if run_id else ""
     header = (f'<h1>RNAForge — {_esc(raw.get("organism"))}</h1>'
@@ -1678,6 +1867,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
         section_quality(inputs["alignment"], inputs["count"], trimming_cfg, L, inputs.get("seqqc"),
                         inputs.get("qc"), inputs.get("figures_dir"),
                         inputs.get("alignqc"), inputs.get("multiqc")),
+        (section_taxonomy(inputs, L, lang) if meta_ran else ""),
         section_de(inputs["de"], L),
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang,
                         inputs.get("figure_errors")),
@@ -1694,11 +1884,11 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
             "enrichment": enrichment_ran, "kegg": kegg_ran, "gsea": gsea_ran,
             "amr": amr_ran, "operon": operon_ran, "ppi": ppi_ran,
             "seqqc": inputs.get("seqqc") is not None,
-            "short": read_type == "short", "long": read_type == "long"}),
+            "short": read_type == "short", "long": read_type == "long", "meta": meta_ran}),
         section_methods(config, L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran,
-                        read_type=read_type),
+                        read_type=read_type, organism_type=organism_type),
         section_references(L, enrichment_ran, kegg_ran, gsea_ran, semantic_ran, amr_ran, operon_ran, ppi_ran,
-                           read_type=read_type),
+                           read_type=read_type, meta_ran=meta_ran),
     ])
     # Figürleri belge sırasına göre numaralandır: "Şekil N." / "Figure N."
     fig_word = "Şekil" if lang == "tr" else "Figure"
