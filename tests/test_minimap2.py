@@ -148,3 +148,57 @@ def test_run_minimap2_secondary_n_adds_flag(tmp_path, monkeypatch):
 
     run_minimap2(genome, tmp_path / "b", reads, preset="map-ont")
     assert "-N" not in captured["mm"]                              # default: ikincil yok
+
+
+def test_count_primary_alignments_streams_without_buffering(monkeypatch, tmp_path):
+    """Regresyon (OOM, fare Smchd1 null2 13GB BAM): count_primary_alignments samtools view
+    çıktısının TAMAMINI belleğe buffer'lamamalı (uzun okumada satır ~3KB → 50GB+ → OOM kill);
+    Popen ile satır-satır STREAM etmeli. Sahte Popen ile stream davranışı doğrulanır."""
+    import rnaforge.minimap2 as mm
+
+    class _Stream:
+        def __init__(self, lines): self._it = iter(lines)
+        def __iter__(self): return self._it
+        def close(self): pass
+
+    class _Err:
+        def read(self): return ""
+        def close(self): pass
+
+    class FakeProc:
+        def __init__(self, lines):
+            self.stdout = _Stream(lines); self.stderr = _Err()
+        def wait(self): return 0
+
+    lines = ["r1\t0\ttx1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\n",
+             "r2\t0\ttx1\t5\t60\t4M\t*\t0\t0\tACGT\tIIII\n",
+             "r3\t0\ttx2\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\n"]
+    captured = {}
+
+    def fake_popen(cmd, stdout=None, stderr=None, text=None):
+        captured["cmd"] = cmd
+        return FakeProc(lines)
+
+    monkeypatch.setattr(mm.subprocess, "Popen", fake_popen)
+    assert mm.count_primary_alignments(tmp_path / "big.bam") == {"tx1": 2, "tx2": 1}
+    assert "view" in captured["cmd"] and "2308" in captured["cmd"]
+
+
+def test_count_primary_alignments_nonzero_raises(monkeypatch, tmp_path):
+    import rnaforge.minimap2 as mm
+
+    class _Stream:
+        def __iter__(self): return iter([])
+        def close(self): pass
+
+    class _Err:
+        def read(self): return "boom"
+        def close(self): pass
+
+    class FakeProc:
+        def __init__(self): self.stdout = _Stream(); self.stderr = _Err()
+        def wait(self): return 1
+
+    monkeypatch.setattr(mm.subprocess, "Popen", lambda *a, **k: FakeProc())
+    with pytest.raises(mm.Minimap2RunError):
+        mm.count_primary_alignments(tmp_path / "x.bam")

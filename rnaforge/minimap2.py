@@ -114,15 +114,26 @@ def run_minimap2(genome_fasta: Path, out_dir: Path, fastq: Path, preset: str,
 def count_primary_alignments(bam_path: Path, env: str = "rnaforge-longread") -> dict[str, int]:
     """Primer hizalama sayımı hedef (transkript) başına. -F 2308 = unmapped(4)+
     secondary(256)+supplementary(2048) hariç → okuma başına tek satır; sütun 3 = hedef.
-    Ökaryot uzun-okuma gen-düzeyi sayımı (tx2gene ile gene toplanır)."""
-    r = _run(["conda", "run", "-n", env, "samtools", "view", "-F", "2308", str(bam_path)])
-    if r.returncode != 0:
-        raise Minimap2RunError(f"samtools view failed: {r.stderr.strip()[-500:]}")
+    Ökaryot uzun-okuma gen-düzeyi sayımı (tx2gene ile gene toplanır).
+
+    STREAM eder — tüm `samtools view` çıktısını belleğe ALMAZ. Uzun okumada her SAM satırı
+    dizi+kaliteyle ~3KB; -N ile büyümüş 13GB BAM'de milyonlarca satırı tek string'e slurp etmek
+    50GB+ RAM → OOM kill demekti (fare Smchd1 null2'de yakalandı). Popen ile satır-satır okunur;
+    `split('\\t', 3)` yalnız ilk 3 sütunu ayırır (devasa dizi/kalite alanı parse edilmez)."""
+    proc = subprocess.Popen(
+        ["conda", "run", "-n", env, "samtools", "view", "-F", "2308", str(bam_path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
     counts: dict[str, int] = {}
-    for line in r.stdout.splitlines():
-        if not line:
-            continue
-        ref = line.split("\t")[2]
-        if ref and ref != "*":
-            counts[ref] = counts.get(ref, 0) + 1
+    for line in proc.stdout:
+        parts = line.split("\t", 3)
+        if len(parts) >= 3:
+            ref = parts[2]
+            if ref and ref != "*":
+                counts[ref] = counts.get(ref, 0) + 1
+    proc.stdout.close()
+    stderr = proc.stderr.read()
+    proc.stderr.close()
+    if proc.wait() != 0:
+        raise Minimap2RunError(f"samtools view failed: {stderr.strip()[-500:]}")
     return counts
