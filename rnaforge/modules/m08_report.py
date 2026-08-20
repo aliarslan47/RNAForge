@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rnaforge import __version__
 from rnaforge.config import Config
-from rnaforge.report_html import load_report_inputs, render_report, N_SECTIONS
+from rnaforge.report_html import load_report_inputs, render_report
 from rnaforge.state import RunState
 from rnaforge.versions import capture_tool_versions
 
@@ -49,7 +49,9 @@ def run_report(config: Config, metadata_path: Path, run_dir: Path,
         summary = {
             "report": "report/report.html",
             "language": config.report.language,
-            "n_sections": N_SECTIONS,
+            # Render edilen bölüm sayısını doc'tan CANLI say: opsiyonel bölümler daima <section>
+            # olarak gelir, taksonomi yalnız metatranskriptomda → non-meta 17, meta 18 (doğru).
+            "n_sections": doc.count("<section"),
         }
         stats_path.write_text(json.dumps(summary, indent=2))
         log_file.write(f"m08 report done: {report_path} ({len(doc)} bytes)\n")

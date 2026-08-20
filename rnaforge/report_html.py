@@ -9,7 +9,11 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-N_SECTIONS = 18
+# Metatranskriptom-olmayan (prokaryot/ökaryot) raporun daima render edilen bölüm sayısı.
+# Opsiyonel bölümler (GO/KEGG/AMR…) çalışmasa bile "çalışmadı" notuyla <section> olarak render
+# edilir; yalnız taksonomi bölümü metatranskriptomda +1 gelir. Gerçek sayı m08'de doc'tan CANLI
+# hesaplanır (doc.count("<section")); bu sabit taban/geriye-uyum içindir.
+N_SECTIONS = 16
 
 
 def _num(v):

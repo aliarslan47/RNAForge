@@ -129,6 +129,40 @@ def test_section_taxonomy_figure_failure_never_crashes(tmp_path):
     assert 'id="taxonomy"' in html
 
 
+def test_section_taxonomy_rows_sorted_by_mean_fraction(tmp_path):
+    # Ortalama fraksiyona göre AZALAN sıra: E.coli(0.585) > Bacteroides(0.20) > Faecali(0.175).
+    _, rows = parse_abundance_matrix(_abundance_matrix(tmp_path))
+    inputs = {"taxonomy_samples": ["c1", "t1"], "taxonomy_rows": rows, "figures_dir": None}
+    html = section_taxonomy(inputs, LABELS["tr"], "tr")
+    i_ec = html.index("Escherichia coli")
+    i_bf = html.index("Bacteroides fragilis")
+    i_fp = html.index("Faecalibacterium prausnitzii")
+    assert i_ec < i_bf < i_fp
+
+
+def test_section_taxonomy_truncates_to_top_n(tmp_path):
+    # 20 takson, azalan bolluk (Taxon00 en yüksek … Taxon19 en düşük); top_n=15 → yalnız 00..14.
+    p = tmp_path / "wide_matrix.tsv"
+    lines = ["taxon\tc1\tt1"]
+    for i in range(20):
+        v = (20 - i) / 100.0            # Taxon00=0.20 … Taxon19=0.01 (hepsi farklı)
+        lines.append(f"Taxon{i:02d}\t{v}\t{v}")
+    p.write_text("\n".join(lines) + "\n")
+    sample_ids, rows = parse_abundance_matrix(p)
+    inputs = {"taxonomy_samples": sample_ids, "taxonomy_rows": rows, "figures_dir": None}
+    html = section_taxonomy(inputs, LABELS["en"], "en", top_n=15)
+    assert "Taxon00" in html and "Taxon14" in html      # top-15 içinde
+    assert "Taxon15" not in html and "Taxon19" not in html  # kesildi
+    assert html.count("<tr") == 16                      # 1 başlık + 15 veri satırı
+
+
+def test_section_taxonomy_ran_but_empty_matrix_no_crash():
+    # rows=[] ("çalıştı ama boş"): None'dan (çalışmadı) farklı; çökmeden bölüm+not render eder.
+    html = section_taxonomy({"taxonomy_rows": [], "taxonomy_samples": ["c1"]}, LABELS["en"], "en")
+    assert 'id="taxonomy"' in html
+    assert "was not run" not in html                    # "çalışmadı" DEĞİL — çalıştı, veri boş
+
+
 # ---------------------------------------------------------------------------
 # software / methods / references — kraken2/bracken/sortmerna yalnız meta kolunda
 # ---------------------------------------------------------------------------
@@ -231,3 +265,15 @@ def test_render_report_prokaryote_has_no_taxonomy_section(tmp_path):
     assert 'id="taxonomy"' not in doc
     assert "10.1186/s13059-019-1891-0" not in doc       # Kraken2 atfı yok
     assert "10.7717/peerj-cs.104" not in doc            # Bracken atfı yok
+
+
+def test_render_report_meta_has_exactly_one_more_section_than_prokaryote(tmp_path):
+    # n_sections doğruluğu (Task 10 review): taksonomi metatranskriptomda TAM +1 bölümdür;
+    # diğer tüm opsiyonel bölümler her iki kolda da <section> olarak render edilir.
+    md = tmp_path / "m"; md.mkdir()
+    pd = tmp_path / "p"; pd.mkdir()
+    meta_doc = render_report(_meta_inputs(md), _cfg(tmp_path, "metatranscriptome", "tr"),
+                             version="0.1.0")
+    prok_doc = render_report(_prok_inputs(pd), _cfg(tmp_path, "prokaryote", "tr"),
+                             version="0.1.0")
+    assert meta_doc.count("<section") == prok_doc.count("<section") + 1
