@@ -1,0 +1,7 @@
+sample_id	condition	fastq_1
+WT1	WT	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044180.fastq.gz
+WT2	WT	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044183.fastq.gz
+WT3	WT	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044184.fastq.gz
+null1	null	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044181.fastq.gz
+null2	null	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044182.fastq.gz
+null3	null	/home/ali/rnaforge-pipeline/raw/mouse_smchd1/SRR13044186.fastq.gz

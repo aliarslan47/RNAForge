@@ -6,9 +6,26 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-19 16:40 (+03)
+**Son güncelleme:** 2026-08-20 03:05 (+03)
 
 ## Şu an nerede kaldık
+- **★★★ ÖKARYOT UZUN-OKUMA İZOFORM-DÜZEYİ NİCELEME + DE (NanoCount) — KOD TAMAM `main` `2d28720`, 584 test; BİYOLOJİK
+  DOĞRULAMA KOŞUYOR (2026-08-20).** Ali "sırayla düzelt ve ekle" → iki ertelenen madde. **Madde 1 (F2.2, `0acdc05`,
+  575 test):** rapor yazılım tablosu artık sürümleri runtime'da conda'dan okur (`rnaforge/versions.py`, `conda list
+  --json`; best-effort→curated fallback); canlı 16/16 araç, curated'dan kesin (ggplot2 4.0→4.0.3). **Madde 2 (izoform,
+  `2d28720`):** karar = transkriptom+EM (NanoCount), splice-genom/keşif DEĞİL; mevcut transcriptome+tx2gene değişmez.
+  **Tamamen additive** — minimap2 `-N` primary seçimini değiştirmez → gen-düzeyi (doğrulanmış maya) bozulmaz. minimap2
+  `secondary_n`; yeni `nanocount.py` (runner+parser est_count); m05 `counts_transcript.tsv` (best-effort); m06 koşullu
+  izoform-DESeq2→`differential_expression/isoform/` (`summary.isoform_de`); rapor izoform alt-bölümü (TR+EN); env
+  `nanocount 1.0.0.post6` pinli. TDD, 584 test yeşil (575→+9).
+  - **BİYOLOJİK DOĞRULAMA (Ali: şimdi):** veri seti = 2 paralel ajan (ENA+literatür) **AYNI sette buluştu** =
+    **PRJNA637390** (Dong et al., NAR Genom Bioinform 2021) — fare NSC WT vs *Smchd1*-null, ONT direct-cDNA, kanonik ONT
+    DTU benchmark (Ritchie lab). Ref GENCODE vM25 sanitize (142604 tx, tx2gene→sembol). Config `config/mouse_smchd1.yaml`
+    (euk-long, direct-cDNA→`full_length_cdna:false`/chopper-only), 3 WT/3 null (SRR130441 80/83/84 vs 81/82/86, 32GB).
+    **Hedefler:** gen *Smchd1* DOWN (knockout) + *Ndn/Mkrn3/Peg12* UP; **izoform-DTU *Pisd* ENSMUST00000201980 null'da UP**.
+    Koşu `runs/20260820_024602_mouse_smchd1` — m01✅ m02(NanoPlot)⏳; m03/m04(minimap2 ağır)/m05/m06 sırada. Bittiğinde
+    konkordans kontrol edilecek. [[reminder_rnaforge_eukaryote]]
+  - **SIRADA:** izoform doğrulaması tamamlanınca sonuç + DURUM/bellek/karne güncelle; sonra yeni istek.
 - **★★★ FAZ 3 TAMAM (keyfi faktör adları + >2-faktör + örnek-başı checkpoint) — `main` `39b4bc6`, 570 test (2026-08-19).**
   Ali "sırayla plan modunda otonom başla" → brainstorm→plan (`~/.claude/plans/gleaming-baking-graham.md`).
   Kararlar: **üçü de** + faktör modeli **kovaryat genişletme** anlamında (condition ANA tetkik faktörü
