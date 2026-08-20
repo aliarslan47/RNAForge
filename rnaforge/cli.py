@@ -270,6 +270,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m_rrna_deplete already completed in this run directory",
     )
 
+    taxonomy = sub.add_parser(
+        "taxonomy",
+        help="Kraken2/Bracken community composition on rRNA-depleted reads (m_taxonomy, diagnostik)")
+    taxonomy.add_argument("--config", required=True, type=Path)
+    taxonomy.add_argument("--metadata", required=True, type=Path)
+    taxonomy.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    taxonomy.add_argument("--run-id", default="run")
+    taxonomy.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m_taxonomy already completed in this run directory",
+    )
+
     seqqc = sub.add_parser("seqqc", help="rRNA%% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
     seqqc.add_argument("--config", required=True, type=Path)
     seqqc.add_argument("--metadata", required=True, type=Path)
@@ -714,6 +726,21 @@ def _cmd_rrna_deplete(args) -> int:
     return 0
 
 
+def _cmd_taxonomy(args) -> int:
+    from rnaforge.modules.m_taxonomy import run_taxonomy
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_taxonomy(config, _effective_metadata(args.metadata, run_dir), run_dir,
+                           force=args.force)
+    if summary.get("resumed"):
+        print("m_taxonomy already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"taxonomy OK: {summary['n_samples']} sample(s), {summary['n_taxa']} taxon "
+          f"(abundance matrix: {summary['abundance_matrix']})")
+    print(f"run directory: {run_dir}")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -816,6 +843,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_ppi(args)
         if args.command == "rrna-deplete":
             return _cmd_rrna_deplete(args)
+        if args.command == "taxonomy":
+            return _cmd_taxonomy(args)
         if args.command == "seqqc":
             return _cmd_seqqc(args)
         if args.command == "alignqc":
