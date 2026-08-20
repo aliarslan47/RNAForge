@@ -52,13 +52,33 @@ _CORE_ORDER = ["validate", "qc", "trim", "quant", "counts", "de", "figures", "re
 _OPTIONAL_STAGES = ["seqqc", "alignqc", "enrich", "kegg", "gsea", "semantic",
                     "amr", "operon", "ppi", "multiqc"]
 
+# metatranscriptome dalı: rrna-deplete (m_rrna_deplete) + taxonomy (m_taxonomy) trim'den
+# SONRA, quant'tan ÖNCE koşmalı — m04's _quant_meta, m_rrna_deplete'in state'te "done"
+# olmasını GEREKTIRIR (rrna_depleted_reads'ten okur). prokaryot/ökaryot çekirdek zinciri
+# (_CORE_ORDER) buradan ETKİLENMEZ.
+_METATRANSCRIPTOME_EXTRA_STAGES = ["rrna-deplete", "taxonomy"]
+_METATRANSCRIPTOME_INSERT_AFTER = "trim"
+
+
+def _core_order_for(organism_type: str | None) -> list[str]:
+    """organism_type='metatranscriptome' için genişletilmiş çekirdek sırayı üretir;
+    diğer tüm organism_type'lar (ve None — config okunamadığında düşülen varsayılan)
+    değişmeden _CORE_ORDER'ı alır."""
+    if organism_type == "metatranscriptome":
+        idx = _CORE_ORDER.index(_METATRANSCRIPTOME_INSERT_AFTER) + 1
+        return _CORE_ORDER[:idx] + _METATRANSCRIPTOME_EXTRA_STAGES + _CORE_ORDER[idx:]
+    return list(_CORE_ORDER)
+
 
 def build_run_sequence(start: str | None = None, end: str | None = None,
-                       include=None) -> list[str]:
+                       include=None, organism_type: str | None = None) -> list[str]:
     """`rnaforge run`'ın çalıştıracağı sıralı aşama listesini üretir (saf; I/O yok).
 
     start/end çekirdek zinciri dilimler; include opsiyonel aşamaları (kanonik sırada)
-    rapordan önce (rapor dilimde değilse en sona) yerleştirir."""
+    rapordan önce (rapor dilimde değilse en sona) yerleştirir. organism_type=
+    'metatranscriptome' çekirdek zincire rrna-deplete+taxonomy'i trim'den sonra ekler
+    (bkz. _core_order_for); diğer organism_type'larda çekirdek zincir DEĞİŞMEZ."""
+    core_order = _core_order_for(organism_type)
     include = list(include or [])
     unknown = [s for s in include if s not in _OPTIONAL_STAGES]
     if unknown:
@@ -67,15 +87,15 @@ def build_run_sequence(start: str | None = None, end: str | None = None,
             f"available: {', '.join(_OPTIONAL_STAGES)}"
         )
     for label, stage in (("--from", start), ("--to", end)):
-        if stage is not None and stage not in _CORE_ORDER:
+        if stage is not None and stage not in core_order:
             raise ValueError(
-                f"{label} {stage!r} is not a core stage; core: {', '.join(_CORE_ORDER)}"
+                f"{label} {stage!r} is not a core stage; core: {', '.join(core_order)}"
             )
-    i0 = _CORE_ORDER.index(start) if start else 0
-    i1 = _CORE_ORDER.index(end) if end else len(_CORE_ORDER) - 1
+    i0 = core_order.index(start) if start else 0
+    i1 = core_order.index(end) if end else len(core_order) - 1
     if i0 > i1:
         raise ValueError(f"--from {start!r} comes after --to {end!r}")
-    sliced = _CORE_ORDER[i0:i1 + 1]
+    sliced = core_order[i0:i1 + 1]
     ordered_incl = [s for s in _OPTIONAL_STAGES if s in include]
     if "report" in sliced:
         idx = sliced.index("report")
@@ -256,6 +276,30 @@ def build_parser() -> argparse.ArgumentParser:
     ppi.add_argument(
         "--force", action="store_true",
         help="re-run even if m15 already completed in this run directory",
+    )
+
+    rrna_deplete = sub.add_parser(
+        "rrna-deplete",
+        help="deplete rRNA reads with SortMeRNA --other, for metatranscriptome (m_rrna_deplete)")
+    rrna_deplete.add_argument("--config", required=True, type=Path)
+    rrna_deplete.add_argument("--metadata", required=True, type=Path)
+    rrna_deplete.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    rrna_deplete.add_argument("--run-id", default="run")
+    rrna_deplete.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m_rrna_deplete already completed in this run directory",
+    )
+
+    taxonomy = sub.add_parser(
+        "taxonomy",
+        help="Kraken2/Bracken community composition on rRNA-depleted reads (m_taxonomy, diagnostik)")
+    taxonomy.add_argument("--config", required=True, type=Path)
+    taxonomy.add_argument("--metadata", required=True, type=Path)
+    taxonomy.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    taxonomy.add_argument("--run-id", default="run")
+    taxonomy.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m_taxonomy already completed in this run directory",
     )
 
     seqqc = sub.add_parser("seqqc", help="rRNA%% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
@@ -680,6 +724,43 @@ def _cmd_seqqc(args) -> int:
     return 0
 
 
+def _cmd_rrna_deplete(args) -> int:
+    from rnaforge.modules.m_rrna_deplete import run_rrna_deplete
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = _load_run_profile(config, run_dir)
+    summary = run_rrna_deplete(config, _effective_metadata(args.metadata, run_dir), run_dir,
+                               force=args.force)
+    if summary.get("resumed"):
+        print("m_rrna_deplete already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    rates = [v["depletion_rate"] for v in summary["samples"].values()]
+    mean_rate = sum(rates) / len(rates) if rates else 0.0
+    print(f"rrna-deplete OK: {summary['n_samples']} sample(s), mean depletion rate {mean_rate:.1%}")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
+def _cmd_taxonomy(args) -> int:
+    from rnaforge.modules.m_taxonomy import run_taxonomy
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_taxonomy(config, _effective_metadata(args.metadata, run_dir), run_dir,
+                           force=args.force)
+    if summary.get("resumed"):
+        print("m_taxonomy already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    print(f"taxonomy OK: {summary['n_samples']} sample(s), {summary['n_taxa']} taxon "
+          f"(abundance matrix: {summary['abundance_matrix']})")
+    print(f"run directory: {run_dir}")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -706,6 +787,7 @@ _STAGE_DISPATCH = {
     "seqqc": _cmd_seqqc, "alignqc": _cmd_alignqc, "enrich": _cmd_enrich, "kegg": _cmd_kegg,
     "gsea": _cmd_gsea, "semantic": _cmd_semantic, "amr": _cmd_amr, "operon": _cmd_operon,
     "ppi": _cmd_ppi, "multiqc": _cmd_multiqc,
+    "rrna-deplete": _cmd_rrna_deplete, "taxonomy": _cmd_taxonomy,
 }
 
 
@@ -726,9 +808,23 @@ def _cmd_doctor(args) -> int:
     return 0
 
 
+def _organism_type_for_run(args) -> str | None:
+    """`rnaforge run`'ın aşama sırasını organism_type'a göre seçebilmesi için config'i
+    ÖNCEDEN, en iyi çaba (best-effort) okur — yalnız sıralama amaçlı. Config
+    okunamazsa (yok/bozuk) None döner: sıra prokaryot/ökaryot varsayılanına düşer;
+    gerçek hata SESSİZCE yutulmaz — ilk aşamanın (validate) kendi config yüklemesi
+    aynı ConfigError'ı tekrar fırlatır ve pipeline yine yüksek sesle durur."""
+    try:
+        return load_config(args.config).organism_type
+    except Exception:
+        return None
+
+
 def _cmd_run(args) -> int:
     include = [s.strip() for s in (args.include or "").split(",") if s.strip()]
-    sequence = build_run_sequence(args.from_stage, args.to_stage, include)
+    organism_type = _organism_type_for_run(args)
+    sequence = build_run_sequence(args.from_stage, args.to_stage, include,
+                                  organism_type=organism_type)
     print(f"pipeline: {' → '.join(sequence)}")
     for i, name in enumerate(sequence, start=1):
         print(f"=== [{i}/{len(sequence)}] {name} ===")
@@ -780,6 +876,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_operon(args)
         if args.command == "ppi":
             return _cmd_ppi(args)
+        if args.command == "rrna-deplete":
+            return _cmd_rrna_deplete(args)
+        if args.command == "taxonomy":
+            return _cmd_taxonomy(args)
         if args.command == "seqqc":
             return _cmd_seqqc(args)
         if args.command == "alignqc":

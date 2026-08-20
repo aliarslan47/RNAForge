@@ -1,0 +1,10 @@
+name: rnaforge-meta
+channels:
+  - conda-forge
+  - bioconda
+# Kesin sürüm pin'i (tekrarlanabilirlik): sınıflandırıcı/bolluk-tahmini sürümü doğrudan
+# takson atamalarını ve fraksiyonları etkiler; floating >= byte-aynı tekrarı garanti etmezdi.
+# rRNA depletion (SortMeRNA) burada YOK — zaten rnaforge-seqqc'te; rrna.env varsayılanı seqqc.
+dependencies:
+  - kraken2=2.1.6
+  - bracken=3.1

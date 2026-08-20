@@ -1,0 +1,7 @@
+sample_id	condition	fastq_1	fastq_2	subject
+nonibd_1	nonIBD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949596_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949596_2.fastq.gz	M2039
+nonibd_2	nonIBD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949228_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949228_2.fastq.gz	P6018
+nonibd_3	nonIBD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949133_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949133_2.fastq.gz	M2060
+cd_1	CD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949185_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949185_2.fastq.gz	C3009
+cd_2	CD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949388_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949388_2.fastq.gz	C3016
+cd_3	CD	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949593_1.fastq.gz	/home/ali/rnaforge-pipeline/raw/hmp2_ibd/SRR5949593_2.fastq.gz	C3012

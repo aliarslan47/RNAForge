@@ -1,0 +1,40 @@
+# RNAForge — İnsan bağırsağı metatranskriptomu, Crohn (CD) vs non-IBD.
+# Veri: PRJNA398089 (iHMP/HMP2 IBD, IBDMDB). Dışkı, ribo-deplete, Illumina PE.
+# 3 non-IBD + 3 CD (subject->diagnosis join HMP2_metadata.tsv ile doğrulandı).
+# Referans-tabanlı metatranskriptom: 12 baskın bağırsak türü gen kataloğu.
+organism: "Human gut metatranscriptome (CD vs non-IBD)"
+organism_type: "metatranscriptome"
+platform: "illumina"
+
+reference:
+  gene_catalog_fasta: "references/gut_catalog/gene_catalog.fna"
+  catalog_annotation: "references/gut_catalog/gene_catalog.gff"
+
+taxonomy:
+  kraken2_db: "references/kraken2/gut"
+  bracken_read_len: 100
+  bracken_level: "S"
+
+rrna:
+  db_fasta: "references/rrna/gut_rrna.fasta"
+
+library:
+  strandedness: "unstranded"        # HMP2 metatranskriptom kütüphanesi yönsüz
+  selection: "rrna_depletion"
+
+quantification:
+  feature_type: "CDS"               # RefSeq bakteri GFF: exon yok, CDS/locus_tag
+  attribute: "locus_tag"
+
+de:
+  design: "~condition"
+  reference: "nonIBD"               # kontrast referansı: sağlıklı → CD'de UP pozitif log2FC
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32
