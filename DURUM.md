@@ -6,11 +6,22 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-20 03:05 (+03)
+**Son güncelleme:** 2026-08-20 05:05 (+03)
 
 ## Şu an nerede kaldık
-- **★★★ ÖKARYOT UZUN-OKUMA İZOFORM-DÜZEYİ NİCELEME + DE (NanoCount) — KOD TAMAM `main` `2d28720`, 584 test; BİYOLOJİK
-  DOĞRULAMA KOŞUYOR (2026-08-20).** Ali "sırayla düzelt ve ekle" → iki ertelenen madde. **Madde 1 (F2.2, `0acdc05`,
+- **★★★ ÖKARYOT UZUN-OKUMA İZOFORM-DÜZEYİ (NanoCount) — KOD + BİYOLOJİK DOĞRULAMA TAMAM → BEŞİNCİ KOL. `main` `f4357ea`,
+  586 test (2026-08-20).** Ali "sırayla düzelt ve ekle" → iki ertelenen madde tamam.
+  - **★★ BİYOLOJİK DOĞRULAMA BAŞARILI (fare Smchd1, PRJNA637390):** koşu `runs/20260820_024602_mouse_smchd1`, 3 WT/3 null,
+    30335 gen / 41834 transkript, min replika kor. **0.97**. **GEN-DÜZEYİ konkordans kusursuz:** *Smchd1* **−1.97**
+    (padj 1.2e-13, knockout geni en güçlü DOWN=sanity ✓), *Pisd* +1.11 (5.5e-11), *Peg12* +0.96 (2.3e-7, imprinted UP),
+    *Ndn* +1.02 (4.2e-3, imprinted UP) — makaleyle uyumlu, 11 anlamlı gen (6↑/5↓). **İZOFORM-DTU hedefi tuttu:**
+    *Pisd* **ENSMUST00000201980.4 (Pisd-212 "Known5", retained_intron) log2FC +1.71 → null'da UP** = belgelenmiş DTU
+    yönü ✓; resiprokal kanonik *Pisd*-201 (ENSMUST00000061895) −0.85 DOWN = **izoform switch imzası**. Genom-çapında
+    FDR'de izoform DEG=0 → **aşırı-çağırma YOK** (subtle DTU, makale specificity'siyle uyumlu — dürüst davranış).
+  - **★ GERÇEK-VERİ BUG + FIX (`f4357ea`, OOM):** null2 (13GB BAM) `count_primary_alignments`'te çöktü — `samtools view`
+    çıktısının tümü tek Python string'ine slurp ediliyordu (uzun okuma satırı ~3KB × milyonlar → 50GB+ RAM → OOM kill,
+    dmesg doğruladı). **Popen ile satır-satır STREAM + split('\t',3)** → tepe bellek tek satır. TDD (+2 test).
+  - **Madde 1 (F2.2, `0acdc05`,
   575 test):** rapor yazılım tablosu artık sürümleri runtime'da conda'dan okur (`rnaforge/versions.py`, `conda list
   --json`; best-effort→curated fallback); canlı 16/16 araç, curated'dan kesin (ggplot2 4.0→4.0.3). **Madde 2 (izoform,
   `2d28720`):** karar = transkriptom+EM (NanoCount), splice-genom/keşif DEĞİL; mevcut transcriptome+tx2gene değişmez.
