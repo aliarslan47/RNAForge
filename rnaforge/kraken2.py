@@ -30,7 +30,7 @@ def parse_kraken2_report(path: Path) -> list[dict]:
     try:
         with path.open() as f:
             for line_no, line in enumerate(f, 1):
-                line = line.rstrip("\n")
+                line = line.strip()
                 if not line:
                     continue
                 parts = line.split("\t")
@@ -42,9 +42,9 @@ def parse_kraken2_report(path: Path) -> list[dict]:
                     fraction_pct = float(parts[0])
                     # parts[1] is clade_reads (unused)
                     reads = int(parts[2])
-                    rank = parts[3]
-                    taxid = parts[4]
-                    name = parts[5].lstrip()  # Remove indentation
+                    rank = parts[3].strip()
+                    taxid = parts[4].strip()
+                    name = parts[5].strip()  # Remove indentation and trailing whitespace
                 except (ValueError, IndexError) as e:
                     raise Kraken2ParseError(
                         f"Kraken2 report line {line_no} parse error: {e}"
@@ -82,7 +82,7 @@ def parse_bracken(path: Path) -> dict[str, float]:
                 raise Kraken2ParseError("Bracken file is empty")
             # Skip header
             for line_no, line in enumerate(lines[1:], 2):
-                line = line.rstrip("\n")
+                line = line.strip()
                 if not line:
                     continue
                 parts = line.split("\t")
@@ -91,7 +91,7 @@ def parse_bracken(path: Path) -> dict[str, float]:
                         f"Bracken line {line_no} has < 7 fields: {line}"
                     )
                 try:
-                    name = parts[0]
+                    name = parts[0].strip()
                     # parts[1] is taxonomy_id (unused for this output)
                     # parts[2] is taxonomy_lvl (unused)
                     # parts[3] is kraken_assigned_reads (unused)
@@ -115,28 +115,36 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
-def run_kraken2(reads: Path, db: Path, out_prefix: Path, paired: bool = False,
-                threads: int = 4, env: str = "rnaforge-core") -> Path:
+def run_kraken2(reads: list[Path], db: Path, out_prefix: Path, paired: bool = False,
+                threads: int = 4, env: str = "rnaforge-meta") -> Path:
     """Run Kraken2 taxonomic profiling.
 
     Args:
-        reads: FASTQ file (or first of pair if paired=True).
+        reads: List of FASTQ file(s). If paired=True, must be [r1, r2].
+               If paired=False, must be single-element list [r1].
         db: Kraken2 database directory.
         out_prefix: Output prefix (report will be <out_prefix>.report).
-        paired: If True, expects reads to be read 1; will look for paired read 2.
+        paired: If True, expects reads to have 2 elements; adds --paired flag.
         threads: Number of threads.
-        env: Conda environment name.
+        env: Conda environment name (default: "rnaforge-meta").
 
     Returns: Path to the generated report file (<out_prefix>.report).
 
     Raises: Kraken2RunError on failure.
     """
-    reads = Path(reads)
+    reads = [Path(r) for r in reads]
     db = Path(db)
     out_prefix = Path(out_prefix)
 
-    if not reads.exists():
-        raise Kraken2RunError(f"input reads file does not exist: {reads}")
+    expected_count = 2 if paired else 1
+    if len(reads) != expected_count:
+        raise Kraken2RunError(
+            f"expected {expected_count} read file(s), got {len(reads)}"
+        )
+
+    for r in reads:
+        if not r.exists():
+            raise Kraken2RunError(f"input reads file does not exist: {r}")
     if not db.exists():
         raise Kraken2RunError(f"Kraken2 database does not exist: {db}")
 
@@ -147,20 +155,10 @@ def run_kraken2(reads: Path, db: Path, out_prefix: Path, paired: bool = False,
            "--report", str(report), "--threads", str(threads)]
 
     if paired:
-        # For paired: reads is R1, construct R2 filename
-        reads_r2 = Path(str(reads).replace("_R1", "_R2").replace("_1.fastq", "_2.fastq"))
-        if not reads_r2.exists():
-            # Try alternative patterns
-            stem = reads.stem
-            if stem.endswith("_1"):
-                reads_r2 = reads.parent / (stem[:-2] + "_2" + reads.suffix)
-            else:
-                reads_r2 = Path(str(reads).replace(".fastq", "_2.fastq"))
-        if not reads_r2.exists():
-            raise Kraken2RunError(f"paired read 2 does not exist: {reads_r2}")
-        cmd += [str(reads), str(reads_r2)]
-    else:
-        cmd += [str(reads)]
+        cmd += ["--paired"]
+
+    for r in reads:
+        cmd += [str(r)]
 
     r = _run(cmd)
     if r.returncode != 0 or not report.exists():
@@ -172,7 +170,7 @@ def run_kraken2(reads: Path, db: Path, out_prefix: Path, paired: bool = False,
 
 
 def run_bracken(kraken_report: Path, db: Path, out_path: Path, read_len: int = 100,
-                level: str = "S", env: str = "rnaforge-core") -> Path:
+                level: str = "S", env: str = "rnaforge-meta") -> Path:
     """Run Bracken abundance estimation on Kraken2 report.
 
     Args:
@@ -181,7 +179,7 @@ def run_bracken(kraken_report: Path, db: Path, out_path: Path, read_len: int = 1
         out_path: Output file path.
         read_len: Read length (default 100).
         level: Taxonomic level (default "S" for species).
-        env: Conda environment name.
+        env: Conda environment name (default: "rnaforge-meta").
 
     Returns: Path to the output file.
 

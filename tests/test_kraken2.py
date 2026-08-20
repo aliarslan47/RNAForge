@@ -62,7 +62,83 @@ def test_run_kraken2_requires_db(tmp_path):
     reads = tmp_path / "reads.fastq"
     reads.write_text("@r1\nACGT\n+\nIIII\n")
     with pytest.raises(Kraken2RunError, match="database"):
-        run_kraken2(reads, tmp_path / "fake_db", tmp_path / "out", paired=False, threads=1)
+        run_kraken2([reads], tmp_path / "fake_db", tmp_path / "out", paired=False, threads=1)
+
+
+def test_run_kraken2_constructs_command_unpaired(tmp_path, monkeypatch):
+    """run_kraken2 builds correct command for unpaired reads. Monkeypatch _run
+    to capture and check command construction without needing a real database."""
+    reads = tmp_path / "reads.fastq"
+    reads.write_text("@r1\nACGT\n+\nIIII\n")
+    db = tmp_path / "db"
+    db.mkdir()
+
+    # Pre-create the report file to avoid "report not found" error
+    report = tmp_path / "out.report"
+    report.write_text("")
+
+    captured_cmd = []
+
+    def mock_run(cmd):
+        captured_cmd.append(cmd)
+        from subprocess import CompletedProcess
+        return CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr("rnaforge.kraken2._run", mock_run)
+
+    run_kraken2([reads], db, tmp_path / "out", paired=False, threads=2, env="test-env")
+
+    assert len(captured_cmd) == 1
+    cmd = captured_cmd[0]
+    assert cmd[0:3] == ["conda", "run", "-n"]
+    assert "test-env" in cmd
+    assert "kraken2" in cmd
+    assert "--db" in cmd
+    assert str(db) in cmd
+    assert "--report" in cmd
+    assert str(report) in cmd
+    assert "--threads" in cmd
+    assert "2" in cmd
+    assert str(reads) in cmd
+    assert "--paired" not in cmd
+
+
+def test_run_kraken2_constructs_command_paired(tmp_path, monkeypatch):
+    """run_kraken2 builds correct command for paired reads with --paired flag."""
+    r1 = tmp_path / "reads_1.fastq"
+    r2 = tmp_path / "reads_2.fastq"
+    r1.write_text("@r1\nACGT\n+\nIIII\n")
+    r2.write_text("@r2\nTGCA\n+\nIIII\n")
+    db = tmp_path / "db"
+    db.mkdir()
+
+    # Pre-create the report file to avoid "report not found" error
+    report = tmp_path / "out.report"
+    report.write_text("")
+
+    captured_cmd = []
+
+    def mock_run(cmd):
+        captured_cmd.append(cmd)
+        from subprocess import CompletedProcess
+        return CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr("rnaforge.kraken2._run", mock_run)
+
+    run_kraken2([r1, r2], db, tmp_path / "out", paired=True, threads=4, env="test-env")
+
+    assert len(captured_cmd) == 1
+    cmd = captured_cmd[0]
+    assert cmd[0:3] == ["conda", "run", "-n"]
+    assert "test-env" in cmd
+    assert "kraken2" in cmd
+    assert "--paired" in cmd
+    assert str(r1) in cmd
+    assert str(r2) in cmd
+    # Verify --paired comes before the reads
+    paired_idx = cmd.index("--paired")
+    r1_idx = cmd.index(str(r1))
+    assert paired_idx < r1_idx
 
 
 @pytest.mark.skipif(shutil.which("conda") is None, reason="conda yok")
