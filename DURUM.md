@@ -6,28 +6,34 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-20 (+03) — metatranskriptom kolu MEKANİK DOĞRULANDI (gerçek insan bağırsağı, HMP2/IBD) + `main`'e MERGE edildi; biyolojik konkordans 3v3 subject-baskınlığı nedeniyle SONUÇSUZ (veri sınırı, kod değil)
+**Son güncelleme:** 2026-08-20 (+03) — metatranskriptom kolu `main`'e MERGE'li; İKİ gerçek-veri koşusu (HMP2 + B.theta) MEKANİK doğruladı, B.theta ayrıca İSTATİSTİKSEL SAĞLAMLIK + makale-null-uyumu gösterdi; güçlü-pozitif biyolojik konkordans HENÜZ YOK. **KULLANICI "kayıt al bekle beni" DEDİ — yeni koşu başlatılmayacak, kullanıcı dönene dek beklemede.**
 
 ## Şu an nerede kaldık
-- **★★★ METATRANSKRİPTOM KOLU — GERÇEK VERİ DOĞRULAMASI + MERGE TAMAM (2026-08-20).** 12 görevlik kol (TDD, 680 test yeşil)
-  `feature/metatranscriptome-refbased` → **`main`'e MERGE edildi + push.** Doğrulama koşusu `runs/20260820_152013_hmp2_ibd`:
-  - **✅ MEKANİK DOĞRULAMA BAŞARILI:** HMP2/IBD (PRJNA398089) 3 CD + 3 non-IBD dışkı metatranskriptomu ile UÇTAN UCA çöküşsüz
-    çalıştı: validate→qc→trim→rRNA-deplete(%25.1)→Kraken2/Bracken taksonomi(12 tür)→gen-katalog Bowtie2→featureCounts
-    (45690 gen×6)→DESeq2(66 anlamlı, CD vs nonIBD)→8 figür→rapor(1.77MB). Bir **bozuk FASTQ'yu yüksek sesle yakalayıp
-    durdu** (SRR5949388_2 igzip eof → yeniden indirildi = kapı sistemi doğru çalışıyor). Koşul ataması HMP2_metadata.tsv
-    subject→diagnosis join ile DOĞRULANDI (3 CD: C3009/C3016/C3012, 3 nonIBD: M2039/P6018/M2060 — gerçek biyolojik replika).
-  - **⚠ BİYOLOJİK KONKORDANS SONUÇSUZ (veri/örneklem sınırı, KOD DEĞİL):** seçilen 3v3'te güçlü **subject-baskınlığı** —
-    her dışkı örneği farklı bir türle domine (normalize sayım: Roseburia nonibd_2'de 91001 vs diğerleri <1000; Enterocloster
-    cd_1'de 244201 vs diğerleri <400). Yön işaretleri "doğru tarafta" görünse de (E.bolteae/R.gnavus/E.coli CD'de yüksek,
-    Roseburia butirat non-IBD'de yüksek) TEK-örnek outlier'lardan geliyor, grup-düzeyi CD-vs-nonIBD farkı DEĞİL. Bu tam olarak
-    önceden koyulan *"3v3 kesitsel onların istatistiğini üretmez"* sınırının gerçekleşmesi = HMP2 dışkı MTX'in bilinen
-    kişiler-arası devasa değişkenliği. "Biyolojik doğrulandı" DENMEZ ([[feedback_dogruluk_kontrol]]). Kolun KOD kalitesi
-    ayrıca TDD (12 görev) + e2e smoke + bu mekanik-gerçek-veri koşusu ile üçlü kanıtlı.
-  - **REFERANSLAR (gitignore'lu, diskte kaldı):** `references/gut_catalog/` (12 tür birleşik FASTA+GFF, contig→tür +
-    locus→tür haritası; E.coli=K-12), `references/kraken2/gut/` (taxid-etiketli custom DB, taxdump ile), `references/rrna/`
-    (gen kataloğu rRNA'larından). Config: `config/hmp2_ibd.yaml` + `.samples.tsv` (commit'lendi).
-  - **İLERİ (opsiyonel, güçlü biyolojik konkordans istenirse):** grup başına 6+ replika (subject-baskınlığı ortalanır) VEYA
-    dysbiosis-skoru dengeli alt küme — ama HMP2 doğası gereği garantisiz + CD tarafında derin örnek kıt. Şimdilik yapılmadı.
+- **⏸ BEKLEMEDE (kullanıcı 2026-08-20: "kayıt al bekle beni").** Sıradaki OLASI adım (kullanıcı onayıyla): güçlü-pozitif
+  biyolojik konkordans için **makale-DE-teyitli** bir metatranskriptom seti (aday: antibiyotik PRJEB109068 ±ampisilin) —
+  AMA koşmadan ÖNCE makalenin açık/güçlü DEG tablosu teyit edilecek (HMP2+B.theta derslerinden: seti DE-gücü teyitsiz seçme).
+  Güçlü-teyitli aday çıkmazsa B.theta doğrulaması "yeterli" kabul edilip kol kapatılacak. **Kullanıcı bekleniyor, otonom devam YOK.**
+- **★★★ METATRANSKRİPTOM KOLU — main'e MERGE'li + İKİ GERÇEK-VERİ DOĞRULAMASI (2026-08-20).** 12 görevlik kol (TDD, 680 test)
+  `feature/metatranscriptome-refbased` → `main` merge (`5a4345d`). **Mimari şeması Artifact:**
+  `https://claude.ai/code/artifact/33d10c10-efe5-4464-a09a-bf3ed5bdcf52` (kod-doğrulanmış DAG, TR/EN).
+  - **DENEME 1 — HMP2/IBD (PRJNA398089, 3 CD + 3 non-IBD dışkı, 12-tür gen kataloğu):** ✅ MEKANİK başarılı (uçtan uca,
+    45690 gen×6, 66 DEG, bozuk-FASTQ yakalandı). ⚠ BİYOLOJİK SONUÇSUZ — 3v3 **subject-baskınlığı** (her dışkı örneği farklı
+    türle domine; heatmap 2 outlier sütun). "3v3 onların istatistiğini üretmez" sınırının gerçekleşmesi. **VERİ + config
+    SİLİNDİ** (kullanıcı isteği); referanslar (`references/gut_catalog|kraken2/gut|rrna`) gitignore'lu diskte kaldı.
+  - **DENEME 2 — B. theta VPI-5482 gnotobiyotik (PRJEB48101, Weagley Cell Reports 2022, NAD-deficient vs NA-supplemented,
+    6v6 single-end, tek-tür temiz referans):** koşu `runs/20260820_170348_btheta_nad`.
+    - ✅ **MEKANİK kusursuz:** taxonomy **1 taxon** (B.theta doğru), 4801 gen×12, 50 DEG (48↑/2↓), rapor+8 figür.
+    - ✅ **İSTATİSTİKSEL SAĞLAMLIK (HMP2'den kritik fark):** heatmap **6 def vs 6 suf GRUP-DÜZEYİNDE tutarlı** ayrışıyor
+      (subject-baskınlık YOK) → kol, uygun veriyle grup-düzeyi tutarlı DE üretebiliyor. HMP2'de gösterilemeyen şey.
+    - ✅ **MAKALE KONKORDANSI (test edilebilir tek nokta):** makale bu kontrastta gen-ekspresyon DEĞİŞMEDİĞİNİ raporluyor
+      (TIR genleri p=0.56/0.88, genom-çapı DEG yok). Bizde TIR geni `BT_RS17215` padj=**0.99**, log2FC=0.01 = **null-null uyumu**.
+    - ❌ **GÜÇLÜ POZİTİF BİYOLOJİK HİKAYE YOK:** NAD homeostaz genleri (nadE `BT_RS01010` padj 0.61, nadC `BT_RS07890` padj 0.99)
+      anlamsız; 50 DEG çoğu hypothetical/DUF/besin geni. "NAD genleri UP" bir BEKLENTİYDİ, makale bulgusu değildi (makale null).
+      Yani seçtiğimiz kontrast güçlü-pozitif DE için uygun DEĞİLDİ (makale de null bulmuş). Referanslar `references/btheta` +
+      `references/kraken2/btheta` gitignore'lu diskte; config `config/btheta_nad.yaml`+`.samples.tsv` commit'li.
+  - **DÜRÜST DURUM:** Kol mekanik + istatistiksel + null-uyumu olarak SAĞLAM; downstream (m06+) zaten 5 kolda güçlü doğrulanmış.
+    Eksik olan tek şey diğer 5 kol gibi bir "güçlü-pozitif biyolojik konkordans" örneği — iki denemede de veri/kontrast (kod değil)
+    nedeniyle ulaşılamadı. Ders: metatranskriptom set seçiminde DE-gücü makaleden ÖNCE teyit edilmeli.
 - **★★★ (KOD DETAYI) METATRANSKRİPTOM REFERANS-TABANLI KISA-OKUMA KOLU — 12 GÖREVLİK PLAN (TDD).** Üçüncü organizma tipi: `organism_type: metatranscriptome`
   → `rnaforge run` `trim`'den sonra rrna-deplete + taxonomy'i OTOMATİK ekler (config-driven, `--profile`
   bayrağı YOK) → gen kataloğuna Bowtie2 → featureCounts → DESeq2 → rapor. Downstream (m06+) DEĞİŞMEZ, kol additive.

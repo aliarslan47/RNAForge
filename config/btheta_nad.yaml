@@ -1,0 +1,40 @@
+# RNAForge — B. thetaiotaomicron VPI-5482 gnotobiyotik metatranskriptom.
+# Veri: PRJEB48101 (gut microbial TIR-domain NADase, gnotobiyotik fare sekumu).
+# Kontrast: NAD-deficient vs NA-supplemented, mono-kolonizasyon, 6v6 (single-end).
+# Subject-baskınlığı YOK: özdeş inokulum + tanımlı tek tür → replikalar karşılaştırılabilir.
+organism: "Bacteroides thetaiotaomicron VPI-5482 (gnotobiotic cecal metatranscriptome)"
+organism_type: "metatranscriptome"
+platform: "illumina"
+
+reference:
+  gene_catalog_fasta: "references/btheta/gene_catalog.fna"
+  catalog_annotation: "references/btheta/gene_catalog.gff"
+
+taxonomy:
+  kraken2_db: "references/kraken2/btheta"
+  bracken_read_len: 100
+  bracken_level: "S"
+
+rrna:
+  db_fasta: "references/rrna/btheta_rrna.fasta"
+
+library:
+  strandedness: "unstranded"
+  selection: "rrna_depletion"
+
+quantification:
+  feature_type: "CDS"
+  attribute: "locus_tag"
+
+de:
+  design: "~condition"
+  reference: "NAsupplemented"      # NAD-yeterli = kontrol; NADdeficient'te artış = +log2FC
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32

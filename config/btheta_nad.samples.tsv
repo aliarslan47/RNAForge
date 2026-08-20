@@ -1,0 +1,13 @@
+sample_id	condition	fastq_1
+def_1	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881676.fastq.gz
+def_2	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881677.fastq.gz
+def_3	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881673.fastq.gz
+def_4	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881675.fastq.gz
+def_5	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881674.fastq.gz
+def_6	NADdeficient	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881678.fastq.gz
+suf_1	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881680.fastq.gz
+suf_2	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881679.fastq.gz
+suf_3	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881683.fastq.gz
+suf_4	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881684.fastq.gz
+suf_5	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881682.fastq.gz
+suf_6	NAsupplemented	/home/ali/rnaforge-pipeline/raw/btheta_nad/ERR7881681.fastq.gz
