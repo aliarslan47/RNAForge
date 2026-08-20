@@ -1,0 +1,16 @@
+name: metatranscriptome
+permissive: true
+description: >
+  Referans-tabanlı kısa-okuma metatranskriptom (topluluk RNA-seq). Eşikler BİLİNÇLİ olarak
+  permissive ve DAMGALIDIR: gen kataloğu doğası gereği eksiktir (topluluğun tümü referansta
+  yoktur) → düşük hizalama/atama NORMALDİR, geçersizlik değildir. Yalnız KATASTROFİK (~0)
+  hizalama şüpheli (WARN). rRNA depletion verimi düşükse WARN. replicate_correlation korunur.
+  Bu profille üretilen rapor "geniş toleranslı" damgası taşır; temsili bir metatranskriptom
+  veri setine kalibre edilene dek sıkılaştırılmaz.
+thresholds:
+  read_depth: 1000000
+  base_quality: 20
+  rrna_depletion_rate: 0.30
+  alignment_rate: 0.05
+  assignment_rate: 0.02
+  replicate_correlation: 0.75
