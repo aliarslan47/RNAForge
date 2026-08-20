@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-ORGANISM_TYPES = ("prokaryote", "eukaryote")
+ORGANISM_TYPES = ("prokaryote", "eukaryote", "metatranscriptome")
 PLATFORMS = ("auto", "illumina", "ont", "pacbio_hifi")
 STRANDEDNESS = ("unstranded", "stranded", "reverse")
 SELECTIONS = ("rrna_depletion", "polya")
@@ -21,12 +21,14 @@ KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
     "quantification", "enrichment", "amr", "operon", "ppi", "basecall",
+    "taxonomy", "rrna",
 })
 
 # organism_type -> zorunlu reference alanları
 REQUIRED_REFERENCE = {
     "prokaryote": ("genome_fasta", "annotation_gff"),
     "eukaryote": ("transcriptome_fasta", "tx2gene"),
+    "metatranscriptome": ("gene_catalog_fasta", "catalog_annotation"),
 }
 
 
@@ -40,6 +42,8 @@ class Reference:
     annotation_gff: Path | None = None
     transcriptome_fasta: Path | None = None
     tx2gene: Path | None = None
+    gene_catalog_fasta: Path | None = None
+    catalog_annotation: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,20 @@ class Basecall:
     device: str = "cuda:all"
     env: str = "rnaforge-basecall"  # pod5 dönüşümü için
     models_dir: str | None = None   # model önbelleği (yeniden indirmeyi önler)
+
+
+@dataclass(frozen=True)
+class Taxonomy:
+    kraken2_db: Path | None = None
+    bracken_read_len: int = 100
+    bracken_level: str = "S"
+    env: str = "rnaforge-meta"
+
+
+@dataclass(frozen=True)
+class Rrna:
+    db_fasta: Path | None = None
+    env: str = "rnaforge-seqqc"
 
 
 @dataclass(frozen=True)
@@ -174,6 +192,8 @@ class Config:
     operon: Operon = field(default_factory=Operon)
     ppi: PPI = field(default_factory=PPI)
     basecall: Basecall = field(default_factory=Basecall)
+    taxonomy: Taxonomy = field(default_factory=Taxonomy)
+    rrna: Rrna = field(default_factory=Rrna)
 
 
 def _one_of(value, allowed, field: str):
@@ -186,7 +206,8 @@ def _one_of(value, allowed, field: str):
 # bölüm içindeki yazım hatası (ör. de.fdr_treshold) sessizce default kullanmasın.
 # quality HARİÇ: gate-override adları serbest-biçimdir (değişken), sabit sete bağlanamaz.
 _KNOWN_SECTION_KEYS = {
-    "reference": {"genome_fasta", "annotation_gff", "transcriptome_fasta", "tx2gene"},
+    "reference": {"genome_fasta", "annotation_gff", "transcriptome_fasta", "tx2gene",
+                  "gene_catalog_fasta", "catalog_annotation"},
     "library": {"strandedness", "selection", "chemistry", "full_length_cdna"},
     "trimming": {"min_length", "aggressive_quality"},
     "de": {"design", "fdr_threshold", "log2fc_threshold", "reference", "contrasts"},
@@ -200,6 +221,8 @@ _KNOWN_SECTION_KEYS = {
     "operon": {"max_gap"},
     "ppi": {"taxid", "string_dir", "min_score", "min_community_size"},
     "basecall": {"dorado_bin", "model", "device", "env", "models_dir"},
+    "taxonomy": {"kraken2_db", "bracken_read_len", "bracken_level", "env"},
+    "rrna": {"db_fasta", "env"},
 }
 
 
@@ -321,16 +344,36 @@ def _build_reference(raw: dict, organism_type: str) -> Reference:
         annotation_gff=to_path(raw.get("annotation_gff")),
         transcriptome_fasta=to_path(raw.get("transcriptome_fasta")),
         tx2gene=to_path(raw.get("tx2gene")),
+        gene_catalog_fasta=to_path(raw.get("gene_catalog_fasta")),
+        catalog_annotation=to_path(raw.get("catalog_annotation")),
     )
 
 
-def load_config(path: Path | str) -> Config:
-    path = Path(path)
-    if not path.exists():
-        raise ConfigError(f"config file not found: {path}")
-    raw = yaml.safe_load(path.read_text()) or {}
+def _build_taxonomy(raw: dict) -> Taxonomy:
+    to_path = lambda v: Path(v) if v else None  # noqa: E731
+    return Taxonomy(
+        kraken2_db=to_path(raw.get("kraken2_db")),
+        bracken_read_len=_as_int(raw.get("bracken_read_len", 100), "taxonomy.bracken_read_len"),
+        bracken_level=str(raw.get("bracken_level", "S")),
+        env=str(raw.get("env", "rnaforge-meta")),
+    )
+
+
+def _build_rrna(raw: dict) -> Rrna:
+    to_path = lambda v: Path(v) if v else None  # noqa: E731
+    return Rrna(
+        db_fasta=to_path(raw.get("db_fasta")),
+        env=str(raw.get("env", "rnaforge-seqqc")),
+    )
+
+
+def parse_config(raw: dict) -> Config:
+    """Parse a config dictionary into a Config object.
+
+    Takes a raw dictionary (typically from yaml.safe_load) and returns a validated Config.
+    """
     if not isinstance(raw, dict):
-        raise ConfigError(f"config must be a YAML mapping: {path}")
+        raise ConfigError(f"config must be a dict, got {type(raw).__name__}")
 
     unknown = [k for k in raw if k not in KNOWN_TOP_LEVEL_KEYS]
     if unknown:
@@ -357,6 +400,8 @@ def load_config(path: Path | str) -> Config:
     operon_raw = _section(raw, "operon")
     ppi_raw = _section(raw, "ppi")
     basecall_raw = _section(raw, "basecall")
+    taxonomy_raw = _section(raw, "taxonomy")
+    rrna_raw = _section(raw, "rrna")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -450,4 +495,17 @@ def load_config(path: Path | str) -> Config:
             min_community_size=_as_int(
                 ppi_raw.get("min_community_size", 3), "ppi.min_community_size"),
         ),
+        taxonomy=_build_taxonomy(taxonomy_raw),
+        rrna=_build_rrna(rrna_raw),
     )
+
+
+def load_config(path: Path | str) -> Config:
+    """Load and parse a config file."""
+    path = Path(path)
+    if not path.exists():
+        raise ConfigError(f"config file not found: {path}")
+    raw = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"config must be a YAML mapping: {path}")
+    return parse_config(raw)
