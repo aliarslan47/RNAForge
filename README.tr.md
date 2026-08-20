@@ -6,7 +6,7 @@ HTML rapora; diferansiyel ekspresyonun üstünde tam bir fonksiyonel-analiz katm
 İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.4)
 
 [![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
-[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot%20%C2%B7%20metatranskriptom-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 [![okuma](https://img.shields.io/badge/okuma-k%C4%B1sa%20%C2%B7%20uzun-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 
 ## Ne yapar
@@ -25,7 +25,14 @@ Tüm pipeline'ın etkileşimli, çift-dilli node-graph şeması (organizma × ok
   ekspresyon, yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.
   QC → trim → hizalama araç zinciri **okuma tipine** göre otomatik seçilir (aşağıya bak);
   kantifikasyon `organism_type` ile yönlendirilir (prokaryot: Bowtie2/minimap2 + featureCounts ·
-  ökaryot: Salmon + tximport). İki boyut da aynı gen × örnek sayım matrisinde buluşur.
+  ökaryot: Salmon + tximport · metatranskriptom: gen-kataloğu Bowtie2 + featureCounts). İki boyut da
+  aynı gen × örnek sayım matrisinde buluşur.
+- **Metatranskriptom kolu** (`organism_type: metatranscriptome`): referans-tabanlı kısa-okuma kolu;
+  kırpmadan sonra iki aşama ekler — rRNA depletion (SortMeRNA `--other`) ve topluluk kompozisyonu
+  (Kraken2 + Bracken, tanısal) — sonra rRNA-çıkarılmış okumaları bir gen kataloğuna hizalar ve
+  featureCounts ile sayar. Bilinçli olarak permissive, damgalı `metatranscriptome` profilinde koşar
+  (kısmi katalog düşük hizalama WARN verir, asla FAIL değil); rapora "Topluluk Kompozisyonu
+  (Taksonomi)" bölümü eklenir. Downstream (m06 DE ve sonrası) değişmez.
 - **Okuma tipleri (kısa / uzun)**: Illumina okumaları kısa-okuma zincirini çalıştırır (FastQC → fastp →
   Bowtie2); ONT/PacBio okumaları uzun-okuma zincirini (NanoPlot → Pychopper+chopper → minimap2 →
   featureCounts `-L`). Okuma tipi m01'de otomatik tespit edilir; m05'ten itibaren (DESeq2 ve tüm
@@ -43,7 +50,7 @@ ikili politikayla zorlar:
 - **FAIL** → sonuç **geçersiz**: koşu durur, biyolojik çıktı üretilmez (exit 1).
 - **WARN** → sonuç **şüpheli**: üretilir ama öyle damgalanır.
 
-Eşikler veridir (`profiles/{prokaryote,eukaryote,prokaryote_long}.yml`); ezilen eşik rapora yazılır
+Eşikler veridir (`profiles/{prokaryote,eukaryote,prokaryote_long,metatranscriptome}.yml`); ezilen eşik rapora yazılır
 (sessiz gevşetme yok). Uzun-okuma koşuları `prokaryote_long` profilini kullanır; eşikleri bilinçli
 olarak permissive ve damgalıdır (ONT kalitesi ~Q10–15, Q30 değil): yalnız katastrofik hizalama hatası
 (yanlış referans) FAIL verir, ONT'de doğal olan düşük survival/assignment WARN olur. Her koşu ayrıca
@@ -75,6 +82,10 @@ bir güvence kartı yazar (`UNKNOWN`/`INVALID`/`SUSPECT`/`TRUSTWORTHY`).
 
 Downstream analizler (m09–m15) organizma- ve okuma-tipi-agnostiktir ve bir koşuyu asla geçersiz kılmaz —
 verdict kalite kapılarından değişmeden taşınır. QC ekleri (m16–m18) tanısaldır.
+
+Metatranskriptom koşuları `trim` ile `quant` arasına iki aşama daha ekler (`rnaforge run` otomatik
+sıralar): **`rrna-deplete`** (SortMeRNA rRNA çıkarma, `m_rrna_deplete`) ve **`taxonomy`** (Kraken2 +
+Bracken topluluk kompozisyonu, `m_taxonomy`, tanısal — asla FAIL değil).
 
 ## Kurulum
 
@@ -129,6 +140,12 @@ rnaforge report   --config config/config.yaml --metadata samples.tsv --run-id de
 
 > Not: `python -m rnaforge.cli` ÇALIŞMAZ (main-guard yok); kurulu `rnaforge` entry point'ini kullan.
 
+**Metatranskriptom** koşuları için config'te `organism_type: metatranscriptome` verin
+(`reference.gene_catalog_fasta` + `reference.catalog_annotation`, `taxonomy.kraken2_db` ve
+`rrna.db_fasta` ile); `rnaforge run` `trim`'den sonra `rrna-deplete` ve `taxonomy` aşamalarını
+otomatik ekler ve permissive `metatranscriptome` profilini seçer — ek bayrak gerekmez. İki aşama elle
+de sürülebilir (`rnaforge rrna-deplete …` sonra `rnaforge taxonomy …`, aynı `--run-id`).
+
 ### Metadata biçimi (TSV)
 
 | Sütun | Zorunlu | Açıklama |
@@ -165,10 +182,23 @@ curl -s https://stringdb-downloads.org/download/protein.links.v12.0/511145.prote
 
 AMR/virülans (m13) abricate'in paketli CARD/VFDB veritabanlarını kullanır (ayrı indirme yok).
 
+Metatranskriptom kolu için `prepare_references.sh` Kraken2/Bracken DB'sini (tarball, `references/kraken2/
+<ad>/` altına açılır) ve SortMeRNA rRNA referansını indirir:
+
+```bash
+bash prepare_references.sh \
+     --kraken2-db-url https://…/k2_standard.tar.gz --kraken2-db-name standard \
+     --rrna-db-url https://…/smr_v4.3_default_db.fasta
+```
+
+Config'te göster: `taxonomy.kraken2_db: references/kraken2/standard` ve
+`rrna.db_fasta: references/rrna/smr_v4.3_default_db.fasta`.
+
 ## Temel tasarım kararları
 
-- **`organism_type` zorunlu ve varsayılanı yok** (`prokaryote` | `eukaryote`). Yalnız kantifikasyonu
-  (m04/m05) yönlendirir; iki yol da aynı gen × örnek sayım matrisinde buluşur, böylece tüm downstream
+- **`organism_type` zorunlu ve varsayılanı yok** (`prokaryote` | `eukaryote` | `metatranscriptome`).
+  Yalnız kantifikasyonu (m04/m05) yönlendirir — metatranskriptomda ayrıca quant'tan önce rRNA depletion
+  + taksonomi ekler; tüm yollar aynı gen × örnek sayım matrisinde buluşur, böylece tüm downstream
   adımlar (m06–m15) organizma-agnostiktir.
 - **İki yönlendirme boyutu: `organism_type` × okuma tipi.** Okuma tipi (kısa/uzun) m01'de FASTQ'tan
   otomatik tespit edilir (Illumina → kısa; ONT/PacBio → uzun) ve m02–m05'i yönlendirir; `organism_type`

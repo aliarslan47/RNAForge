@@ -6,7 +6,7 @@ self-contained HTML report, with a full functional-analysis layer on top of diff
 Turkish version: [README.tr.md](README.tr.md) · Reference document: [PLAN.md](PLAN.md) (v1.4)
 
 [![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
-[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote%20%C2%B7%20metatranscriptome-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 [![reads](https://img.shields.io/badge/reads-short%20%C2%B7%20long-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 
 ## What it does
@@ -25,7 +25,14 @@ The full pipeline as an interactive, bilingual node-graph (organism × read-type
   differential expression, publication-quality figures, and a bilingual (`tr`/`en`) self-contained
   HTML report. The QC → trim → align tool chain is chosen automatically by **read type** (see below);
   quantification is routed by `organism_type` (prokaryote: Bowtie2/minimap2 + featureCounts ·
-  eukaryote: Salmon + tximport). Both dimensions converge on the same gene × sample count matrix.
+  eukaryote: Salmon + tximport · metatranscriptome: gene-catalog Bowtie2 + featureCounts). Both
+  dimensions converge on the same gene × sample count matrix.
+- **Metatranscriptome arm** (`organism_type: metatranscriptome`): a reference-based short-read arm
+  that inserts two stages after trimming — rRNA depletion (SortMeRNA `--other`) and community
+  composition (Kraken2 + Bracken, diagnostic) — then aligns rRNA-depleted reads to a gene catalog
+  and quantifies with featureCounts. It runs on the deliberately permissive, stamped
+  `metatranscriptome` profile (low alignment to a partial catalog WARNs, never FAILs), and the report
+  gains a "Community composition (taxonomy)" section. Downstream (m06 DE onward) is unchanged.
 - **Read types (short / long)**: Illumina reads run the short-read chain (FastQC → fastp → Bowtie2);
   ONT/PacBio reads run the long-read chain (NanoPlot → Pychopper+chopper → minimap2 →
   featureCounts `-L`). The read type is auto-detected in m01; from m05 onward (DESeq2 and all
@@ -43,7 +50,7 @@ RNAForge enforces gates with a two-tier policy:
 - **FAIL** → the result is **invalid**: the run stops, no biological output is produced (exit 1).
 - **WARN** → the result is **suspect**: it is produced but stamped as such.
 
-Thresholds are data (`profiles/{prokaryote,eukaryote,prokaryote_long}.yml`); an overridden threshold
+Thresholds are data (`profiles/{prokaryote,eukaryote,prokaryote_long,metatranscriptome}.yml`); an overridden threshold
 is written into the report (no silent loosening). Long-read runs use the `prokaryote_long` profile,
 whose thresholds are deliberately permissive and stamped (ONT quality ~Q10–15, not Q30): only a
 catastrophic alignment failure (wrong reference) FAILs, while ONT-typical lower survival/assignment
@@ -75,6 +82,10 @@ WARN. Every run also writes a confidence card (`UNKNOWN`/`INVALID`/`SUSPECT`/`TR
 
 The downstream analyses (m09–m15) are organism- and read-type-agnostic and never invalidate a run —
 the verdict carries over unchanged from the quality gates. The QC add-ons (m16–m18) are diagnostic.
+
+Metatranscriptome runs additionally insert two stages between `trim` and `quant` (auto-ordered by
+`rnaforge run`): **`rrna-deplete`** (SortMeRNA rRNA removal, `m_rrna_deplete`) and **`taxonomy`**
+(Kraken2 + Bracken community composition, `m_taxonomy`, diagnostic — never FAILs).
 
 ## Install
 
@@ -110,6 +121,12 @@ rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo \
 # or run a slice of the core chain:
 rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo --from trim --to counts
 ```
+
+For **metatranscriptome** runs, set `organism_type: metatranscriptome` in the config (with
+`reference.gene_catalog_fasta` + `reference.catalog_annotation`, `taxonomy.kraken2_db`, and
+`rrna.db_fasta`); `rnaforge run` then auto-inserts `rrna-deplete` and `taxonomy` after `trim` and
+picks the permissive `metatranscriptome` profile — no extra flag. The two stages can also be driven
+by hand (`rnaforge rrna-deplete …` then `rnaforge taxonomy …`, same `--run-id`).
 
 Or drive each stage by hand (same `--run-id` throughout):
 
@@ -172,10 +189,23 @@ Blocked-source note: QuickGO downloads are blocked on some networks; the script 
 GO annotation (GAF) from the **EBI-GOA FTP proteome** file via `--goa-url` (the documented fallback),
 not QuickGO. AMR/virulence (m13) uses abricate's bundled CARD/VFDB databases (no separate download).
 
+For the metatranscriptome arm, the same script fetches the Kraken2/Bracken database (tarball,
+extracted into `references/kraken2/<name>/`) and the SortMeRNA rRNA reference:
+
+```bash
+bash prepare_references.sh \
+     --kraken2-db-url https://…/k2_standard.tar.gz --kraken2-db-name standard \
+     --rrna-db-url https://…/smr_v4.3_default_db.fasta
+```
+
+Point the config at these: `taxonomy.kraken2_db: references/kraken2/standard` and
+`rrna.db_fasta: references/rrna/smr_v4.3_default_db.fasta`.
+
 ## Key design decisions
 
-- **`organism_type` is required and has no default** (`prokaryote` | `eukaryote`). It routes only
-  quantification (m04/m05); both paths converge on the same gene × sample count matrix, so every
+- **`organism_type` is required and has no default** (`prokaryote` | `eukaryote` | `metatranscriptome`).
+  It routes only quantification (m04/m05) — and, for metatranscriptome, inserts rRNA depletion +
+  taxonomy before quant; all paths converge on the same gene × sample count matrix, so every
   downstream step (m06–m15) is organism-agnostic.
 - **Two routing dimensions: `organism_type` × read type.** The read type (short/long) is
   auto-detected from the FASTQ in m01 (Illumina → short; ONT/PacBio → long) and drives m02–m05;

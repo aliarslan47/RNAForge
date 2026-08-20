@@ -2,7 +2,7 @@
 
 Araç sarmalayıcıları `conda run -n <env> ...` çağırır; env yoksa hata koşunun
 ORTASINDA derin patlar. `rnaforge doctor` bunu ÖNDEN, actionable mesajla yakalar:
-hangi env eksik + nasıl kurulur (envs/<env>.yml). Kurulumun tek elle-adımı 9 env
+hangi env eksik + nasıl kurulur (envs/<env>.yml). Kurulumun tek elle-adımı 10 env
 oluşturmak; bu kontrol onları unutmayı ucuza yakalar."""
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ ENVIRONMENTS = {
     "rnaforge-de": "R/DESeq2 + fgsea + tximport (DE + downstream)",
     "rnaforge-amr": "abricate (AMR/virulence, m13)",
     "rnaforge-seqqc": "SortMeRNA + RSeQC + MultiQC (m16/m18)",
+    "rnaforge-meta": "kraken2 + bracken (metatranscriptome taxonomy, m_taxonomy)",
 }
 
 
