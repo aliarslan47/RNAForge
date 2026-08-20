@@ -43,11 +43,6 @@ class Profile:
     def overrides(self) -> dict[str, float]:
         return {g: self._thresholds[g] for g in sorted(self._overridden)}
 
-    @property
-    def thresholds(self) -> types.MappingProxyType[str, float]:
-        """Eşiklere okuma-yalnız erişim sağla."""
-        return self._thresholds
-
 
 def profile_name_for(organism_type: str, read_type: str) -> str:
     """read_type'a göre profil adı. Uzun okuma ONT-permissive profili kullanır
