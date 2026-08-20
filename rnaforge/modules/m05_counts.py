@@ -76,7 +76,10 @@ def run_counts(config: Config, metadata_path: Path, run_dir: Path,
     # ROUTER: önce organism_type (ökaryot → tximport), sonra read_type (prokaryot: kısa
     # featureCounts kapılı / uzun featureCounts -L diagnostik). Step-1'in `require_short_read`
     # muhafızı read_type dispatch'le değişti — uzun-okuma kolunun SON Step-1 muhafızıydı.
-    if config.organism_type == "eukaryote":
+    if config.organism_type == "metatranscriptome":
+        summary = _counts_meta(config, metadata_path, run_dir,
+                               quant_dir, stats_dir, logs_dir, state)
+    elif config.organism_type == "eukaryote":
         read_type = resolve_read_type(run_dir)
         if read_type == "long":
             summary = _counts_euk_long(config, metadata_path, run_dir,
@@ -305,6 +308,60 @@ def _counts_short(config: Config, metadata_path: Path, run_dir: Path,
         for g in gates:
             log(f"gate {g.name}: {g.status} — {g.message}")
         raise_if_failed(gates)
+    return summary
+
+
+def _counts_meta(config: Config, metadata_path: Path, run_dir: Path,
+                 quant_dir: Path, stats_dir: Path, logs_dir: Path,
+                 state: RunState) -> dict:
+    """Metatranskriptom sayım (featureCounts, katalog anotasyonu). DİAGNOSTİK —
+    assignment_rate FAIL kapısı YOK (permissive metatranscriptome profili — gen
+    kataloğu doğası gereği eksik, düşük atama NORMALDİR; m04'ün _quant_meta
+    felsefesiyle aynı). Girdi BAM'ler m04 _quant_meta'nın ürettiği
+    quantification/<sid>/aligned.sorted.bam; anotasyon config.reference.
+    catalog_annotation (annotation_gff DEĞİL). Aynı counts.tsv sözleşmesi → m06+ aynen."""
+    stats_path = stats_dir / "count_statistics.json"
+    profile = load_profile(config.organism_type, config.quality)
+    log_path = logs_dir / "counts.log"
+    with log_path.open("w") as log_file:
+        def log(msg: str) -> None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        samples = load_metadata(metadata_path)
+        bams = [quant_dir / s.sample_id / "aligned.sorted.bam" for s in samples]
+        paired = any(s.fastq_2 is not None for s in samples)
+        log(f"m05 metatranscriptome featureCounts (gene catalog): {len(samples)} sample(s), "
+            f"feature_type={config.quantification.feature_type}, "
+            f"attribute={config.quantification.attribute}, paired={paired}")
+        result = run_featurecounts(
+            bams, config.reference.catalog_annotation, quant_dir / "_featurecounts",
+            feature_type=config.quantification.feature_type,
+            attribute=config.quantification.attribute,
+            paired=paired, threads=config.resources.threads,
+        )
+        state.heartbeat()
+        sample_ids = [s.sample_id for s in samples]
+        assignment_by_sample = _write_count_outputs(
+            result, sample_ids, quant_dir, log,
+            config.quantification.feature_type, config.quantification.attribute)
+
+        # DİAGNOSTİK: warn_only=True — düşük/sıfır atama gen kataloğu doğası gereği
+        # eksikliğinden (topluluğun tümü referansta yoktur), asla GateFailure yükselmez.
+        gates = build_count_gates(assignment_by_sample, profile, warn_only=True)
+        summary = {
+            "read_type": "short", "organism_type": "metatranscriptome",
+            "n_samples": len(samples), "n_genes": len(result.gene_ids),
+            "samples": {sid: {"assignment_rate": assignment_by_sample[sid]} for sid in sample_ids},
+            "gate_counts": dict(Counter(g.status for g in gates)),
+            "expression_values": ["tpm.tsv", "fpkm.tsv"],
+        }
+        stats_path.write_text(json.dumps(summary, indent=2))
+        write_gate_results(run_dir, gates)
+        for g in gates:
+            log(f"gate {g.name}: {g.status} — {g.message}")
+        raise_if_failed(gates)   # no-op: warn_only=True never produces FAIL
+        log(f"count statistics written: {stats_path}")
     return summary
 
 
