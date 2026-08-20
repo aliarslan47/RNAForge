@@ -258,6 +258,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run even if m15 already completed in this run directory",
     )
 
+    rrna_deplete = sub.add_parser(
+        "rrna-deplete",
+        help="deplete rRNA reads with SortMeRNA --other, for metatranscriptome (m_rrna_deplete)")
+    rrna_deplete.add_argument("--config", required=True, type=Path)
+    rrna_deplete.add_argument("--metadata", required=True, type=Path)
+    rrna_deplete.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    rrna_deplete.add_argument("--run-id", default="run")
+    rrna_deplete.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m_rrna_deplete already completed in this run directory",
+    )
+
     seqqc = sub.add_parser("seqqc", help="rRNA%% (SortMeRNA) + strandedness (RSeQC) QC gates (m16)")
     seqqc.add_argument("--config", required=True, type=Path)
     seqqc.add_argument("--metadata", required=True, type=Path)
@@ -680,6 +692,28 @@ def _cmd_seqqc(args) -> int:
     return 0
 
 
+def _cmd_rrna_deplete(args) -> int:
+    from rnaforge.modules.m_rrna_deplete import run_rrna_deplete
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    profile = _load_run_profile(config, run_dir)
+    summary = run_rrna_deplete(config, _effective_metadata(args.metadata, run_dir), run_dir,
+                               force=args.force)
+    if summary.get("resumed"):
+        print("m_rrna_deplete already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    rates = [v["depletion_rate"] for v in summary["samples"].values()]
+    mean_rate = sum(rates) / len(rates) if rates else 0.0
+    print(f"rrna-deplete OK: {summary['n_samples']} sample(s), mean depletion rate {mean_rate:.1%}")
+    print(f"run directory: {run_dir}")
+    card_path = write_confidence_card(run_dir, profile)
+    card = json.loads(card_path.read_text())
+    print(f"quality verdict: {card['verdict']} "
+          f"(PASS={card['counts']['PASS']} WARN={card['counts']['WARN']} "
+          f"FAIL={card['counts']['FAIL']}, profile={profile.name})")
+    return 0
+
+
 def _cmd_report(args) -> int:
     from rnaforge.modules.m08_report import run_report
     config = load_config(args.config)
@@ -780,6 +814,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_operon(args)
         if args.command == "ppi":
             return _cmd_ppi(args)
+        if args.command == "rrna-deplete":
+            return _cmd_rrna_deplete(args)
         if args.command == "seqqc":
             return _cmd_seqqc(args)
         if args.command == "alignqc":
