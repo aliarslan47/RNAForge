@@ -9,12 +9,15 @@ import pytest
 
 from rnaforge.config import load_config
 from rnaforge.gates import PASS, WARN
+from rnaforge.metadata import load_metadata
 from rnaforge.modules import m_rrna_deplete
 from rnaforge.modules.m01_validate import run_validation
+from rnaforge.modules.m03_trim import trimmed_reads
 from rnaforge.modules.m_rrna_deplete import (
     build_rrna_gates, rrna_depleted_reads, run_rrna_deplete,
 )
 from rnaforge.quality import load_profile
+from rnaforge.state import RunState
 from tests.conftest import write_fastq
 
 
@@ -65,8 +68,27 @@ def _setup(tmp_path):
     return config_path, metadata_path
 
 
-def _run_m01(config_path, metadata_path, run_dir):
+def _mark_m03_done(run_dir, metadata_path):
+    """m_rrna_deplete m03 (trim) tamamlanmışlığını VE gerçek trimmed_reads() dosyalarını
+    ister (spec §3: m03 fastp -> rRNA depletion). Gerçek `run_trim` çağırmak yerine
+    (metatranscriptome profili şu an m03'ün `survival_rate` kapısı için eşik tanımlamıyor —
+    ayrı, bu görevin kapsamı dışında bir profil boşluğu) sözleşme yoluna doğrudan sahte
+    trimlenmiş FASTQ yazıp state'i işaretliyoruz — trimmed_reads() ile AYNI adlandırma."""
+    samples = load_metadata(metadata_path)
+    state = RunState(run_dir)
+    for sample in samples:
+        out1, out2 = trimmed_reads(run_dir, sample)
+        out1.parent.mkdir(parents=True, exist_ok=True)
+        out1.write_text("@r\nACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIII\n")
+        if out2 is not None:
+            out2.write_text("@r\nACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIII\n")
+        state.mark_item_done("m03_trim", sample.sample_id, {"survival_rate": 0.98})
+    state.mark_done("m03_trim", [])
+
+
+def _run_m01_m03(config_path, metadata_path, run_dir):
     run_validation(load_config(config_path), metadata_path, run_dir)
+    _mark_m03_done(run_dir, metadata_path)
 
 
 def _fake_sortmerna(monkeypatch, depletion_rate=0.40):
@@ -89,11 +111,23 @@ def test_run_rrna_deplete_requires_m01(tmp_path, monkeypatch):
         run_rrna_deplete(load_config(config_path), metadata_path, tmp_path / "run")
 
 
+def test_run_rrna_deplete_requires_m03_after_m01(tmp_path, monkeypatch):
+    """m01 bitmiş ama m03 (trim) bitmemişse de yüksek sesle durmalı — spec §3 akışı
+    m03 fastp -> rRNA depletion; trimlenmemiş okuma üzerinde depletion çalıştırmak
+    adapter/kalite trimlemesini sessizce atlar (veri doğruluğu kusuru)."""
+    _fake_sortmerna(monkeypatch)
+    config_path, metadata_path = _setup(tmp_path)
+    run_dir = tmp_path / "run"
+    run_validation(load_config(config_path), metadata_path, run_dir)   # yalnız m01
+    with pytest.raises(ValueError, match="m03"):
+        run_rrna_deplete(load_config(config_path), metadata_path, run_dir)
+
+
 def test_run_rrna_deplete_writes_stats_and_output(tmp_path, monkeypatch):
     _fake_sortmerna(monkeypatch, depletion_rate=0.40)
     config_path, metadata_path = _setup(tmp_path)
     run_dir = tmp_path / "run"
-    _run_m01(config_path, metadata_path, run_dir)
+    _run_m01_m03(config_path, metadata_path, run_dir)
     config = load_config(config_path)
     summary = run_rrna_deplete(config, metadata_path, run_dir)
 
@@ -109,7 +143,6 @@ def test_run_rrna_deplete_writes_stats_and_output(tmp_path, monkeypatch):
         out_dir = run_dir / "rrna_depleted" / sid
         others = sorted(out_dir.glob("other_*.fastq.gz"))
         assert len(others) == 1
-        from rnaforge.metadata import load_metadata
         sample = next(s for s in load_metadata(metadata_path) if s.sample_id == sid)
         assert rrna_depleted_reads(run_dir, sample) == others
 
@@ -119,7 +152,6 @@ def test_run_rrna_deplete_writes_stats_and_output(tmp_path, monkeypatch):
     assert rrna_gate["status"] == PASS
     assert not any(g["status"] == "FAIL" for g in gates if g["module"] == "m_rrna_deplete")
 
-    from rnaforge.state import RunState
     state = RunState(run_dir)
     assert state.is_done("m_rrna_deplete")
     for sid in stats:
@@ -130,7 +162,7 @@ def test_run_rrna_deplete_resumes_without_rerunning(tmp_path, monkeypatch):
     _fake_sortmerna(monkeypatch, depletion_rate=0.40)
     config_path, metadata_path = _setup(tmp_path)
     run_dir = tmp_path / "run"
-    _run_m01(config_path, metadata_path, run_dir)
+    _run_m01_m03(config_path, metadata_path, run_dir)
     config = load_config(config_path)
     run_rrna_deplete(config, metadata_path, run_dir)
 
@@ -151,7 +183,7 @@ def test_run_rrna_deplete_low_depletion_warns_not_fails(tmp_path, monkeypatch):
     _fake_sortmerna(monkeypatch, depletion_rate=0.01)
     config_path, metadata_path = _setup(tmp_path)
     run_dir = tmp_path / "run"
-    _run_m01(config_path, metadata_path, run_dir)
+    _run_m01_m03(config_path, metadata_path, run_dir)
     config = load_config(config_path)
     summary = run_rrna_deplete(config, metadata_path, run_dir)   # raise ETMEMELİ
 

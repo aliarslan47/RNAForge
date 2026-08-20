@@ -4,6 +4,10 @@
 bu modül aile deseninin geri kalanını sağlar: per-sample döngü, atomic state, heartbeat,
 örnek-başı resume, ve rRNA'sız FASTQ'ları sözleşme yoluna (`rrna_depleted/<sid>/`) yazma.
 
+Girdi: m03 (fastp) TRIMLENMİŞ okumalar (`m03_trim.trimmed_reads`) — ham metadata FASTQ'ları
+DEĞİL. Spec §3 akışı m03 → rRNA depletion olduğundan, adapter/kalite trimlemesi atlanmadan
+depletion yapılmalı (m04 kısa-okuma dalının `trimmed_reads()` kullanımıyla aynı desen).
+
 Kapı: `rrna_depletion_rate` — WARN-ONLY, ASLA FAIL (permissive metatranscriptome profili;
 gen kataloğu/rRNA DB'si eksik olabilir, düşük depletion verimi ŞÜPHELİ ama geçersiz değil).
 """
@@ -18,6 +22,7 @@ from pathlib import Path
 from rnaforge.config import Config
 from rnaforge.gates import FAIL, PASS, WARN, GateResult, write_gate_results
 from rnaforge.metadata import Sample, load_metadata
+from rnaforge.modules.m03_trim import trimmed_reads
 from rnaforge.quality import Profile, load_profile
 from rnaforge.rrna_deplete import run_sortmerna_deplete
 from rnaforge.state import RunState
@@ -117,6 +122,12 @@ def run_rrna_deplete(config: Config, metadata_path: Path, run_dir: Path,
             f"directory first: {run_dir}. Run `rnaforge validate` with the same "
             "--run-id, then re-run rrna-deplete."
         )
+    if not state.is_done("m03_trim"):
+        raise ValueError(
+            "m_rrna_deplete requires m03 (trim) to have completed in this run "
+            f"directory first: {run_dir}. Run `rnaforge trim` with the same "
+            "--run-id, then re-run rrna-deplete."
+        )
 
     log_path = logs_dir / "rrna_deplete.log"
     with log_path.open("w") as log_file:
@@ -138,8 +149,9 @@ def run_rrna_deplete(config: Config, metadata_path: Path, run_dir: Path,
                     f"{per_sample[sid].get('depletion_rate')})")
                 continue
 
-            paired = sample.fastq_2 is not None
-            reads = [sample.fastq_1, sample.fastq_2] if paired else [sample.fastq_1]
+            t1, t2 = trimmed_reads(run_dir, sample)
+            paired = t2 is not None
+            reads = [t1, t2] if paired else [t1]
             workdir = run_dir / "rrna_work" / sid
             result = run_sortmerna_deplete(
                 reads, config.rrna.db_fasta, workdir, paired=paired,
