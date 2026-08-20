@@ -15,6 +15,10 @@ description: >
 thresholds:
   read_depth: 1000000
   base_quality: 20
+  # m02 qc duplikasyon kapısı (WARN-only). Permissive/düşük: metatranskriptom kütüphaneleri
+  # yüksek-ifadeli transkript + artık rRNA nedeniyle DOĞAL olarak yüksek duplikasyonludur
+  # (düşük benzersiz fraksiyon normaldir) → yalnız aşırı duplikasyonda (<0.10) WARN.
+  dedup_fraction: 0.10
   survival_rate: 0.20
   rrna_depletion_rate: 0.30
   alignment_rate: 0.05
