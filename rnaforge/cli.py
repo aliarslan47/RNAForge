@@ -52,13 +52,33 @@ _CORE_ORDER = ["validate", "qc", "trim", "quant", "counts", "de", "figures", "re
 _OPTIONAL_STAGES = ["seqqc", "alignqc", "enrich", "kegg", "gsea", "semantic",
                     "amr", "operon", "ppi", "multiqc"]
 
+# metatranscriptome dalı: rrna-deplete (m_rrna_deplete) + taxonomy (m_taxonomy) trim'den
+# SONRA, quant'tan ÖNCE koşmalı — m04's _quant_meta, m_rrna_deplete'in state'te "done"
+# olmasını GEREKTIRIR (rrna_depleted_reads'ten okur). prokaryot/ökaryot çekirdek zinciri
+# (_CORE_ORDER) buradan ETKİLENMEZ.
+_METATRANSCRIPTOME_EXTRA_STAGES = ["rrna-deplete", "taxonomy"]
+_METATRANSCRIPTOME_INSERT_AFTER = "trim"
+
+
+def _core_order_for(organism_type: str | None) -> list[str]:
+    """organism_type='metatranscriptome' için genişletilmiş çekirdek sırayı üretir;
+    diğer tüm organism_type'lar (ve None — config okunamadığında düşülen varsayılan)
+    değişmeden _CORE_ORDER'ı alır."""
+    if organism_type == "metatranscriptome":
+        idx = _CORE_ORDER.index(_METATRANSCRIPTOME_INSERT_AFTER) + 1
+        return _CORE_ORDER[:idx] + _METATRANSCRIPTOME_EXTRA_STAGES + _CORE_ORDER[idx:]
+    return list(_CORE_ORDER)
+
 
 def build_run_sequence(start: str | None = None, end: str | None = None,
-                       include=None) -> list[str]:
+                       include=None, organism_type: str | None = None) -> list[str]:
     """`rnaforge run`'ın çalıştıracağı sıralı aşama listesini üretir (saf; I/O yok).
 
     start/end çekirdek zinciri dilimler; include opsiyonel aşamaları (kanonik sırada)
-    rapordan önce (rapor dilimde değilse en sona) yerleştirir."""
+    rapordan önce (rapor dilimde değilse en sona) yerleştirir. organism_type=
+    'metatranscriptome' çekirdek zincire rrna-deplete+taxonomy'i trim'den sonra ekler
+    (bkz. _core_order_for); diğer organism_type'larda çekirdek zincir DEĞİŞMEZ."""
+    core_order = _core_order_for(organism_type)
     include = list(include or [])
     unknown = [s for s in include if s not in _OPTIONAL_STAGES]
     if unknown:
@@ -67,15 +87,15 @@ def build_run_sequence(start: str | None = None, end: str | None = None,
             f"available: {', '.join(_OPTIONAL_STAGES)}"
         )
     for label, stage in (("--from", start), ("--to", end)):
-        if stage is not None and stage not in _CORE_ORDER:
+        if stage is not None and stage not in core_order:
             raise ValueError(
-                f"{label} {stage!r} is not a core stage; core: {', '.join(_CORE_ORDER)}"
+                f"{label} {stage!r} is not a core stage; core: {', '.join(core_order)}"
             )
-    i0 = _CORE_ORDER.index(start) if start else 0
-    i1 = _CORE_ORDER.index(end) if end else len(_CORE_ORDER) - 1
+    i0 = core_order.index(start) if start else 0
+    i1 = core_order.index(end) if end else len(core_order) - 1
     if i0 > i1:
         raise ValueError(f"--from {start!r} comes after --to {end!r}")
-    sliced = _CORE_ORDER[i0:i1 + 1]
+    sliced = core_order[i0:i1 + 1]
     ordered_incl = [s for s in _OPTIONAL_STAGES if s in include]
     if "report" in sliced:
         idx = sliced.index("report")
@@ -767,6 +787,7 @@ _STAGE_DISPATCH = {
     "seqqc": _cmd_seqqc, "alignqc": _cmd_alignqc, "enrich": _cmd_enrich, "kegg": _cmd_kegg,
     "gsea": _cmd_gsea, "semantic": _cmd_semantic, "amr": _cmd_amr, "operon": _cmd_operon,
     "ppi": _cmd_ppi, "multiqc": _cmd_multiqc,
+    "rrna-deplete": _cmd_rrna_deplete, "taxonomy": _cmd_taxonomy,
 }
 
 
@@ -787,9 +808,23 @@ def _cmd_doctor(args) -> int:
     return 0
 
 
+def _organism_type_for_run(args) -> str | None:
+    """`rnaforge run`'ın aşama sırasını organism_type'a göre seçebilmesi için config'i
+    ÖNCEDEN, en iyi çaba (best-effort) okur — yalnız sıralama amaçlı. Config
+    okunamazsa (yok/bozuk) None döner: sıra prokaryot/ökaryot varsayılanına düşer;
+    gerçek hata SESSİZCE yutulmaz — ilk aşamanın (validate) kendi config yüklemesi
+    aynı ConfigError'ı tekrar fırlatır ve pipeline yine yüksek sesle durur."""
+    try:
+        return load_config(args.config).organism_type
+    except Exception:
+        return None
+
+
 def _cmd_run(args) -> int:
     include = [s.strip() for s in (args.include or "").split(",") if s.strip()]
-    sequence = build_run_sequence(args.from_stage, args.to_stage, include)
+    organism_type = _organism_type_for_run(args)
+    sequence = build_run_sequence(args.from_stage, args.to_stage, include,
+                                  organism_type=organism_type)
     print(f"pipeline: {' → '.join(sequence)}")
     for i, name in enumerate(sequence, start=1):
         print(f"=== [{i}/{len(sequence)}] {name} ===")
