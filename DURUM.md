@@ -6,9 +6,70 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-20 05:05 (+03)
+**Son güncelleme:** 2026-08-20 (+03) — metatranskriptom kolu KODU BİTTİ (branch, merge bekliyor) + bağırsak biyolojik-doğrulama İNDİRME aşamasında (koşu başlatılmadı)
 
 ## Şu an nerede kaldık
+- **★★★ METATRANSKRİPTOM REFERANS-TABANLI KISA-OKUMA KOLU — 12 GÖREVLİK PLAN KODU TAMAM (TDD). Branch
+  `feature/metatranscriptome-refbased` `f9081e6` (main+17 commit), 666 test (2026-08-20). → MERGE +
+  BİYOLOJİK DOĞRULAMA KULLANICI ONAYI BEKLİYOR.** Üçüncü organizma tipi: `organism_type: metatranscriptome`
+  → `rnaforge run` `trim`'den sonra rrna-deplete + taxonomy'i OTOMATİK ekler (config-driven, `--profile`
+  bayrağı YOK) → gen kataloğuna Bowtie2 → featureCounts → DESeq2 → rapor. Downstream (m06+) DEĞİŞMEZ, kol additive.
+  - **Task 1-9 (önceki oturum, 13 commit):** config (organism_type + taxonomy/rrna bölümleri), permissive
+    `metatranscriptome.yml` profili, rRNA depletion (SortMeRNA `--other`, `rrna_deplete.py`+`m_rrna_deplete`+CLI),
+    Kraken2/Bracken (`kraken2.py`+`m_taxonomy`+CLI), m04 `_quant_meta` + m05 `_counts_meta` dalları (diagnostik,
+    FAIL yok), `rnaforge run` orkestrasyon sırası. Task 10: rapor taksonomi bölümü (`1d789a0`).
+  - **★ Task 10 REVIEW (`59799ae`):** verdict = kabul kriterleri karşılanıyor (koşullu bölüm, rozet, TR+EN
+    yöntem, doğru atıflar Kopylova2012/Wood2019/Lu2017, kullanılmayan-araç bastırma, crash-güvenliği). Tek
+    minor düzeltildi: `N_SECTIONS` sabiti off-by-one (non-meta raporda taksonomi boş render → yanlış
+    `n_sections`); artık doc'tan CANLI sayılır (non-meta 16 / meta 17). Test sağlamlaştırma (top_n/sıra/boş-matris).
+  - **★ Task 11 (`115ca32`):** `envs/rnaforge-meta.yml` (kraken2=2.1.6+bracken=3.1; sortmerna EKLENMEZ —
+    seqqc'te, rrna.env varsayılanı seqqc). `preflight.ENVIRONMENTS`+rnaforge-meta (doctor; install.sh glob'lar).
+    `prepare_references.sh`: `--kraken2-db-url`/`--kraken2-db-name` (tarball indir+aç `_fetch_tar`) + `--rrna-db-url`
+    + `--help`. README EN+TR metatranskriptom kolu belgelendi.
+  - **★ Task 12 e2e + GERÇEK BUG (`9aff864`+`f9081e6`):** `test_e2e_meta_smoke` gerçek fastp→bowtie2→
+    featureCounts→DESeq2→rapor koşturur (SortMeRNA+Kraken2/Bracken monkeypatch, kendi birim testlerinde
+    doğrulanır). **E2e gerçek bug yakaladı:** `metatranscriptome.yml` `dedup_fraction` eşiğini tanımlamıyordu
+    → m02 qc `no threshold for gate 'dedup_fraction'` ile ÇÖKÜYORDU (kol daha önce uçtan-uca m02'den
+    geçmemiş). Permissive 0.10 eklendi (WARN-only; metatranskriptom yüksek-duplikasyonlu). E2e 62s'de PASS.
+  - **TEST ORTAMI NOTU:** base python 3.13 + `varcode 1.3.0` yanlış-paketlenmiş üst-düzey `tests` paketi
+    kuruyor → repo `tests/` namespace'ini gölgeliyor, çıplak `pytest` toplama'da patlıyor. Geçici çözüm:
+    `pytest -o consider_namespace_packages=true --import-mode=importlib`. `test_confidence` `from
+    tests.test_m01_validate import` yaptığından ayrı koşulur (655 + confidence 11 = 666). networkx base'e
+    kuruldu (ppi/confidence için). Kalıcı çözüm için ya varcode'un stray `tests`'i kaldırılmalı ya repo
+    `pyproject.toml`'a bu iki bayrak eklenmeli (ayrı, kullanıcı kararı).
+  - **AÇIK: branch main'e MERGE EDİLMEDİ** (kullanıcı onayı bekliyor, aile disiplini). Bu DURUM.md commit'lenmedi.
+  - **⏳ BİYOLOJİK DOĞRULAMA — İNSAN BAĞIRSAĞI, İNDİRME SÜRÜYOR (2026-08-20, kullanıcı "başlama" dedi = koşu
+    BAŞLATILMADI, yalnız indirme arka planda).** Kullanıcı kompleks/gerçek bağırsak metatranskriptomu istedi.
+    - **VERİ: `PRJNA398089` (iHMP/HMP2 IBD, IBDMDB)** — dışkı, ribo-deplete, Illumina PE. 3v3 CD↔non-IBD alt küme (~1 GB):
+      non-IBD `SRR5949596`/`SRR5949228`/`SRR5949133`; CD `SRR5949185`/`SRR5949388`/`SRR5949593`. İniyor →
+      `raw/hmp2_ibd/`. **Koşul eşlemesi ENA'da YOK** → subject→diagnosis join gerekir: `HMP2_metadata.tsv`
+      (biobakery Maaslin2 kopyası: `raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv`,
+      `subject`+`diagnosis`∈{CD,UC,nonIBD}). ENA `sample_title`="Stool sample <subj><Cxx>" → subject çıkar.
+    - **REFERANS (gen kataloğu): ~12 baskın tür RefSeq genomu** `datasets` ile iniyor → `references/gut_catalog/dl/`.
+      Türler: B.theta, B.fragilis, Phocaeicola(B.)vulgatus, B.uniformis, **F.prausnitzii**, P.copri, Agathobacter(E.)rectalis,
+      R.intestinalis, **E.coli**, B.longum, **R.gnavus**, Enterocloster(C.)bolteae. → **KUR:** tüm `*_genomic.fna` birleştir
+      = `gene_catalog_fasta`; tüm `*_genomic.gff` birleştir = `catalog_annotation`; contig→tür haritası tut.
+      **Config'te: `quantification.feature_type: CDS`, `attribute: locus_tag`** (RefSeq GFF CDS/locus_tag; default exon/gene_id DEĞİL).
+    - **Kraken2 DB:** aynı 12 genomdan **küçük özel DB** (`kraken2-build --add-to-library`+`--build`, rnaforge-meta env)
+      → `references/kraken2/gut/` (config `taxonomy.kraken2_db`). **rRNA:** SortMeRNA referansı → `references/rrna/`
+      (küçük; ör. SILVA smr default DB veya genomlardan rRNA çıkar). Env'ler hazır (doctor 10/10, rnaforge-meta kuruldu).
+    - **KOŞU (henüz YOK):** config `organism_type: metatranscriptome` + yukarıdaki referanslar → `rnaforge run --to report`
+      (rrna-deplete→taxonomy→gen-katalog Bowtie2→featureCounts→DESeq2→rapor). Runs-dir `runs/`, run-id ör. `hmp2_ibd`.
+    - **KIYAS (kullanıcının şartı — yayınlanmışla):** (1) **Takson** = Kraken2/Bracken kompozisyonu (hazır çıktı) ↔ bağırsak
+      taksonları. (2) **DE YÖNÜ** = CDS-DESeq2'yi tür başına toplayıp işaret kıyası. **Beklenen (Lloyd-Price 2019 Nature
+      `10.1038/s41586-019-1237-9` Supp T15-28 + Schirmer 2018 NatMicro `10.1038/s41564-017-0089-z`):** IBD/dysbiosis'te
+      **F.prausnitzii/butirat DOWN**, **E.coli/oksidatif-stres UP**, **R.gnavus/C.bolteae UP**. **DÜRÜST SINIR:** referans
+      modelimiz (12-genom) ≠ onların HUMAnN/UniRef → konkordans **yön+takson düzeyi**, birebir p/etki-büyüklüğü DEĞİL;
+      3v3 kesitsel onların istatistiğini üretmez. featureCounts multi-map (yakın Bacteroides) dikkat.
+    - **SIRADAKİ ADIM (diğer oturum devam):** indirmeler bitince → kataloğu+GFF birleştir → Kraken2 DB kur → rRNA ref →
+      config yaz → `rnaforge run --to report` → kıyas raporu. İndirme logları: scratchpad `fastq_dl.log`/`genome_dl.log`.
+  - **⚠ TEST ORTAMI (diğer oturum bilmeli):** base python 3.13'te `varcode 1.3.0` stray üst-düzey `tests` paketi repo
+    `tests/`'ini gölgeliyor → çıplak `pytest` toplama'da patlar. **Koş:** `pytest -o consider_namespace_packages=true
+    --import-mode=importlib`. `test_confidence` `from tests.test_m01_validate import` yaptığından tek başına toplanınca
+    patlar → ayrı koş (`pytest tests/test_m01_validate.py tests/test_confidence.py`), veya suite'i `test_confidence` hariç
+    koş (655) + ayrı (confidence 11) = 666. `networkx==3.6.1` base'e kuruldu (ppi/confidence importu için). `rnaforge-meta`
+    env `conda env create -f` ile ToS kapısına takılıyor → `conda create -n rnaforge-meta --override-channels -c conda-forge
+    -c bioconda kraken2=2.1.6 bracken=3.1` ile kuruldu (bracken paketi 3.1; `bracken -v` yanlış "3.0.1" der).
 - **★★★ ÖKARYOT UZUN-OKUMA İZOFORM-DÜZEYİ (NanoCount) — KOD + BİYOLOJİK DOĞRULAMA TAMAM → BEŞİNCİ KOL. `main` `f4357ea`,
   586 test (2026-08-20).** Ali "sırayla düzelt ve ekle" → iki ertelenen madde tamam.
   - **★★ BİYOLOJİK DOĞRULAMA BAŞARILI (fare Smchd1, PRJNA637390):** koşu `runs/20260820_024602_mouse_smchd1`, 3 WT/3 null,
