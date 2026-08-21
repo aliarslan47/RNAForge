@@ -6,25 +6,21 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-20 (+03) — metatranskriptom kolu `main`'e MERGE'li; İKİ gerçek-veri koşusu (HMP2 + B.theta) MEKANİK doğruladı, B.theta ayrıca İSTATİSTİKSEL SAĞLAMLIK + makale-null-uyumu gösterdi; güçlü-pozitif biyolojik konkordans HENÜZ YOK. **KULLANICI "kayıt al bekle beni" DEDİ — yeni koşu başlatılmayacak, kullanıcı dönene dek beklemede.**
+**Son güncelleme:** 2026-08-21 (+03) — metatranskriptom kolu `main`'e MERGE'li; B.theta gerçek-veri koşusu MEKANİK + İSTATİSTİKSEL SAĞLAMLIK + makale-null-uyumu gösterdi; güçlü-pozitif biyolojik konkordans HENÜZ YOK. **KULLANICI "kayıt al bekle beni" DEDİ — yeni koşu başlatılmayacak, kullanıcı dönene dek beklemede.**
 
 ## Şu an nerede kaldık
 - **⏸ BEKLEMEDE (kullanıcı 2026-08-20: "kayıt al bekle beni").** Sıradaki OLASI adım (kullanıcı onayıyla): güçlü-pozitif
   biyolojik konkordans için **makale-DE-teyitli** bir metatranskriptom seti (aday: antibiyotik PRJEB109068 ±ampisilin) —
-  AMA koşmadan ÖNCE makalenin açık/güçlü DEG tablosu teyit edilecek (HMP2+B.theta derslerinden: seti DE-gücü teyitsiz seçme).
+  AMA koşmadan ÖNCE makalenin açık/güçlü DEG tablosu teyit edilecek (B.theta dersi: seti DE-gücü teyitsiz seçme).
   Güçlü-teyitli aday çıkmazsa B.theta doğrulaması "yeterli" kabul edilip kol kapatılacak. **Kullanıcı bekleniyor, otonom devam YOK.**
-- **★★★ METATRANSKRİPTOM KOLU — main'e MERGE'li + İKİ GERÇEK-VERİ DOĞRULAMASI (2026-08-20).** 12 görevlik kol (TDD, 680 test)
+- **★★★ METATRANSKRİPTOM KOLU — main'e MERGE'li + GERÇEK-VERİ DOĞRULAMASI (2026-08-20).** 12 görevlik kol (TDD, 680 test)
   `feature/metatranscriptome-refbased` → `main` merge (`5a4345d`). **Mimari şeması Artifact:**
   `https://claude.ai/code/artifact/33d10c10-efe5-4464-a09a-bf3ed5bdcf52` (kod-doğrulanmış DAG, TR/EN).
-  - **DENEME 1 — HMP2/IBD (PRJNA398089, 3 CD + 3 non-IBD dışkı, 12-tür gen kataloğu):** ✅ MEKANİK başarılı (uçtan uca,
-    45690 gen×6, 66 DEG, bozuk-FASTQ yakalandı). ⚠ BİYOLOJİK SONUÇSUZ — 3v3 **subject-baskınlığı** (her dışkı örneği farklı
-    türle domine; heatmap 2 outlier sütun). "3v3 onların istatistiğini üretmez" sınırının gerçekleşmesi. **VERİ + config
-    SİLİNDİ** (kullanıcı isteği); referanslar (`references/gut_catalog|kraken2/gut|rrna`) gitignore'lu diskte kaldı.
-  - **DENEME 2 — B. theta VPI-5482 gnotobiyotik (PRJEB48101, Weagley Cell Reports 2022, NAD-deficient vs NA-supplemented,
+  - **B. theta VPI-5482 gnotobiyotik (PRJEB48101, Weagley Cell Reports 2022, NAD-deficient vs NA-supplemented,
     6v6 single-end, tek-tür temiz referans):** koşu `runs/20260820_170348_btheta_nad`.
     - ✅ **MEKANİK kusursuz:** taxonomy **1 taxon** (B.theta doğru), 4801 gen×12, 50 DEG (48↑/2↓), rapor+8 figür.
-    - ✅ **İSTATİSTİKSEL SAĞLAMLIK (HMP2'den kritik fark):** heatmap **6 def vs 6 suf GRUP-DÜZEYİNDE tutarlı** ayrışıyor
-      (subject-baskınlık YOK) → kol, uygun veriyle grup-düzeyi tutarlı DE üretebiliyor. HMP2'de gösterilemeyen şey.
+    - ✅ **İSTATİSTİKSEL SAĞLAMLIK:** heatmap **6 def vs 6 suf GRUP-DÜZEYİNDE tutarlı** ayrışıyor
+      (subject-baskınlık YOK) → kol, uygun veriyle grup-düzeyi tutarlı DE üretebiliyor.
     - ✅ **MAKALE KONKORDANSI (test edilebilir tek nokta):** makale bu kontrastta gen-ekspresyon DEĞİŞMEDİĞİNİ raporluyor
       (TIR genleri p=0.56/0.88, genom-çapı DEG yok). Bizde TIR geni `BT_RS17215` padj=**0.99**, log2FC=0.01 = **null-null uyumu**.
     - ❌ **GÜÇLÜ POZİTİF BİYOLOJİK HİKAYE YOK:** NAD homeostaz genleri (nadE `BT_RS01010` padj 0.61, nadC `BT_RS07890` padj 0.99)
@@ -60,39 +56,7 @@
     tests.test_m01_validate import` yaptığından ayrı koşulur (655 + confidence 11 = 666). networkx base'e
     kuruldu (ppi/confidence için). Kalıcı çözüm için ya varcode'un stray `tests`'i kaldırılmalı ya repo
     `pyproject.toml`'a bu iki bayrak eklenmeli (ayrı, kullanıcı kararı).
-  - **AÇIK: branch main'e MERGE EDİLMEDİ** (kullanıcı onayı bekliyor, aile disiplini). Bu DURUM.md commit'lenmedi.
-  - **⏳ BİYOLOJİK DOĞRULAMA — İNSAN BAĞIRSAĞI, İNDİRME SÜRÜYOR (2026-08-20, kullanıcı "başlama" dedi = koşu
-    BAŞLATILMADI, yalnız indirme arka planda).** Kullanıcı kompleks/gerçek bağırsak metatranskriptomu istedi.
-    - **VERİ: `PRJNA398089` (iHMP/HMP2 IBD, IBDMDB)** — dışkı, ribo-deplete, Illumina PE. 3v3 CD↔non-IBD alt küme (~1 GB):
-      non-IBD `SRR5949596`/`SRR5949228`/`SRR5949133`; CD `SRR5949185`/`SRR5949388`/`SRR5949593`. İniyor →
-      `raw/hmp2_ibd/`. **Koşul eşlemesi ENA'da YOK** → subject→diagnosis join gerekir: `HMP2_metadata.tsv`
-      (biobakery Maaslin2 kopyası: `raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv`,
-      `subject`+`diagnosis`∈{CD,UC,nonIBD}). ENA `sample_title`="Stool sample <subj><Cxx>" → subject çıkar.
-    - **REFERANS (gen kataloğu): ~12 baskın tür RefSeq genomu** `datasets` ile iniyor → `references/gut_catalog/dl/`.
-      Türler: B.theta, B.fragilis, Phocaeicola(B.)vulgatus, B.uniformis, **F.prausnitzii**, P.copri, Agathobacter(E.)rectalis,
-      R.intestinalis, **E.coli**, B.longum, **R.gnavus**, Enterocloster(C.)bolteae. → **KUR:** tüm `*_genomic.fna` birleştir
-      = `gene_catalog_fasta`; tüm `*_genomic.gff` birleştir = `catalog_annotation`; contig→tür haritası tut.
-      **Config'te: `quantification.feature_type: CDS`, `attribute: locus_tag`** (RefSeq GFF CDS/locus_tag; default exon/gene_id DEĞİL).
-    - **Kraken2 DB:** aynı 12 genomdan **küçük özel DB** (`kraken2-build --add-to-library`+`--build`, rnaforge-meta env)
-      → `references/kraken2/gut/` (config `taxonomy.kraken2_db`). **rRNA:** SortMeRNA referansı → `references/rrna/`
-      (küçük; ör. SILVA smr default DB veya genomlardan rRNA çıkar). Env'ler hazır (doctor 10/10, rnaforge-meta kuruldu).
-    - **KOŞU (henüz YOK):** config `organism_type: metatranscriptome` + yukarıdaki referanslar → `rnaforge run --to report`
-      (rrna-deplete→taxonomy→gen-katalog Bowtie2→featureCounts→DESeq2→rapor). Runs-dir `runs/`, run-id ör. `hmp2_ibd`.
-    - **KIYAS (kullanıcının şartı — yayınlanmışla):** (1) **Takson** = Kraken2/Bracken kompozisyonu (hazır çıktı) ↔ bağırsak
-      taksonları. (2) **DE YÖNÜ** = CDS-DESeq2'yi tür başına toplayıp işaret kıyası. **Beklenen (Lloyd-Price 2019 Nature
-      `10.1038/s41586-019-1237-9` Supp T15-28 + Schirmer 2018 NatMicro `10.1038/s41564-017-0089-z`):** IBD/dysbiosis'te
-      **F.prausnitzii/butirat DOWN**, **E.coli/oksidatif-stres UP**, **R.gnavus/C.bolteae UP**. **DÜRÜST SINIR:** referans
-      modelimiz (12-genom) ≠ onların HUMAnN/UniRef → konkordans **yön+takson düzeyi**, birebir p/etki-büyüklüğü DEĞİL;
-      3v3 kesitsel onların istatistiğini üretmez. featureCounts multi-map (yakın Bacteroides) dikkat.
-    - **SIRADAKİ ADIM (diğer oturum devam):** indirmeler bitince → kataloğu+GFF birleştir → Kraken2 DB kur → rRNA ref →
-      config yaz → `rnaforge run --to report` → kıyas raporu. İndirme logları: scratchpad `fastq_dl.log`/`genome_dl.log`.
-  - **⚠ TEST ORTAMI (diğer oturum bilmeli):** base python 3.13'te `varcode 1.3.0` stray üst-düzey `tests` paketi repo
-    `tests/`'ini gölgeliyor → çıplak `pytest` toplama'da patlar. **Koş:** `pytest -o consider_namespace_packages=true
-    --import-mode=importlib`. `test_confidence` `from tests.test_m01_validate import` yaptığından tek başına toplanınca
-    patlar → ayrı koş (`pytest tests/test_m01_validate.py tests/test_confidence.py`), veya suite'i `test_confidence` hariç
-    koş (655) + ayrı (confidence 11) = 666. `networkx==3.6.1` base'e kuruldu (ppi/confidence importu için). `rnaforge-meta`
-    env `conda env create -f` ile ToS kapısına takılıyor → `conda create -n rnaforge-meta --override-channels -c conda-forge
-    -c bioconda kraken2=2.1.6 bracken=3.1` ile kuruldu (bracken paketi 3.1; `bracken -v` yanlış "3.0.1" der).
+  - **Branch `main`'e MERGE'li** (`5a4345d`); güçlü-pozitif biyolojik konkordans için makale-DE-teyitli set beklemede (yukarı bak).
 - **★★★ ÖKARYOT UZUN-OKUMA İZOFORM-DÜZEYİ (NanoCount) — KOD + BİYOLOJİK DOĞRULAMA TAMAM → BEŞİNCİ KOL. `main` `f4357ea`,
   586 test (2026-08-20).** Ali "sırayla düzelt ve ekle" → iki ertelenen madde tamam.
   - **★★ BİYOLOJİK DOĞRULAMA BAŞARILI (fare Smchd1, PRJNA637390):** koşu `runs/20260820_024602_mouse_smchd1`, 3 WT/3 null,
