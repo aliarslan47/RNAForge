@@ -1,230 +1,80 @@
 # RNAForge
 
-Tekrarlanabilir, modüler **bulk RNA-seq** analiz pipeline'ı — ham FASTQ'tan tek, kendi kendine yeten
-HTML rapora; diferansiyel ekspresyonun üstünde tam bir fonksiyonel-analiz katmanıyla.
-
-İngilizce sürüm: [README.md](README.md) · Referans doküman: [PLAN.md](PLAN.md) (v1.4)
+Tekrarlanabilir, modüler **bulk RNA-seq** pipeline'ı — ham FASTQ'tan tek, kendine yeten bir HTML rapora; diferansiyel ifadenin üzerine kurulu bir fonksiyonel analiz katmanıyla.
 
 [![Pipeline DAG](https://img.shields.io/badge/pipeline-DAG-0d6b8f)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
-[![organizma](https://img.shields.io/badge/organizma-prokaryot%20%C2%B7%20%C3%B6karyot%20%C2%B7%20metatranskriptom-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
-[![okuma](https://img.shields.io/badge/okuma-k%C4%B1sa%20%C2%B7%20uzun-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![organism](https://img.shields.io/badge/organism-prokaryote%20%C2%B7%20eukaryote%20%C2%B7%20metatranscriptome-2f8f5b)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
+[![reads](https://img.shields.io/badge/reads-short%20%C2%B7%20long-c07211)](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)
 
-## Ne yapar
+**Türkçe** · [English](README.md)
 
-Ham okumaları biyolojiye taşıyan aşamalı bir pipeline:
+## Nedir?
 
-```
-validate → qc → trim → quant → counts → de → figures → report
-                                          └→ enrich · kegg · gsea · semantic · amr · operon · ppi
-```
+RNAForge, Forge ailesinin bulk RNA-seq üyesidir — BacForge (bakteri) ve VirusForge (virüs/faj) ile aynı mimari, ancak ayrı ve izole bir kurulum. Ham okumaları tek komutla biyolojiye taşır ve çift dilli (`tr`/`en`), kendine yeten bir HTML raporla sonlanır.
 
-Tüm pipeline'ın etkileşimli, çift-dilli node-graph şeması (organizma × okuma-tipi dallanması, `m00`–`m18`) —
-[**render edilmiş şema**](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html) · kaynak: `docs/pipeline_architecture.html`.
+## Ne yapar?
 
-- **Çekirdek**: girdi/tasarım doğrulama, QC, nazik kırpma, hizalama/kantifikasyon, DESeq2 diferansiyel
-  ekspresyon, yayın kalitesinde figürler ve çift dilli (`tr`/`en`) kendi kendine yeten HTML rapor.
-  QC → trim → hizalama araç zinciri **okuma tipine** göre otomatik seçilir (aşağıya bak);
-  kantifikasyon `organism_type` ile yönlendirilir (prokaryot: Bowtie2/minimap2 + featureCounts ·
-  ökaryot: Salmon + tximport · metatranskriptom: gen-kataloğu Bowtie2 + featureCounts). İki boyut da
-  aynı gen × örnek sayım matrisinde buluşur.
-- **Metatranskriptom kolu** (`organism_type: metatranscriptome`): referans-tabanlı kısa-okuma kolu;
-  kırpmadan sonra iki aşama ekler — rRNA depletion (SortMeRNA `--other`) ve topluluk kompozisyonu
-  (Kraken2 + Bracken, tanısal) — sonra rRNA-çıkarılmış okumaları bir gen kataloğuna hizalar ve
-  featureCounts ile sayar. Bilinçli olarak permissive, damgalı `metatranscriptome` profilinde koşar
-  (kısmi katalog düşük hizalama WARN verir, asla FAIL değil); rapora "Topluluk Kompozisyonu
-  (Taksonomi)" bölümü eklenir. Downstream (m06 DE ve sonrası) değişmez.
-- **Okuma tipleri (kısa / uzun)**: Illumina okumaları kısa-okuma zincirini çalıştırır (FastQC → fastp →
-  Bowtie2); ONT/PacBio okumaları uzun-okuma zincirini (NanoPlot → Pychopper+chopper → minimap2 →
-  featureCounts `-L`). Okuma tipi m01'de otomatik tespit edilir; m05'ten itibaren (DESeq2 ve tüm
-  fonksiyonel analiz) pipeline okuma-tipinden bağımsızdır.
-- **Fonksiyonel analiz** (hepsi opsiyonel, organizma-agnostik, hiçbiri yeni FAIL kapısı üretmez):
-  GO aşırı-temsil (ORA), KEGG yolak ORA, GSEA (fgsea), REVIGO-benzeri semantik indirgeme,
-  AMR + virülans overlay (abricate/CARD/VFDB), operon tahmini + koordinasyon ve STRING
-  protein-etkileşim modülleri (Louvain community detection).
+Aşamalı bir pipeline — `validate → qc → trim → quant → counts → de → figures → report` — üzerine opsiyonel fonksiyonel analiz katmanı (GO / KEGG / GSEA / semantik / AMR / operon / PPI).
 
-### Kalite kapıları (sonuçlar neden güvenilir)
+İki yönlendirme ekseni aynı gen × örnek sayım matrisinde birleşir; böylece DE'den sonrası tüm adımlar bağımsızdır:
 
-Doğru bir pipeline bile kötü girdiden makul görünen ama **sahte** bir sonuç üretir. RNAForge kapıları
-ikili politikayla zorlar:
+- **Organizma** (`organism_type`): prokaryot (Bowtie2/minimap2 + featureCounts) · ökaryot (Salmon + tximport) · metatranskriptom (rRNA arındırma + Kraken2/Bracken + gen-kataloğu).
+- **Okuma tipi** (otomatik algılanır): kısa (Illumina: FastQC → fastp → Bowtie2) · uzun (ONT/PacBio: NanoPlot → Pychopper+chopper → minimap2).
 
-- **FAIL** → sonuç **geçersiz**: koşu durur, biyolojik çıktı üretilmez (exit 1).
-- **WARN** → sonuç **şüpheli**: üretilir ama öyle damgalanır.
+Tasarımı gereği güvenilir: iki kademeli kalite kapıları (**FAIL** run'ı durdurur, **WARN** şüpheli sonucu damgalar), eşikler veridir (`profiles/*.yml`) ve her run bir güven kartı yazar. Uydurma sonuç yok.
 
-Eşikler veridir (`profiles/{prokaryote,eukaryote,prokaryote_long,metatranscriptome}.yml`); ezilen eşik rapora yazılır
-(sessiz gevşetme yok). Uzun-okuma koşuları `prokaryote_long` profilini kullanır; eşikleri bilinçli
-olarak permissive ve damgalıdır (ONT kalitesi ~Q10–15, Q30 değil): yalnız katastrofik hizalama hatası
-(yanlış referans) FAIL verir, ONT'de doğal olan düşük survival/assignment WARN olur. Her koşu ayrıca
-bir güvence kartı yazar (`UNKNOWN`/`INVALID`/`SUSPECT`/`TRUSTWORTHY`).
-
-## Pipeline modülleri
-
-| Aşama | Subcommand | Ne yapar |
-|---|---|---|
-| m00 | `basecall` | ONT ham sinyal (FAST5/POD5) → FASTQ (dorado, GPU); opsiyonel, yalnız ham sinyal girdisinde |
-| m01 | `validate` | Config + metadata + FASTQ doğrulama, platform + okuma-tipi tespiti, tasarım kapıları |
-| m02 | `qc` | kısa: FastQC · uzun: NanoPlot (teşhis; koşuyu asla durdurmaz) |
-| m03 | `trim` | kısa: fastp (nazik) · uzun: Pychopper+chopper (cDNA) / chopper (direct-RNA) |
-| m04 | `quant` | Hizalama (prok kısa: Bowtie2 · uzun: minimap2 · ökaryot: Salmon) |
-| m05 | `counts` | featureCounts (uzun-okumada `-L`) → gen × örnek sayım matrisi |
-| m06 | `de` | DESeq2 diferansiyel ekspresyon |
-| m07 | `figures` | PCA, volcano, MA, heatmap, dispersiyon, … (PNG 300dpi + SVG) |
-| m08 | `report` | Tek, kendi kendine yeten çift dilli HTML rapor (okuma-tipi farkında) |
-| m09 | `enrich` | GO aşırı-temsil (ORA), hipergeometrik + BH |
-| m10 | `kegg` | KEGG yolak ORA |
-| m11 | `gsea` | Sıralı gen listesinde GSEA (fgsea) |
-| m12 | `semantic` | GO terimlerinin REVIGO-benzeri semantik indirgemesi (+ MDS haritası) |
-| m13 | `amr` | AMR (CARD + AMRFinderPlus) + virülans (VFDB) genlerinin DE'ye overlay'i |
-| m14 | `operon` | Operon tahmini (intergenik mesafe) + DE koordinasyonu |
-| m15 | `ppi` | STRING PPI alt-ağı + Louvain community modülleri |
-| m16 | `seqqc` | rRNA% (SortMeRNA) + strandedness (RSeQC) — WARN kapıları |
-| m17 | `alignqc` | insert-size + coverage + read-distribution (samtools/RSeQC) |
-| m18 | `multiqc` | koşu genelinde toplu MultiQC görünümü (en son) |
-
-Downstream analizler (m09–m15) organizma- ve okuma-tipi-agnostiktir ve bir koşuyu asla geçersiz kılmaz —
-verdict kalite kapılarından değişmeden taşınır. QC ekleri (m16–m18) tanısaldır.
-
-Metatranskriptom koşuları `trim` ile `quant` arasına iki aşama daha ekler (`rnaforge run` otomatik
-sıralar): **`rrna-deplete`** (SortMeRNA rRNA çıkarma, `m_rrna_deplete`) ve **`taxonomy`** (Kraken2 +
-Bracken topluluk kompozisyonu, `m_taxonomy`, tanısal — asla FAIL değil).
+Etkileşimli çift dilli düğüm grafiği: **[render edilmiş diyagram](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)**.
 
 ## Kurulum
 
 ```bash
-conda env create -f envs/rnaforge-core.yml     # orkestrasyon (Python) + networkx/numpy/scipy
-conda activate rnaforge-core
-pip install -e .
+bash install.sh
+conda run -n rnaforge-core rnaforge doctor   # gerekli tüm env'lerin varlığını doğrula
 ```
 
-Araç ortamları (bir kez kurulur, modüller tarafından kullanılır):
-
-```bash
-conda env create -f envs/rnaforge-qc.yml           # FastQC, fastp
-conda env create -f envs/rnaforge-quant-prok.yml   # Bowtie2, samtools, featureCounts
-conda env create -f envs/rnaforge-quant-euk.yml    # Salmon
-conda env create -f envs/rnaforge-longread.yml     # minimap2, NanoPlot, Pychopper, chopper, samtools
-conda env create -f envs/rnaforge-basecall.yml     # pod5, samtools (+ dorado binary, GPU) — ham sinyal m00
-conda env create -f envs/rnaforge-de.yml           # R: DESeq2, ggplot2, fgsea
-conda env create -f envs/rnaforge-amr.yml          # abricate (CARD/VFDB)
-conda env create -f envs/rnaforge-seqqc.yml        # SortMeRNA, RSeQC, MultiQC (m16/m18)
-```
+İdempotenttir; sürümü sabitlenmiş dokuz conda ortamı yaratır (`envs/*.yml`). `dorado` (ONT ham-sinyal basecalling, m00) conda dışında kurulan yalnızca-GPU bir ikili dosyadır — sadece FAST5/POD5 girdisinde gerekir.
 
 ## Kullanım
 
 ```bash
-# çekirdek zincir (baştan sona aynı --run-id)
-rnaforge validate --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge qc       --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge trim     --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge quant    --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge counts   --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge de       --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge figures  --config config/config.yaml --metadata samples.tsv --run-id demo
+# tüm pipeline (FAIL'de durur, resume edilebilir)
+rnaforge run --config config/config.yaml --metadata samples.tsv --run-id demo
 
-# opsiyonel QC / tanısal (m04 gerekir; tanısal figür/tablo üretir, asla FAIL vermez)
-rnaforge seqqc    --config config/config.yaml --metadata samples.tsv --run-id demo  # rRNA% + strandedness (m16)
-rnaforge alignqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # insert-size + coverage + read-distribution (m17)
-rnaforge multiqc  --config config/config.yaml --metadata samples.tsv --run-id demo  # toplu MultiQC görünümü (m18, en son)
+# rapordan önce opsiyonel aşamalar ekle
+rnaforge run ... --include enrich,kegg,gsea,seqqc,alignqc,multiqc
 
-# opsiyonel fonksiyonel analizler (herhangi alt-küme; her biri referans verisi ister — aşağıya bak)
-rnaforge enrich   --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge kegg     --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge gsea     --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge semantic --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge amr      --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge operon   --config config/config.yaml --metadata samples.tsv --run-id demo
-rnaforge ppi      --config config/config.yaml --metadata samples.tsv --run-id demo
-
-# raporu en son üret — hangi analizler koştuysa onları gömer
-rnaforge report   --config config/config.yaml --metadata samples.tsv --run-id demo
+# ya da çekirdek zincirin bir dilimini çalıştır
+rnaforge run ... --from trim --to counts
 ```
 
-> Not: `python -m rnaforge.cli` ÇALIŞMAZ (main-guard yok); kurulu `rnaforge` entry point'ini kullan.
+Her aşama aynı `--run-id` ile elle de sürülebilir. Kurulu `rnaforge` giriş noktasını kullan (`python -m` değil).
 
-**Metatranskriptom** koşuları için config'te `organism_type: metatranscriptome` verin
-(`reference.gene_catalog_fasta` + `reference.catalog_annotation`, `taxonomy.kraken2_db` ve
-`rrna.db_fasta` ile); `rnaforge run` `trim`'den sonra `rrna-deplete` ve `taxonomy` aşamalarını
-otomatik ekler ve permissive `metatranscriptome` profilini seçer — ek bayrak gerekmez. İki aşama elle
-de sürülebilir (`rnaforge rrna-deplete …` sonra `rnaforge taxonomy …`, aynı `--run-id`).
+## Modüller
 
-### Metadata biçimi (TSV)
-
-| Sütun | Zorunlu | Açıklama |
+| Kod | Alt komut | Ne yapar |
 |---|---|---|
-| `sample_id` | evet | Benzersiz örnek kimliği |
-| `condition` | evet | Deney grubu; ≥2 seviye ve her birinde ≥2 replika gerekir |
-| `fastq_1` | evet | R1 yolu (veya single-end okumalar) |
-| `fastq_2` | hayır | Paired-end için R2 yolu |
-| `subject` | hayır | Eşleşmiş/subject id; tespit edilir, eşleşmiş görünüyorsa bilinçli ele alınmalı |
-| `batch` | hayır | Batch/kovaryat; tasarım formülü `batch` kullanıyorsa zorunlu |
+| m00 | `basecall` | ONT ham sinyal (FAST5/POD5) → dorado ile FASTQ (GPU); opsiyonel |
+| m01 | `validate` | Config/metadata/FASTQ doğrulama, platform + okuma-tipi algılama |
+| m02 | `qc` | kısa: FastQC · uzun: NanoPlot |
+| m03 | `trim` | kısa: fastp (yumuşak) · uzun: Pychopper+chopper / chopper |
+| m04 | `quant` | Hizalama (prok: Bowtie2/minimap2 · ökar: Salmon) |
+| m05 | `counts` | featureCounts → gen × örnek sayım matrisi |
+| m06 | `de` | DESeq2 diferansiyel ifade |
+| m07 | `figures` | PCA, volkan, MA, ısı haritası, dispersiyon (PNG 300dpi + SVG) |
+| m08 | `report` | Tek, kendine yeten çift dilli HTML rapor |
+| m09 | `enrich` | GO aşırı-temsil analizi (ORA) |
+| m10 | `kegg` | KEGG yolak ORA |
+| m11 | `gsea` | Sıralanmış gen listesinde GSEA (fgsea) |
+| m12 | `semantic` | GO terimlerinin REVIGO-benzeri semantik indirgemesi |
+| m13 | `amr` | AMR (CARD + AMRFinderPlus) + virülans (VFDB) örtüşmesi |
+| m14 | `operon` | Operon tahmini + DE koordinasyonu |
+| m15 | `ppi` | STRING PPI alt-ağı + Louvain modülleri |
+| m16 | `seqqc` | rRNA% (SortMeRNA) + iplik yönü (RSeQC) |
+| m17 | `alignqc` | insert boyu + kapsam + okuma dağılımı |
+| m18 | `multiqc` | run genelinde toplu MultiQC görünümü (en son) |
 
-## Referans verisi (tek sefer hazırlık, git-ignore'lu)
+Metatranskriptom run'ları `trim` ile `quant` arasına `rrna-deplete` ve `taxonomy` aşamalarını otomatik ekler. Aşağı-akış analizleri (m09–m18) organizma ve okuma-tipinden bağımsızdır ve bir run'ı asla geçersiz kılmaz. Tam tasarım, metadata formatı ve referans-veri hazırlığı `PLAN.md` ve `docs/` içindedir.
 
-Fonksiyonel analizler `references/` altındaki yerel dosyaları okur (asla commit edilmez). Organizmanız
-için bir kez indirin (*E. coli* K-12 örnekleri):
+---
 
-```bash
-# GO ontolojisi (m09/m12) + organizma GO anotasyonu (EBI-GOA)
-curl -L -o references/go/go-basic.obo http://purl.obolibrary.org/obo/go/go-basic.obo
-curl -L https://ftp.ebi.ac.uk/pub/databases/GO/goa/proteomes/18.E_coli_MG1655.goa \
-     -o references/ecoli_bw25113/ecoli.gaf
-
-# KEGG (m10) — organizma-başı REST dosyaları
-curl -s https://rest.kegg.jp/link/pathway/eco > references/kegg/eco/pathway_links.tsv
-curl -s https://rest.kegg.jp/list/pathway/eco > references/kegg/eco/pathway_names.tsv
-curl -s https://rest.kegg.jp/list/eco        > references/kegg/eco/gene_list.tsv
-
-# STRING (m15) — taxon-başı ağ
-curl -s https://stringdb-downloads.org/download/protein.info.v12.0/511145.protein.info.v12.0.txt.gz \
-     -o references/string/511145/protein.info.txt.gz
-curl -s https://stringdb-downloads.org/download/protein.links.v12.0/511145.protein.links.v12.0.txt.gz \
-     -o references/string/511145/protein.links.txt.gz
-```
-
-AMR/virülans (m13) abricate'in paketli CARD/VFDB veritabanlarını kullanır (ayrı indirme yok).
-
-Metatranskriptom kolu için `prepare_references.sh` Kraken2/Bracken DB'sini (tarball, `references/kraken2/
-<ad>/` altına açılır) ve SortMeRNA rRNA referansını indirir:
-
-```bash
-bash prepare_references.sh \
-     --kraken2-db-url https://…/k2_standard.tar.gz --kraken2-db-name standard \
-     --rrna-db-url https://…/smr_v4.3_default_db.fasta
-```
-
-Config'te göster: `taxonomy.kraken2_db: references/kraken2/standard` ve
-`rrna.db_fasta: references/rrna/smr_v4.3_default_db.fasta`.
-
-## Temel tasarım kararları
-
-- **`organism_type` zorunlu ve varsayılanı yok** (`prokaryote` | `eukaryote` | `metatranscriptome`).
-  Yalnız kantifikasyonu (m04/m05) yönlendirir — metatranskriptomda ayrıca quant'tan önce rRNA depletion
-  + taksonomi ekler; tüm yollar aynı gen × örnek sayım matrisinde buluşur, böylece tüm downstream
-  adımlar (m06–m15) organizma-agnostiktir.
-- **İki yönlendirme boyutu: `organism_type` × okuma tipi.** Okuma tipi (kısa/uzun) m01'de FASTQ'tan
-  otomatik tespit edilir (Illumina → kısa; ONT/PacBio → uzun) ve m02–m05'i yönlendirir; `organism_type`
-  m04/m05'i yönlendirir. Tanımlanamayan platformlar yine net hatayla reddedilir (asla yanlış yola sessizce
-  sokulmaz).
-- **ONT uzun okumalar için `library.chemistry` zorunlu** (`cdna` | `direct_rna`) — FASTQ'tan tespit
-  edilemez ve m03 uzun-okuma ön-işlemesini seçer (cDNA → Pychopper+chopper; direct-RNA → yalnız chopper).
-  PacBio HiFi bunu gerektirmez.
-- **Ham sinyal (FAST5/POD5) m00 `basecall` ile desteklenir** — bir örneğin `fastq_1`'i POD5/FAST5
-  dosyası ya da dizini gösteriyorsa `rnaforge basecall` dorado'yu (GPU, `hac` model) çalıştırıp FASTQ
-  üretir, sonra pipeline değişmeden devam eder. FASTQ girdisinde m00 atlanır. dorado ayrı kurulan
-  GPU-only bir ONT binary'sidir (`basecall.dorado_bin`); GPU gerekir.
-- **Kırpma bilinçli olarak nazik.** Agresif kalite kırpması ekspresyon tahminlerini bozar
-  ([Williams ve ark. 2016](https://doi.org/10.1186/s12859-016-0956-2)); bozulmayı asgari-uzunluk
-  filtresi engeller.
-- **Uydurma sonuç yok.** Belirsiz annotation birleştirmeleri (gen sembolüyle) tahmin edilmez, atılır;
-  tahmin edilen yapılar (operon, STRING etkileşimleri) rapora tahmin olarak damgalanır.
-
-## Geliştirme
-
-```bash
-conda run -n rnaforge-core --cwd "$(pwd)" python -m pytest -q
-```
-
-Depo kökünden çalıştırın (test suit'i `tests.conftest`'i import eder).
-
-## Gizlilik
-
-Müşteri verisi asla commit edilmez. `runs/`, `raw/` ve `references/` git-ignore'ludur.
+Forge ailesi: **RNAForge** (bulk RNA-seq) · [BacForge](https://github.com/aliarslan47/BacForge) (bakteri) · [VirusForge](https://github.com/aliarslan47/VirusForge) (virüs/faj) · [PipelineForge](https://github.com/aliarslan47/PipelineForge) (DAG üreticisi). Müşteri verisi asla commit'lenmez (`runs/`, `raw/`, `references/` git-ignore'da).
