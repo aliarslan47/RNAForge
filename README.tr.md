@@ -77,4 +77,4 @@ Metatranskriptom run'ları `trim` ile `quant` arasına `rrna-deplete` ve `taxono
 
 ---
 
-Forge ailesi: **RNAForge** (bulk RNA-seq) · [BacForge](https://github.com/aliarslan47/BacForge) (bakteri) · [VirusForge](https://github.com/aliarslan47/VirusForge) (virüs/faj) · [PipelineForge](https://github.com/aliarslan47/PipelineForge) (DAG üreticisi). Müşteri verisi asla commit'lenmez (`runs/`, `raw/`, `references/` git-ignore'da).
+Forge ailesi: **RNAForge** (bulk RNA-seq) · [BacForge](https://github.com/aliarslan47/BacForge) (bakteri) · [VirusForge](https://github.com/aliarslan47/VirusForge) (virüs/faj) · [MicrobiomeForge](https://github.com/aliarslan47/MicrobiomeForge) (mikrobiyom) · [Vaxforge](https://github.com/aliarslan47/Vaxforge) (ters aşılama) · [ImmForge](https://github.com/aliarslan47/ImmForge) (bağışıklık simülasyonu) · [PipelineForge](https://github.com/aliarslan47/PipelineForge) (DAG üreticisi). Müşteri verisi asla commit'lenmez (`runs/`, `raw/`, `references/` git-ignore'da).

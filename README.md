@@ -77,4 +77,4 @@ Metatranscriptome runs auto-insert `rrna-deplete` and `taxonomy` between `trim` 
 
 ---
 
-Forge family: **RNAForge** (bulk RNA-seq) · [BacForge](https://github.com/aliarslan47/BacForge) (bacteria) · [VirusForge](https://github.com/aliarslan47/VirusForge) (virus/phage) · [PipelineForge](https://github.com/aliarslan47/PipelineForge) (DAG generator). Customer data is never committed (`runs/`, `raw/`, `references/` are git-ignored).
+Forge family: **RNAForge** (bulk RNA-seq) · [BacForge](https://github.com/aliarslan47/BacForge) (bacteria) · [VirusForge](https://github.com/aliarslan47/VirusForge) (virus/phage) · [MicrobiomeForge](https://github.com/aliarslan47/MicrobiomeForge) (microbiome) · [Vaxforge](https://github.com/aliarslan47/Vaxforge) (reverse vaccinology) · [ImmForge](https://github.com/aliarslan47/ImmForge) (immune simulation) · [PipelineForge](https://github.com/aliarslan47/PipelineForge) (DAG generator). Customer data is never committed (`runs/`, `raw/`, `references/` are git-ignored).
