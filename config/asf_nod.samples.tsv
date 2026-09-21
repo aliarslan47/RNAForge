@@ -1,0 +1,7 @@
+sample_id	condition	subject	fastq_1
+cecum_m1	cecum	m1	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452973.fastq.gz
+cecum_m2	cecum	m2	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452976.fastq.gz
+cecum_m4	cecum	m4	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452981.fastq.gz
+colon_m1	colon	m1	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452975.fastq.gz
+colon_m2	colon	m2	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452978.fastq.gz
+colon_m4	colon	m4	/home/ali/rnaforge-pipeline/raw/asf_nod/SRR452983.fastq.gz

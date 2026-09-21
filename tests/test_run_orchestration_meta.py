@@ -124,7 +124,7 @@ def test_run_executes_metatranscriptome_sequence_in_order(tmp_path, monkeypatch)
     assert main(_run_args(config_path, tmp_path)) == 0
     assert calls == [
         "validate", "qc", "trim", "rrna-deplete", "taxonomy",
-        "quant", "counts", "de", "figures", "report",
+        "quant", "counts", "de", "figures", "report", "cleanup",
     ]
 
 
@@ -136,7 +136,8 @@ def test_run_prokaryote_config_sequence_still_unchanged(tmp_path, monkeypatch):
             "--metadata", str(tmp_path / "m.tsv"),
             "--runs-dir", str(tmp_path / "runs"), "--run-id", "demo"]
     assert main(args) == 0
-    assert calls == ["validate", "qc", "trim", "quant", "counts", "de", "figures", "report"]
+    assert calls == ["validate", "qc", "trim", "quant", "counts", "de", "figures",
+                     "report", "cleanup"]
 
 
 def test_run_stops_on_first_gate_failure_metatranscriptome(tmp_path, monkeypatch):

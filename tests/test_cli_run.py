@@ -62,10 +62,21 @@ def _run_args(tmp_path, *extra):
 def test_run_executes_all_core_stages_in_order(tmp_path, monkeypatch):
     calls = _fake_dispatch(monkeypatch)
     assert main(_run_args(tmp_path)) == 0
-    assert calls == ["validate", "qc", "trim", "quant", "counts", "de", "figures", "report"]
+    # tam koşu (--to yok) → cleanup (m19) EN SON otomatik eklenir
+    assert calls == ["validate", "qc", "trim", "quant", "counts", "de", "figures",
+                     "report", "cleanup"]
 
 
 def test_run_stops_on_first_gate_failure(tmp_path, monkeypatch):
     calls = _fake_dispatch(monkeypatch, fail_at="counts")
     assert main(_run_args(tmp_path)) == 1                 # GateFailure → exit 1
     assert calls == ["validate", "qc", "trim", "quant", "counts"]   # de/figures/report KOŞMAZ
+
+
+def test_run_auto_appends_cleanup_only_on_full_run(tmp_path, monkeypatch):
+    """cleanup YALNIZ tam koşuda (--to yok) eklenir; --to ile erken durdurulan koşuda
+    ara dosyalar korunur (cleanup KOŞMAZ)."""
+    calls = _fake_dispatch(monkeypatch)
+    assert main(_run_args(tmp_path, "--to", "counts")) == 0
+    assert calls == ["validate", "qc", "trim", "quant", "counts"]   # cleanup YOK
+    assert "cleanup" not in calls

@@ -1,0 +1,41 @@
+# RNAForge — Altered Schaedler Flora (ASF) gnotobiyotik NOD-fare bağırsak metatranskriptomu.
+# Veri: SRP012007 (Illumina GAIIx, single-end 76 bp). Tanımlı 8-türlü community → mikrobiyom.
+# Kontrast: SEKUM vs KOLON (anatomik bölge), fareyle eşleştirilmiş 3v3.
+#   library_name etiketlerinden: Cecum vs Colon; kit=Qiagen sabit, Ribominus YOK (confound min.).
+# Katalog: 8 ASF genomu (RefSeq/GenBank) birleşik gene_catalog.fna + .gff (124 kontig, 31.339 CDS).
+organism: "Altered Schaedler Flora (ASF) — gnotobiotic NOD mouse gut metatranscriptome"
+organism_type: "metatranscriptome"
+platform: "illumina"
+
+reference:
+  gene_catalog_fasta: "references/asf/gene_catalog.fna"
+  catalog_annotation: "references/asf/gene_catalog.gff"
+
+taxonomy:
+  kraken2_db: "references/kraken2/asf"
+  bracken_read_len: 75
+  bracken_level: "S"
+
+rrna:
+  db_fasta: "references/asf/asf_rrna.fasta"
+
+library:
+  strandedness: "unstranded"
+  selection: "rrna_depletion"
+
+quantification:
+  feature_type: "CDS"
+  attribute: "locus_tag"
+
+de:
+  design: "~subject + condition"   # subject=fare (eşleştirilmiş); condition=bölge (sekum/kolon)
+  reference: "cecum"               # sekum = baz; kolon'daki artış = +log2FC
+  fdr_threshold: 0.05
+  log2fc_threshold: 1.0
+
+report:
+  language: "tr"
+
+resources:
+  threads: 8
+  memory_gb: 32

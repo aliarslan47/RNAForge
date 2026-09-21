@@ -400,6 +400,10 @@ LABELS: dict[str, dict[str, str]] = {
         "sw_purpose": "Amaç", "db_name": "Veritabanı", "db_version": "Sürüm / kaynak", "db_purpose": "Amaç",
         "cap_software": "Kullanılan yazılımlar", "cap_database": "Kullanılan veritabanları",
         "expr_note": "Gen ekspresyon değerleri TPM ve FPKM olarak quantification/tpm.tsv ve fpkm.tsv'de üretildi.",
+        "meta_de_note": ("Metatranskriptom (RNA-tek-başına): sonuçlar mutlak gen ekspresyonu değil, "
+                         "koşullar arası diferansiyel BOLLUK/aktivite (topluluk kompozisyonu + hücre-başı "
+                         "transkripsiyonun bileşkesi) olarak yorumlanmalıdır; eşlik eden metagenom (DNA) "
+                         "olmadan bu iki bileşen ayrıştırılamaz."),
         "up_table": "En Güçlü 25 Artan (Up)", "down_table": "En Güçlü 25 Azalan (Down)",
         "mean_suffix": "ort.",
         "enrichment": "Fonksiyonel Zenginleştirme (GO)",
@@ -519,6 +523,10 @@ LABELS: dict[str, dict[str, str]] = {
         "sw_purpose": "Purpose", "db_name": "Database", "db_version": "Version / source", "db_purpose": "Purpose",
         "cap_software": "Software used", "cap_database": "Databases used",
         "expr_note": "Gene expression values were produced as TPM and FPKM in quantification/tpm.tsv and fpkm.tsv.",
+        "meta_de_note": ("Metatranscriptome (RNA-only): results should be interpreted as differential "
+                         "ABUNDANCE/activity between conditions (the convolution of community composition and "
+                         "per-cell transcription), not absolute gene expression; without a paired metagenome "
+                         "(DNA) these two components cannot be separated."),
         "up_table": "Top 25 Up-regulated", "down_table": "Top 25 Down-regulated",
         "mean_suffix": "mean",
         "enrichment": "Functional Enrichment (GO)",
@@ -858,7 +866,7 @@ def _multiqc_note(multiqc: dict | None, L: dict) -> str:
             f'<a href="{_esc(rel)}">{_esc(rel)}</a></p>')
 
 
-def section_de(de: dict, L: dict) -> str:
+def section_de(de: dict, L: dict, meta: bool = False) -> str:
     n_sig = de.get("n_significant", 0)
     summary = (f'<p class="summary">{_esc(L["summary"])}: {_esc(n_sig)} / '
                f'{_esc(de.get("n_genes"))} — {_esc(de.get("contrast"))} '
@@ -873,6 +881,8 @@ def section_de(de: dict, L: dict) -> str:
     ]
     tbl = _table([" ", " "], rows, L["cap_de"])
     expr = f'<p class="note">{_esc(L["expr_note"])}</p>'
+    # Metatranskriptom (RNA-tek-başına): DE'yi diferansiyel bolluk/aktivite olarak yorumla uyarısı.
+    meta_note = f'<p class="note">{_esc(L["meta_de_note"])}</p>' if meta else ""
     # İzoform-düzeyi DE alt-bölümü (ökaryot uzun-okuma; m06 isoform_de üretti). Yoksa boş.
     iso = de.get("isoform_de")
     iso_html = ""
@@ -887,7 +897,7 @@ def section_de(de: dict, L: dict) -> str:
                     f'<p class="note">{_esc(L["iso_note"])}</p>'
                     f'{_table([" ", " "], iso_rows, L["cap_iso"])}')
     return (f'<section id="de"><h2>{_esc(L["de"])}</h2>'
-            f'{_intro("de", L)}{summary}{tbl}{expr}{iso_html}</section>')
+            f'{_intro("de", L)}{summary}{tbl}{expr}{meta_note}{iso_html}</section>')
 
 
 def collect_figure_errors(run_dir: Path) -> list[str]:
@@ -1872,7 +1882,7 @@ def render_report(inputs: dict, config, version: str, run_id: str = "") -> str:
                         inputs.get("qc"), inputs.get("figures_dir"),
                         inputs.get("alignqc"), inputs.get("multiqc")),
         (section_taxonomy(inputs, L, lang) if meta_ran else ""),
-        section_de(inputs["de"], L),
+        section_de(inputs["de"], L, meta=meta_ran),
         section_figures(inputs["figures"], inputs["figures_dir"], L, lang,
                         inputs.get("figure_errors")),
         section_table(inputs["de_results"], inputs["gene_map"],

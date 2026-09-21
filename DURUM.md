@@ -6,9 +6,16 @@
 **Konum:** `/home/ali/rnaforge-pipeline/` (git deposu)
 **GitHub:** `github.com/aliarslan47/RNAForge` — **PRIVATE**, remote `origin` (SSH)
 **Referans doküman:** `PLAN.md` **v1.3** (tek referans — Kural 1)
-**Son güncelleme:** 2026-08-21 (+03) — metatranskriptom kolu `main`'e MERGE'li; B.theta gerçek-veri koşusu MEKANİK + İSTATİSTİKSEL SAĞLAMLIK + makale-null-uyumu gösterdi; güçlü-pozitif biyolojik konkordans HENÜZ YOK. **KULLANICI "kayıt al bekle beni" DEDİ — yeni koşu başlatılmayacak, kullanıcı dönene dek beklemede.**
+**Son güncelleme:** 2026-08-21 (+03) — **DISK TEMİZLİĞİ + m19 auto-cleanup + ASF/NOD metatranskriptom koşusu + meta DAG.** Detay: bellekte [[reminder_rnaforge_asf_metatx]]. **KULLANICI "kaydet sonra bakarız çıkıyorum" DEDİ — beklemede.**
 
-## Şu an nerede kaldık
+## Şu an nerede kaldık (2026-09-21 en güncel)
+- **✅ ASF raporu "RNA-tek-başına → diferansiyel BOLLUK/aktivite" uyarı notu EKLENDİ (2026-09-21).** `section_de` artık metatranskriptom (`meta=True`) koşusunda DE özetinin altına iki-dilli tek-satır not basar (mutlak ekspresyon değil, topluluk kompozisyonu + hücre-başı transkripsiyon bileşkesi; eşlik eden metagenom/DNA olmadan ayrıştırılamaz). ASF raporu `--force` ile yeniden üretildi, not `runs/20260821_142941_asf_nod/report/report.html`'de doğrulandı. Test: `test_section_de_meta_abundance_note` (meta'da çıkar, non-meta'da çıkmaz). Detay: bellek `reminder_rnaforge_asf_metatx`.
+- **YENİ: m19 auto-cleanup modülü** eklendi (config `cleanup.remove_intermediates`, tam `run` sonunda trimmed+BAM otomatik siler; 672 test toplandı, ilgili 120 geçti). CLI giriş: **`rnaforge` konsol komutu** — `python -m rnaforge.cli` çalışmaz (`__main__` guard yok!).
+- **YENİ: ASF/NOD mikrobiyom metatranskriptomu KOŞULDU** — `runs/20260821_142941_asf_nod` (tanımlı 8-türlü topluluk, sekum-vs-kolon 3v3, eski btheta_nad silindi yerine bu). 11/11 aşama; 0 DEG (güç-yetersiz, sinyal padj=0.11 ASF519); pipeline biyolojik olarak KANONİK doğrulandı (kullanıcıyla mutabık). Config: `config/asf_nod.yaml`.
+- **YENİ: Metatranskriptom Pipeline DAG** → `docs/pipeline_metatranscriptome.html` (PipelineForge `specs/rnaforge_meta.yml`); Artifact d7f11d9d (kişisel Forge org'unda, Epigenetiks değil).
+- **DİSK:** `rnaforge-pipeline` 321 GB → ~3 GB (ara dosyalar+kullanılmayan run'lar temizlendi); kalan run'lar: GSE300731_final, typhi_rif, airway_dex, yeast_carbon (+asf_nod).
+
+## (ESKİ) B.theta beklemesi
 - **⏸ BEKLEMEDE (kullanıcı 2026-08-20: "kayıt al bekle beni").** Sıradaki OLASI adım (kullanıcı onayıyla): güçlü-pozitif
   biyolojik konkordans için **makale-DE-teyitli** bir metatranskriptom seti (aday: antibiyotik PRJEB109068 ±ampisilin) —
   AMA koşmadan ÖNCE makalenin açık/güçlü DEG tablosu teyit edilecek (B.theta dersi: seti DE-gücü teyitsiz seçme).

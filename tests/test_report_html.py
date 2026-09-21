@@ -157,6 +157,21 @@ def test_section_de_counts():
     assert "Isoform" not in h           # izoform yoksa alt-bölüm çıkmaz
 
 
+def test_section_de_meta_abundance_note():
+    """Metatranskriptom koşusunda DE'yi diferansiyel bolluk/aktivite olarak yorumla uyarısı
+    çıkar; non-meta koşuda çıkmaz."""
+    de = {"contrast": "t vs c", "n_genes": 4398, "n_significant": 100,
+          "n_up": 60, "n_down": 40, "fdr_threshold": 0.05, "log2fc_threshold": 1.0,
+          "min_replicate_correlation": 0.9}
+    h_meta_en = section_de(de, LABELS["en"], meta=True)
+    assert "ABUNDANCE" in h_meta_en and "metagenome" in h_meta_en
+    h_meta_tr = section_de(de, LABELS["tr"], meta=True)
+    assert "BOLLUK" in h_meta_tr and "metagenom" in h_meta_tr
+    # non-meta: uyarı çıkmaz (varsayılan meta=False)
+    assert "ABUNDANCE" not in section_de(de, LABELS["en"])
+    assert "BOLLUK" not in section_de(de, LABELS["tr"])
+
+
 def test_section_de_isoform_subsection():
     """isoform_de varsa izoform-düzeyi DE alt-bölümü render edilir (transkript sayısı)."""
     de = {"contrast": "t vs c", "n_genes": 6333, "n_significant": 1425,

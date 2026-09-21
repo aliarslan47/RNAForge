@@ -21,7 +21,7 @@ KNOWN_TOP_LEVEL_KEYS = frozenset({
     "organism", "organism_type", "platform", "reference", "library",
     "trimming", "de", "report", "resources", "paired", "quality",
     "quantification", "enrichment", "amr", "operon", "ppi", "basecall",
-    "taxonomy", "rrna",
+    "taxonomy", "rrna", "cleanup",
 })
 
 # organism_type -> zorunlu reference alanları
@@ -174,6 +174,17 @@ class Resources:
 
 
 @dataclass(frozen=True)
+class Cleanup:
+    """Koşu sonu ara-dosya temizliği (m19). `remove_intermediates=True` iken tam
+    `rnaforge run` (--to VERİLMEMİŞSE) en sonda trimlenmiş FASTQ'ları ve hizalama
+    BAM'lerini siler — bunlar tümüyle yeniden üretilebilir ve disk şişirir; sayım
+    matrisi/DE/rapor/loglar ASLA silinmez. `keep_bam=True` BAM'i korur (yalnız
+    trimmed silinir). --to ile erken durdurulan koşularda temizlik ATLANIR."""
+    remove_intermediates: bool = True
+    keep_bam: bool = False
+
+
+@dataclass(frozen=True)
 class Config:
     organism: str
     organism_type: str
@@ -194,6 +205,7 @@ class Config:
     basecall: Basecall = field(default_factory=Basecall)
     taxonomy: Taxonomy = field(default_factory=Taxonomy)
     rrna: Rrna = field(default_factory=Rrna)
+    cleanup: Cleanup = field(default_factory=Cleanup)
 
 
 def _one_of(value, allowed, field: str):
@@ -223,6 +235,7 @@ _KNOWN_SECTION_KEYS = {
     "basecall": {"dorado_bin", "model", "device", "env", "models_dir"},
     "taxonomy": {"kraken2_db", "bracken_read_len", "bracken_level", "env"},
     "rrna": {"db_fasta", "env"},
+    "cleanup": {"remove_intermediates", "keep_bam"},
 }
 
 
@@ -402,6 +415,7 @@ def parse_config(raw: dict) -> Config:
     basecall_raw = _section(raw, "basecall")
     taxonomy_raw = _section(raw, "taxonomy")
     rrna_raw = _section(raw, "rrna")
+    cleanup_raw = _section(raw, "cleanup")
 
     trimming = Trimming(
         min_length=_as_int(trimming_raw.get("min_length", 36), "trimming.min_length"),
@@ -497,6 +511,16 @@ def parse_config(raw: dict) -> Config:
         ),
         taxonomy=_build_taxonomy(taxonomy_raw),
         rrna=_build_rrna(rrna_raw),
+        cleanup=Cleanup(
+            remove_intermediates=(
+                _as_bool(cleanup_raw["remove_intermediates"], "cleanup.remove_intermediates")
+                if cleanup_raw.get("remove_intermediates") is not None else True
+            ),
+            keep_bam=(
+                _as_bool(cleanup_raw["keep_bam"], "cleanup.keep_bam")
+                if cleanup_raw.get("keep_bam") is not None else False
+            ),
+        ),
     )
 
 

@@ -343,6 +343,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true",
         help="re-run even if m08 already completed in this run directory",
     )
+
+    cleanup = sub.add_parser(
+        "cleanup",
+        help="delete reproducible intermediates (trimmed FASTQ + BAM), keeping results (m19)")
+    cleanup.add_argument("--config", required=True, type=Path)
+    cleanup.add_argument("--metadata", required=True, type=Path)
+    cleanup.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    cleanup.add_argument("--run-id", default="run")
+    cleanup.add_argument(
+        "--force", action="store_true",
+        help="re-run even if m19 already completed in this run directory",
+    )
     return parser
 
 
@@ -689,6 +701,25 @@ def _cmd_alignqc(args) -> int:
     return 0
 
 
+def _cmd_cleanup(args) -> int:
+    from rnaforge.modules.m19_cleanup import run_cleanup
+    config = load_config(args.config)
+    run_dir = resolve_run_dir(args.runs_dir, args.run_id)
+    summary = run_cleanup(config, _effective_metadata(args.metadata, run_dir), run_dir,
+                          force=args.force)
+    if summary.get("resumed"):
+        print("m19_cleanup already completed in this run directory — reusing its result "
+              "(use --force to re-run).")
+    if not summary.get("removed"):
+        print("cleanup: ara dosyalar KORUNDU (cleanup.remove_intermediates=false).")
+    else:
+        print(f"cleanup OK: {summary.get('freed_human')} geri kazanıldı "
+              f"({len(summary.get('removed_paths', []))} yol silindi; "
+              f"keep_bam={summary.get('keep_bam')}).")
+    print(f"run directory: {run_dir}")
+    return 0
+
+
 def _cmd_multiqc(args) -> int:
     from rnaforge.modules.m18_multiqc import run_multiqc
     config = load_config(args.config)
@@ -788,6 +819,7 @@ _STAGE_DISPATCH = {
     "gsea": _cmd_gsea, "semantic": _cmd_semantic, "amr": _cmd_amr, "operon": _cmd_operon,
     "ppi": _cmd_ppi, "multiqc": _cmd_multiqc,
     "rrna-deplete": _cmd_rrna_deplete, "taxonomy": _cmd_taxonomy,
+    "cleanup": _cmd_cleanup,
 }
 
 
@@ -825,6 +857,13 @@ def _cmd_run(args) -> int:
     organism_type = _organism_type_for_run(args)
     sequence = build_run_sequence(args.from_stage, args.to_stage, include,
                                   organism_type=organism_type)
+    # Koşu-sonu temizliği (m19), YALNIZ tam koşuda otomatik eklenir: --to ile erken
+    # durdurulmuşsa (to_stage) ara dosyalar korunur — kullanıcı zinciri kasten kesti,
+    # sonraki aşamaları elle sürebilir. Temizlik EN SON çalışır (m16/m17 dahil tüm
+    # BAM/trimmed tüketicilerden sonra). Config'de kapalıysa m19 no-op'tur.
+    auto_cleanup = args.to_stage is None
+    if auto_cleanup:
+        sequence = sequence + ["cleanup"]
     print(f"pipeline: {' → '.join(sequence)}")
     for i, name in enumerate(sequence, start=1):
         print(f"=== [{i}/{len(sequence)}] {name} ===")
@@ -886,6 +925,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_alignqc(args)
         if args.command == "multiqc":
             return _cmd_multiqc(args)
+        if args.command == "cleanup":
+            return _cmd_cleanup(args)
         if args.command == "report":
             return _cmd_report(args)
         return _cmd_validate(args)
