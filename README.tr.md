@@ -23,7 +23,7 @@ Aşamalı bir pipeline — `validate → qc → trim → quant → counts → de
 
 Tasarımı gereği güvenilir: iki kademeli kalite kapıları (**FAIL** run'ı durdurur, **WARN** şüpheli sonucu damgalar), eşikler veridir (`profiles/*.yml`) ve her run bir güven kartı yazar. Uydurma sonuç yok.
 
-Etkileşimli çift dilli düğüm grafiği: **[render edilmiş diyagram](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)**.
+Etkileşimli çift dilli düğüm grafiği: **[render edilmiş diyagram](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)** · [metatranskriptom kolu](https://aliarslan47.github.io/RNAForge/pipeline_metatranscriptome.html).
 
 ## Kurulum
 

@@ -23,7 +23,7 @@ Two routing dimensions converge on the same gene × sample count matrix, so ever
 
 Trustworthy by design: two-tier quality gates (**FAIL** stops the run, **WARN** stamps a suspect result), thresholds are data (`profiles/*.yml`), and every run writes a confidence card. No fabricated results.
 
-Interactive bilingual node-graph: **[rendered diagram](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)**.
+Interactive bilingual node-graph: **[rendered diagram](https://aliarslan47.github.io/RNAForge/pipeline_architecture.html)** · [metatranscriptome arm](https://aliarslan47.github.io/RNAForge/pipeline_metatranscriptome.html).
 
 ## Installation
 
